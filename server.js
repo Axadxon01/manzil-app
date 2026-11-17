@@ -571,9 +571,8 @@ const server = http.createServer(async (req, res) => {
       return { ok: Boolean(webhookRes.ok), webhookRes, cmdRes, descRes, shortRes };
     }
 
-    // --- TELEGRAM WEBHOOK (BUYRUQLAR, AVTO-JAVOBLAR VA INLINE TUGMALAR) ---
-    if (req.method === 'POST' && pathname === '/api/telegram/webhook') {
-      const body = await parseBody(req);
+    
+    async function processTelegramUpdate(body) {
       const adminChatId = String(process.env.TELEGRAM_CHAT_ID || '');
       const siteUrl = String(process.env.PUBLIC_URL || 'https://manzil-app-1.onrender.com').replace(/\/+$/, '');
 
@@ -587,7 +586,7 @@ const server = http.createServer(async (req, res) => {
             text: "Faqat admin uchun ruxsat etilgan!",
             show_alert: true
           });
-          return sendJson(res, 200, { ok: true });
+          return;
         }
 
         const [action, guideId] = String(cb.data).split(':');
@@ -623,7 +622,7 @@ const server = http.createServer(async (req, res) => {
             parse_mode: 'HTML'
           });
         }
-        return sendJson(res, 200, { ok: true });
+        return;
       }
 
       // B) XABARLAR VA BUYRUQLAR
@@ -642,25 +641,16 @@ const server = http.createServer(async (req, res) => {
           resize_keyboard: true
         };
 
-        // 1. ADMIN REPLY BRIDGE (Mijoz xabariga Reply qilinsa, javobni mijozga yuborish)
         if (isOwner && msg.reply_to_message && text && !text.startsWith('/')) {
           const repliedText = msg.reply_to_message.text || msg.reply_to_message.caption || '';
           const idMatch = repliedText.match(/ID:\s*(\d+)/);
           if (idMatch && idMatch[1]) {
-            const targetUserId = idMatch[1];
-            const sent = await sendTgTo(
-              targetUserId,
-              '💬 <b>Manzil Qo‘llab-quvvatlash javobi:</b>\n\n' + escHtml(text)
-            );
-            await sendTgTo(
-              chatId,
-              sent.ok ? '✅ Javobingiz foydalanuvchiga yetkazildi!' : '❌ Xabar yuborilmadi: ' + escHtml(sent.description || 'xato')
-            );
-            return sendJson(res, 200, { ok: true });
+            const sent = await sendTgTo(idMatch[1], '💬 <b>Manzil Qo‘llab-quvvatlash javobi:</b>\n\n' + escHtml(text));
+            await sendTgTo(chatId, sent.ok ? '✅ Javobingiz foydalanuvchiga yetkazildi!' : '❌ Xabar yuborilmadi');
+            return;
           }
         }
 
-        // 2. ADMIN BROADCAST (/broadcast xabar)
         if (isOwner && text.startsWith('/broadcast ')) {
           const notice = text.slice('/broadcast '.length).trim();
           const subs = readJson(BOT_USERS_FILE, []);
@@ -671,10 +661,9 @@ const server = http.createServer(async (req, res) => {
             if (r.ok) sentCount++;
           }
           await sendTgTo(chatId, '📣 E’lon <b>' + sentCount + '</b> ta foydalanuvchiga yuborildi.');
-          return sendJson(res, 200, { ok: true });
+          return;
         }
 
-        // 3. ADMIN STATISTIKA (/admin yoki /stats)
         if (isOwner && (text === '/admin' || text === '/stats')) {
           const guides = readJson(FILES.guides, SEED_GUIDES);
           const payments = FILES.payments ? readJson(FILES.payments, []) : [];
@@ -691,174 +680,33 @@ const server = http.createServer(async (req, res) => {
             '🟡 Kutilayotgan gid arizalari: <b>' + pending + ' ta</b>',
             '🟢 Tasdiqlangan gidlar: <b>' + approved + ' ta</b>',
             '💳 Jami buyurtmalar: <b>' + payments.length + ' ta</b> (To‘langan: ' + paid.length + ')',
-            '💰 Umumiy aylanma: <b>$' + gross + '</b>',
-            '🏦 Platforma komissiyasi (12%): <b>$' + comm + '</b>',
-            '👥 Bot foydalanuvchilari: <b>' + subs.length + ' ta</b>',
-            '',
-            '⏳ Kutilayotgan arizalarni ko‘rish: /pending'
-          ].join('\n');
+            '💰 Umumiy aylanma: <b>
 
-          await sendTgTo(chatId, statMsg, {
-            reply_markup: {
-              inline_keyboard: [[{ text: '🖥 Admin Panelni ochish', url: siteUrl + '/admin' }]]
-            }
-          });
-          return sendJson(res, 200, { ok: true });
-        }
-
-        // 4. ADMIN KUTILAYOTGAN ARIZALAR (/pending)
-        if (isOwner && text === '/pending') {
-          const guides = readJson(FILES.guides, SEED_GUIDES);
-          const pendingList = guides.filter(g => g.approved === false && !g.rejected);
-          if (!pendingList.length) {
-            await sendTgTo(chatId, '✅ Hozircha kutilayotgan yangi gid arizalari yo‘q.');
-            return sendJson(res, 200, { ok: true });
-          }
-          for (const g of pendingList) {
-            const card = [
-              '🟡 <b>Kutilayotgan ariza</b>',
-              '🆔 ID: <code>' + escHtml(g.id) + '</code>',
-              '👤 Ism: <b>' + escHtml(g.name) + '</b>',
-              '📍 Hudud: ' + escHtml(g.city) + ', ' + escHtml(g.country),
-              '💰 Stavka: $' + escHtml(g.rate) + '/kun',
-              '✈️ Telegram: @' + escHtml(g.tg),
-              '📝 Yo‘nalish: ' + escHtml(g.spec)
-            ].join('\n');
-            await sendTgTo(chatId, card, {
-              reply_markup: {
-                inline_keyboard: [[
-                  { text: '✅ Tasdiqlash', callback_data: 'approve:' + g.id },
-                  { text: '❌ Rad etish', callback_data: 'reject:' + g.id }
-                ]]
-              }
-            });
-          }
-          return sendJson(res, 200, { ok: true });
-        }
-
-        // 5. /start BUYRUQ
-        if (text.startsWith('/start')) {
-          const welcome = [
-            'Assalomu alaykum, <b>' + escHtml(msg.chat.first_name || 'Sayohatchi') + '</b>! 👋',
-            '',
-            '<b>Manzil</b> sayohat ekotizimining rasmiy botiga xush kelibsiz.',
-            'Bu yerda siz:',
-            '• 🧭 Tasdiqlangan mahalliy gidlarni topishingiz',
-            '• 🛂 O‘zbekistonliklar uchun vizasiz davlatlarni ko‘rishingiz',
-            '• 💼 Gid sifatida ro‘yxatdan o‘tishingiz',
-            '• 🤖 Sayohat bo‘yicha savol yozib tezkor javob olishingiz mumkin.',
-            '',
-            'Pastdagi tugmalardan birini tanlang yoki savolingizni yozing:'
-          ].join('\n');
-
-          await sendTgTo(chatId, welcome, {
-            reply_markup: {
-              inline_keyboard: [[{ text: '🌐 Manzil Web-ilovasini ochish', url: siteUrl }]]
-            }
-          });
-          await sendTgTo(chatId, '⬇️ Tezkor menyu faollashtirildi:', { reply_markup: mainKeyboard });
-          return sendJson(res, 200, { ok: true });
-        }
-
-        // 6. /guides YOKI "🧭 Gidlar katalogi"
-        if (text === '/guides' || text === '🧭 Gidlar katalogi') {
-          const guides = readJson(FILES.guides, SEED_GUIDES).filter(g => g.approved === true);
-          const top = guides.slice(0, 8);
-          const lines = top.map((g, i) =>
-            (i + 1) + '. <b>' + escHtml(g.name) + '</b> — ' + escHtml(g.city) + ' ($' + g.rate + '/kun)\n' +
-            '   🗣 ' + escHtml(g.langs) + ' | ✈️ @' + escHtml(g.tg)
-          );
-          const out = [
-            '🧭 <b>Tasdiqlangan mahalliy gidlar (' + guides.length + ' ta):</b>',
-            '',
-            lines.join('\n\n'),
-            '',
-            'Barcha gidlarni ko‘rish va onlayn band qilish uchun saytga o‘ting:'
-          ].join('\n');
-          await sendTgTo(chatId, out, {
-            reply_markup: {
-              inline_keyboard: [[{ text: '🌐 Barcha gidlar va band qilish', url: siteUrl }]]
-            }
-          });
-          return sendJson(res, 200, { ok: true });
-        }
-
-        // 7. /visa YOKI "🛂 Vizasiz davlatlar"
-        if (text === '/visa' || text === '🛂 Vizasiz davlatlar') {
-          const visaText = [
-            '🛂 <b>O‘zbekiston fuqarolari uchun asosiy vizasiz davlatlar:</b>',
-            '',
-            '🇹🇷 Turkiya — 90 kungacha',
-            '🇬🇪 Gruziya — 1 yilgacha',
-            '🇦🇪 BAA (Dubay) — 30 kungacha',
-            '🇨🇳 Xitoy — 30 kungacha',
-            '🇹🇭 Tailand — 60 kungacha',
-            '🇲🇻 Maldiv orollari — 30 kungacha',
-            '🇰🇿 Qozog‘iston — 30 kungacha',
-            '🇰🇬 Qirg‘iziston — 60 kungacha',
-            '🇹🇯 Tojikiston — 30 kungacha',
-            '🇴🇲 Ummon — 14 kungacha',
-            '',
-            '105+ manzil bo‘yicha to‘liq viza va byudjet hisob-kitobi saytda:'
-          ].join('\n');
-          await sendTgTo(chatId, visaText, {
-            reply_markup: {
-              inline_keyboard: [[{ text: '🌐 Saytda byudjet hisoblash', url: siteUrl }]]
-            }
-          });
-          return sendJson(res, 200, { ok: true });
-        }
-
-        // 8. /apply YOKI "💼 Gid bo‘lish"
-        if (text === '/apply' || text === "💼 Gid bo‘lish") {
-          const applyText = [
-            '💼 <b>Manzil platformasida gid bo‘lib ishlang!</b>',
-            '',
-            '✅ Ro‘yxatdan o‘tish va katalogga chiqish — <b>mutlaqo bepul</b>',
-            '✅ Har bir buyurtmadan <b>88% daromad</b> sizga qoladi (12% platforma komissiyasi)',
-            '✅ Sayyohlar siz bilan to‘g‘ridan-to‘g‘ri Telegram yoki onlayn to‘lov orqali bog‘lanadi',
-            '',
-            'Ariza topshirish uchun saytga kirib «Gid bo‘lish» formasini to‘ldiring:'
-          ].join('\n');
-          await sendTgTo(chatId, applyText, {
-            reply_markup: {
-              inline_keyboard: [[{ text: '📝 Gidlikka ariza topshirish', url: siteUrl }]]
-            }
-          });
-          return sendJson(res, 200, { ok: true });
-        }
-
-        // 9. /support YOKI "💬 Operatorga yozish"
-        if (text === '/support' || text === '💬 Operatorga yozish') {
-          await sendTgTo(
-            chatId,
-            '💬 <b>Qo‘llab-quvvatlash xizmati</b>\n\nSavolingiz, taklifingiz yoki muammoingizni shu yerga yozib yuboring — xabaringiz to‘g‘ridan-to‘g‘ri Manzil operatoriga yetkaziladi.'
-          );
-          return sendJson(res, 200, { ok: true });
-        }
-
-        // 10. UMUMIY SAVOLLARGA AQLLI AVTO-JAVOB + OPERATORGA YO'NALTIRISH
-        if (text) {
-          const aiRes = await generateAiReply(text, [], {}, 'auto');
-          await sendTgTo(chatId, '🤖 ' + escHtml(aiRes.reply));
-
-          if (!isOwner) {
-            const uName = [msg.chat.first_name, msg.chat.last_name].filter(Boolean).join(' ') || 'Foydalanuvchi';
-            const uTag = msg.chat.username ? '@' + msg.chat.username : 'username yo‘q';
-            const fwdMsg = [
-              '📩 <b>Botga yangi xabar keldi</b>',
-              '🆔 ID: <code>' + chatId + '</code>',
-              '👤 Mijoz: <b>' + escHtml(uName) + '</b> (' + escHtml(uTag) + ')',
-              '💬 Xabar: ' + escHtml(text),
-              '',
-              '<i>↩️ Mijozga javob yozish uchun Telegram’da shu xabarga Reply qiling.</i>'
-            ].join('\n');
-            await sendTelegramAdminAction(fwdMsg);
-          }
-        }
+    
+    // --- ADMIN SSO: ADMIN SIFATIDA ASOSIY SAYTGA KIRISH ---
+    if (req.method === 'POST' && pathname === '/api/admin/sso') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
       }
-
-      return sendJson(res, 200, { ok: true });
+      const users = readJson(FILES.users, []);
+      let adminUser = users.find(u => u.id === 'admin_master' || u.role === 'admin');
+      if (!adminUser) {
+        adminUser = {
+          id: 'admin_master',
+          name: 'Manzil Admin',
+          email: 'admin@manzil.uz',
+          role: 'admin',
+          isAdmin: true,
+          plan: [],
+          favorites: [],
+          createdAt: new Date().toISOString()
+        };
+        users.unshift(adminUser);
+        writeJson(FILES.users, users);
+      }
+      const token = signToken({ sub: adminUser.id, email: adminUser.email, role: 'admin' });
+      return sendJson(res, 200, { ok: true, token, user: adminUser });
     }
 
     // --- ADMIN: UMUMIY STATISTIKA VA RO'YXATLAR ---
@@ -1361,3 +1209,2266 @@ setTimeout(async () => {
     });
   }
 }, 3000);
+ + gross + '</b>',
+            '🏦 Platforma komissiyasi (12%): <b>
+
+    
+    // --- ADMIN SSO: ADMIN SIFATIDA ASOSIY SAYTGA KIRISH ---
+    if (req.method === 'POST' && pathname === '/api/admin/sso') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      }
+      const users = readJson(FILES.users, []);
+      let adminUser = users.find(u => u.id === 'admin_master' || u.role === 'admin');
+      if (!adminUser) {
+        adminUser = {
+          id: 'admin_master',
+          name: 'Manzil Admin',
+          email: 'admin@manzil.uz',
+          role: 'admin',
+          isAdmin: true,
+          plan: [],
+          favorites: [],
+          createdAt: new Date().toISOString()
+        };
+        users.unshift(adminUser);
+        writeJson(FILES.users, users);
+      }
+      const token = signToken({ sub: adminUser.id, email: adminUser.email, role: 'admin' });
+      return sendJson(res, 200, { ok: true, token, user: adminUser });
+    }
+
+    // --- ADMIN: UMUMIY STATISTIKA VA RO'YXATLAR ---
+    if (req.method === 'GET' && pathname === '/api/admin/overview') {
+      if (!isAdmin(req, urlObj)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      }
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const feedback = readJson(FILES.feedback, []);
+      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
+      const users = FILES.users ? readJson(FILES.users, []) : [];
+
+      const paidList = payments.filter(p => p.status === 'paid' || p.status === 'completed');
+      const grossRevenue = paidList.reduce((s, p) => s + Number(p.amount || p.totalAmount || 0), 0);
+      const commissionRevenue = paidList.reduce((s, p) => {
+        const amt = Number(p.amount || p.totalAmount || 0);
+        return s + Number(p.commissionAmount != null ? p.commissionAmount : amt * COMMISSION_RATE);
+      }, 0);
+
+      return sendJson(res, 200, {
+        ok: true,
+        commissionRate: COMMISSION_RATE,
+        telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+        publicUrl: process.env.PUBLIC_URL || '',
+        stats: {
+          totalGuides: guides.length,
+          approvedGuides: guides.filter(g => g.approved === true).length,
+          pendingGuides: guides.filter(g => g.approved === false && !g.rejected).length,
+          rejectedGuides: guides.filter(g => g.rejected === true).length,
+          totalPayments: payments.length,
+          paidPayments: paidList.length,
+          grossRevenue: Math.round(grossRevenue * 100) / 100,
+          commissionRevenue: Math.round(commissionRevenue * 100) / 100,
+          totalFeedback: feedback.length,
+          totalUsers: users.length
+        },
+        guides,
+        feedback,
+        payments
+      });
+    }
+
+    // --- ADMIN: TELEGRAM WEBHOOK ULASH VA TEST ---
+    if (req.method === 'POST' && pathname === '/api/admin/telegram/sync-webhook') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
+      const result = await syncTelegramWebhook();
+      return sendJson(res, 200, { ok: Boolean(result.ok), result });
+    }
+
+    if (req.method === 'POST' && pathname === '/api/admin/telegram/test') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
+      const result = await sendTelegramAdminAction('🔔 <b>Manzil Admin Panel:</b> Telegram aloqasi muvaffaqiyatli tekshirildi!');
+      return sendJson(res, 200, { ok: Boolean(result.ok), result });
+    }
+
+    // --- ADMIN: YANGI GID QO'SHISH ---
+    if (req.method === 'POST' && pathname === '/api/guides/admin-create') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const name = String(body.name || '').trim();
+      const city = String(body.city || '').trim();
+      const country = String(body.country || "O'zbekiston").trim();
+      const langs = String(body.langs || "O'zbek, Rus").trim();
+      const spec = String(body.spec || '').trim();
+      const tg = String(body.tg || '').trim().replace(/^@/, '');
+      const rate = Math.max(5, Math.min(2000, Number(body.rate) || 50));
+      if (!name || !city || !tg || !spec) {
+        return sendJson(res, 400, { ok: false, error: 'Barcha maydonlarni to‘ldiring' });
+      }
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const newGuide = {
+        id: 'guide_' + crypto.randomBytes(4).toString('hex'),
+        name, city, country, langs, spec, rate, tg,
+        group: String(body.group || '').trim(),
+        about: String(body.about || '').trim(),
+        approved: true,
+        approvedAt: new Date().toISOString(),
+        commissionRate: COMMISSION_RATE,
+        createdAt: new Date().toISOString()
+      };
+      guides.unshift(newGuide);
+      writeJson(FILES.guides, guides);
+      return sendJson(res, 201, { ok: true, guide: newGuide });
+    }
+
+    // --- GUIDES: REJECT & DELETE (Admin) ---
+    const rejectMatch = pathname.match(/^\/api\/guides\/([^/]+)\/reject$/);
+    if (req.method === 'POST' && rejectMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const guideId = decodeURIComponent(rejectMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const guide = guides.find(g => g.id === guideId);
+      if (!guide) return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
+      guide.approved = false;
+      guide.rejected = true;
+      guide.rejectedAt = new Date().toISOString();
+      writeJson(FILES.guides, guides);
+      return sendJson(res, 200, { ok: true, guide });
+    }
+
+    const delGuideMatch = pathname.match(/^\/api\/guides\/([^/]+)\/delete$/);
+    if (req.method === 'POST' && delGuideMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const guideId = decodeURIComponent(delGuideMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const next = guides.filter(g => g.id !== guideId);
+      writeJson(FILES.guides, next);
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- FEEDBACK: DELETE (Admin) ---
+    const delFbMatch = pathname.match(/^\/api\/feedback\/([^/]+)\/delete$/);
+    if (req.method === 'POST' && delFbMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const fbId = decodeURIComponent(delFbMatch[1]);
+      const items = readJson(FILES.feedback, []);
+      writeJson(FILES.feedback, items.filter(f => f.id !== fbId));
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- PAYMENTS: UPDATE STATUS (Admin) ---
+    const payStatusMatch = pathname.match(/^\/api\/payments\/([^/]+)\/status$/);
+    if (req.method === 'POST' && payStatusMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const payId = decodeURIComponent(payStatusMatch[1]);
+      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
+      const item = payments.find(p => p.id === payId);
+      if (!item) return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
+      item.status = String(body.status || 'paid');
+      item.updatedAt = new Date().toISOString();
+      if (FILES.payments) writeJson(FILES.payments, payments);
+      return sendJson(res, 200, { ok: true, payment: item });
+    }
+
+    // --- GUIDES: APPROVE (Admin) ---
+    const approveMatch = pathname.match(/^\/api\/guides\/([^/]+)\/approve$/);
+    if (req.method === 'POST' && approveMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri (X-Admin-Key)' });
+      }
+      const guideId = decodeURIComponent(approveMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const guide = guides.find(g => g.id === guideId);
+      if (!guide) {
+        return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
+      }
+      guide.approved = true;
+      guide.approvedAt = new Date().toISOString();
+      writeJson(FILES.guides, guides);
+
+      await sendTelegram(`✅ <b>Gid tasdiqlandi!</b>\n👤 ${escHtml(guide.name)} (${escHtml(guide.city)})\n✈️ @${escHtml(guide.tg)}`);
+      return sendJson(res, 200, { ok: true, guide });
+    }
+
+    // --- FEEDBACK: CREATE & LIST ---
+    if (req.method === 'POST' && pathname === '/api/feedback') {
+      const body = await parseBody(req);
+      const name = String(body.name || '').trim();
+      const contact = String(body.contact || '').trim();
+      const type = String(body.type || 'taklif').trim();
+      const msg = String(body.msg || '').trim();
+
+      if (!name || !msg) {
+        return sendJson(res, 400, { ok: false, error: 'Ism va xabar matni kiritilishi shart.' });
+      }
+
+      const items = readJson(FILES.feedback, []);
+      const entry = {
+        id: 'fb_' + crypto.randomBytes(4).toString('hex'),
+        name,
+        contact,
+        type,
+        msg,
+        createdAt: new Date().toISOString()
+      };
+      items.unshift(entry);
+      writeJson(FILES.feedback, items);
+
+      const tgMsg = [
+        `💬 <b>Yangi murojaat (${escHtml(type.toUpperCase())})</b>`,
+        `👤 Ism: <b>${escHtml(name)}</b>`,
+        `📞 Aloqa: ${escHtml(contact || 'ko‘rsatilmagan')}`,
+        `📝 Xabar:\n${escHtml(msg)}`
+      ].join('\n');
+      const tgRes = await sendTelegram(tgMsg);
+
+      return sendJson(res, 201, { ok: true, feedback: entry, telegram: tgRes });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/feedback') {
+      if (!isAdmin(req, urlObj)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti talab qilinadi (X-Admin-Key)' });
+      }
+      const items = readJson(FILES.feedback, []);
+      return sendJson(res, 200, { ok: true, total: items.length, feedback: items });
+    }
+
+    // --- REAL AI CHAT (OpenAI & Grok) ---
+    if (req.method === 'POST' && pathname === '/api/ai/chat') {
+      const body = await parseBody(req);
+      const message = String(body.message || '').trim();
+      if (!message) {
+        return sendJson(res, 400, { ok: false, error: 'Xabar matni bo‘sh bo‘lmasligi kerak' });
+      }
+      const result = await generateAiReply(message, body.history, body.context, body.provider);
+
+      // Chat tarixini saqlash
+      const chats = readJson(FILES.chats, []);
+      chats.unshift({
+        id: 'chat_' + crypto.randomBytes(4).toString('hex'),
+        provider: result.providerUsed,
+        model: result.model,
+        userMessage: message.slice(0, 500),
+        aiReply: result.reply.slice(0, 1000),
+        createdAt: new Date().toISOString()
+      });
+      if (chats.length > 300) chats.length = 300;
+      writeJson(FILES.chats, chats);
+
+      return sendJson(res, 200, { ok: true, ...result });
+    }
+
+    // --- USER AUTH: REGISTER ---
+    if (req.method === 'POST' && pathname === '/api/auth/register') {
+      const body = await parseBody(req);
+      const name = String(body.name || '').trim();
+      const emailOrPhone = String(body.emailOrPhone || '').trim().toLowerCase();
+      const password = String(body.password || '');
+      const role = body.role === 'guide' ? 'guide' : 'tourist';
+
+      if (!name || !emailOrPhone || password.length < 4) {
+        return sendJson(res, 400, { ok: false, error: 'Ism, email/telefon va kamida 4 belgili parol kiriting.' });
+      }
+
+      const users = readJson(FILES.users, []);
+      if (users.some(u => u.emailOrPhone === emailOrPhone)) {
+        return sendJson(res, 409, { ok: false, error: 'Bu email yoki telefon raqami allaqachon ro‘yxatdan o‘tgan.' });
+      }
+
+      const user = {
+        id: 'usr_' + crypto.randomBytes(5).toString('hex'),
+        name,
+        emailOrPhone,
+        role,
+        passwordHash: hashPassword(password),
+        savedData: { favorites: [], plan: [], checklist: [] },
+        createdAt: new Date().toISOString()
+      };
+      users.push(user);
+      writeJson(FILES.users, users);
+
+      const token = signToken({ sub: user.id, emailOrPhone: user.emailOrPhone, role: user.role });
+      const { passwordHash, ...safeUser } = user;
+      return sendJson(res, 201, { ok: true, token, user: safeUser });
+    }
+
+    // --- USER AUTH: LOGIN ---
+    if (req.method === 'POST' && pathname === '/api/auth/login') {
+      const body = await parseBody(req);
+      const emailOrPhone = String(body.emailOrPhone || '').trim().toLowerCase();
+      const password = String(body.password || '');
+
+      const users = readJson(FILES.users, []);
+      const user = users.find(u => u.emailOrPhone === emailOrPhone);
+      if (!user || !verifyPassword(password, user.passwordHash)) {
+        return sendJson(res, 401, { ok: false, error: 'Login yoki parol noto‘g‘ri.' });
+      }
+
+      const token = signToken({ sub: user.id, emailOrPhone: user.emailOrPhone, role: user.role });
+      const { passwordHash, ...safeUser } = user;
+      return sendJson(res, 200, { ok: true, token, user: safeUser });
+    }
+
+    // --- USER AUTH: PROFILE & PAYMENTS ---
+    if (req.method === 'GET' && pathname === '/api/auth/me') {
+      const user = getAuthUser(req);
+      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya talab qilinadi' });
+      const payments = readJson(FILES.payments, []).filter(p => p.userId === user.id || p.customerContact === user.emailOrPhone);
+      const { passwordHash, ...safeUser } = user;
+      return sendJson(res, 200, { ok: true, user: safeUser, payments });
+    }
+
+    // --- USER AUTH: SYNC PLAN & FAVORITES ---
+    if (req.method === 'POST' && pathname === '/api/auth/sync') {
+      const user = getAuthUser(req);
+      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya talab qilinadi' });
+      const body = await parseBody(req);
+      const users = readJson(FILES.users, []);
+      const idx = users.findIndex(u => u.id === user.id);
+      if (idx !== -1) {
+        users[idx].savedData = {
+          favorites: Array.isArray(body.favorites) ? body.favorites : [],
+          plan: Array.isArray(body.plan) ? body.plan : [],
+          checklist: Array.isArray(body.checklist) ? body.checklist : [],
+          updatedAt: new Date().toISOString()
+        };
+        writeJson(FILES.users, users);
+        return sendJson(res, 200, { ok: true, savedData: users[idx].savedData });
+      }
+      return sendJson(res, 404, { ok: false, error: 'Foydalanuvchi topilmadi' });
+    }
+
+    // --- PAYMENTS: CREATE ORDER (Click, Payme, Stripe / Sandbox) ---
+    if (req.method === 'POST' && pathname === '/api/payments/create') {
+      const body = await parseBody(req);
+      const authUser = getAuthUser(req);
+      const amountUsd = Math.max(1, Number(body.amountUsd) || 50);
+      const rateUzs = Math.max(1000, Number(body.rateUzs) || 12850);
+      const amountUzs = Math.round(amountUsd * rateUzs);
+      const provider = ['click', 'payme', 'card', 'stripe'].includes(String(body.provider).toLowerCase())
+        ? String(body.provider).toLowerCase()
+        : 'click';
+
+      const commissionUsd = Number((amountUsd * COMMISSION_RATE).toFixed(2));
+      const guidePayoutUsd = Number((amountUsd - commissionUsd).toFixed(2));
+      const orderId = `MZ-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+
+      let checkoutUrl = null;
+      let checkoutMode = 'sandbox';
+
+      if (provider === 'click' && CLICK_SERVICE_ID && CLICK_MERCHANT_ID) {
+        checkoutMode = 'redirect';
+        checkoutUrl = `https://my.click.uz/services/pay?service_id=${encodeURIComponent(CLICK_SERVICE_ID)}&merchant_id=${encodeURIComponent(CLICK_MERCHANT_ID)}&amount=${amountUzs}&transaction_param=${encodeURIComponent(orderId)}&return_url=${encodeURIComponent(`${PUBLIC_URL}/?payment=${orderId}`)}`;
+      } else if (provider === 'payme' && PAYME_MERCHANT_ID) {
+        checkoutMode = 'redirect';
+        const payloadB64 = Buffer.from(`m=${PAYME_MERCHANT_ID};ac.order_id=${orderId};a=${amountUzs * 100}`).toString('base64');
+        checkoutUrl = `https://checkout.paycom.uz/${payloadB64}`;
+      } else if ((provider === 'card' || provider === 'stripe') && STRIPE_SECRET_KEY) {
+        const params = new URLSearchParams();
+        params.append('mode', 'payment');
+        params.append('success_url', `${PUBLIC_URL}/?payment=${orderId}&status=success`);
+        params.append('cancel_url', `${PUBLIC_URL}/?payment=${orderId}&status=cancel`);
+        params.append('line_items[0][price_data][currency]', 'usd');
+        params.append('line_items[0][price_data][product_data][name]', String(body.title || 'Manzil Sayohat Broni'));
+        params.append('line_items[0][price_data][unit_amount]', String(Math.round(amountUsd * 100)));
+        params.append('line_items[0][quantity]', '1');
+        params.append('metadata[orderId]', orderId);
+
+        const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${STRIPE_SECRET_KEY}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params.toString()
+        });
+        const stripeSession = await stripeRes.json();
+        if (stripeRes.ok && stripeSession.url) {
+          checkoutMode = 'redirect';
+          checkoutUrl = stripeSession.url;
+        }
+      }
+
+      const order = {
+        orderId,
+        userId: authUser ? authUser.id : null,
+        itemType: String(body.itemType || 'guide'),
+        title: String(body.title || 'Gid / Tur xizmati'),
+        guideName: String(body.guideName || 'Manzil Hamkor'),
+        guideTg: String(body.guideTg || '').replace(/^@/, ''),
+        city: String(body.city || ''),
+        days: Math.max(1, Number(body.days) || 1),
+        people: Math.max(1, Number(body.people) || 1),
+        customerName: String(body.customerName || (authUser ? authUser.name : 'Mehmon')).trim(),
+        customerContact: String(body.customerContact || (authUser ? authUser.emailOrPhone : '')).trim(),
+        provider,
+        checkoutMode,
+        checkoutUrl,
+        amountUsd,
+        amountUzs,
+        commissionRate: COMMISSION_RATE,
+        commissionUsd,
+        guidePayoutUsd,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+
+      const payments = readJson(FILES.payments, []);
+      payments.unshift(order);
+      writeJson(FILES.payments, payments);
+
+      return sendJson(res, 201, { ok: true, order });
+    }
+
+    // --- PAYMENTS: CONFIRM / WEBHOOK ---
+    if (req.method === 'POST' && (pathname === '/api/payments/confirm' || pathname.startsWith('/api/payments/webhook/'))) {
+      const body = await parseBody(req);
+      const orderId = String(body.orderId || body.transaction_param || body.merchant_trans_id || '').trim();
+      if (!orderId) {
+        return sendJson(res, 400, { ok: false, error: 'orderId ko‘rsatilmagan' });
+      }
+      const payments = readJson(FILES.payments, []);
+      const order = payments.find(p => p.orderId === orderId);
+      if (!order) {
+        return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
+      }
+      if (order.status !== 'paid') {
+        order.status = 'paid';
+        order.paidAt = new Date().toISOString();
+        order.receiptId = 'RCP-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+        writeJson(FILES.payments, payments);
+
+        const tgMsg = [
+          '💳 <b>Yangi to‘lov tasdiqlandi! (Manzil Pay)</b>',
+          `🧾 Chek: <code>${escHtml(order.receiptId)}</code> | Buyurtma: <code>${escHtml(order.orderId)}</code>`,
+          `📦 Xizmat: <b>${escHtml(order.title)}</b>`,
+          `🧭 Gid: ${escHtml(order.guideName)} ${order.guideTg ? `(@${escHtml(order.guideTg)})` : ''}`,
+          `👤 Mijoz: ${escHtml(order.customerName)} (${escHtml(order.customerContact || '-')})`,
+          `💰 Jami: <b>$${order.amountUsd}</b> (~${order.amountUzs.toLocaleString('ru-RU')} so‘m)`,
+          `📊 Platforma komissiyasi (${Math.round(order.commissionRate * 100)}%): <b>$${order.commissionUsd}</b>`,
+          `🤝 Gid ulushi: <b>$${order.guidePayoutUsd}</b>`,
+          `🏦 Usul: ${escHtml(order.provider.toUpperCase())}`
+        ].join('\n');
+        await sendTelegram(tgMsg);
+      }
+      return sendJson(res, 200, { ok: true, order });
+    }
+
+    // --- PAYMENTS: LIST ---
+    if (req.method === 'GET' && pathname === '/api/payments') {
+      const payments = readJson(FILES.payments, []);
+      if (isAdmin(req, urlObj)) {
+        const paid = payments.filter(p => p.status === 'paid');
+        const totalVolumeUsd = Number(paid.reduce((s, p) => s + (p.amountUsd || 0), 0).toFixed(2));
+        const totalCommissionUsd = Number(paid.reduce((s, p) => s + (p.commissionUsd || 0), 0).toFixed(2));
+        return sendJson(res, 200, {
+          ok: true,
+          summary: { totalOrders: payments.length, paidOrders: paid.length, totalVolumeUsd, totalCommissionUsd },
+          payments
+        });
+      }
+      const user = getAuthUser(req);
+      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya yoki Admin kaliti kerak' });
+      const mine = payments.filter(p => p.userId === user.id || p.customerContact === user.emailOrPhone);
+      return sendJson(res, 200, { ok: true, payments: mine });
+    }
+
+    // Unknown API route
+    if (pathname.startsWith('/api/')) {
+      return sendJson(res, 404, { ok: false, error: 'API endpoint topilmadi' });
+    }
+
+    // --- STATIC FRONTEND ---
+    serveStatic(req, res, pathname);
+  } catch (err) {
+    console.error('[Manzil Server Error]', err);
+    sendJson(res, 500, { ok: false, error: err.message || 'Server ichki xatoligi' });
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`\n🚀 Manzil Full-Stack Server ishga tushdi: ${PUBLIC_URL}`);
+  console.log(`   ├─ Health check: ${PUBLIC_URL}/api/health`);
+  console.log(`   ├─ Telegram bot: ${TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID ? '✅ Ulangan' : '⚠️ Sozlanmagan (.env)'}`);
+  console.log(`   ├─ Real AI Chat: ${OPENAI_API_KEY ? '✅ OpenAI' : ''}${GROK_API_KEY ? ' ✅ Grok (xAI)' : ''}${!OPENAI_API_KEY && !GROK_API_KEY ? 'ℹ️ Lokal fallback rejimi' : ''}`);
+  console.log(`   └─ Komissiya stavkasi: ${Math.round(COMMISSION_RATE * 100)}%\n`);
+});
+
+
+
+
+
+setTimeout(async () => {
+  const token = process.env.TELEGRAM_BOT_TOKEN || '';
+  const pubUrl = String(process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+  if (token && pubUrl.startsWith('https://')) {
+    const callTg = (m, b) => fetch('https://api.telegram.org/bot' + token + '/' + m, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(b)
+    }).catch(() => {});
+    await callTg('setWebhook', { url: pubUrl + '/api/telegram/webhook', allowed_updates: ['message', 'callback_query'] });
+    await callTg('setMyCommands', {
+      commands: [
+        { command: 'start', description: 'Botni ishga tushirish va asosiy menyu' },
+        { command: 'guides', description: "Tasdiqlangan mahalliy gidlar ro'yxati" },
+        { command: 'visa', description: "O'zbekistonliklar uchun vizasiz davlatlar" },
+        { command: 'apply', description: "Gid sifatida ro'yxatdan o'tish" },
+        { command: 'support', description: 'Operatorga savol yoki taklif yozish' },
+        { command: 'admin', description: 'Admin statistika va boshqaruv (admin)' }
+      ]
+    });
+    await callTg('setMyDescription', {
+      description:
+        "🧭 Manzil — O'zbekiston va dunyo bo'ylab 105+ sayohat manzillari, tasdiqlangan mahalliy gidlar va AI sayohat yordamchisi.\n\n" +
+        "✅ Tasdiqlangan gidlar bilan bog'lanish va onlayn band qilish\n" +
+        "✅ O'zbekistonliklar uchun vizasiz davlatlar va byudjet hisobi\n" +
+        "✅ Gid sifatida ro'yxatdan o'tish va 24/7 qo'llab-quvvatlash\n\n" +
+        "Boshlash uchun /start tugmasini bosing!"
+    });
+    await callTg('setMyShortDescription', {
+      short_description: "Manzil rasmiy yordamchi boti — mahalliy gidlar, sayohat rejalari va 24/7 qo'llab-quvvatlash: https://manzil-app-1.onrender.com"
+    });
+  }
+}, 3000);
+ + comm + '</b>',
+            '👥 Bot foydalanuvchilari: <b>' + subs.length + ' ta</b>',
+            '',
+            '⏳ Kutilayotgan arizalarni ko‘rish: /pending'
+          ].join('\n');
+
+          await sendTgTo(chatId, statMsg, {
+            reply_markup: {
+              inline_keyboard: [[{ text: '🖥 Admin Panelni ochish', url: siteUrl + '/admin' }]]
+            }
+          });
+          return;
+        }
+
+        if (isOwner && text === '/pending') {
+          const guides = readJson(FILES.guides, SEED_GUIDES);
+          const pendingList = guides.filter(g => g.approved === false && !g.rejected);
+          if (!pendingList.length) {
+            await sendTgTo(chatId, '✅ Hozircha kutilayotgan yangi gid arizalari yo‘q.');
+            return;
+          }
+          for (const g of pendingList) {
+            const card = [
+              '🟡 <b>Kutilayotgan ariza</b>',
+              '🆔 ID: <code>' + escHtml(g.id) + '</code>',
+              '👤 Ism: <b>' + escHtml(g.name) + '</b>',
+              '📍 Hudud: ' + escHtml(g.city) + ', ' + escHtml(g.country),
+              '💰 Stavka: 
+
+    
+    // --- ADMIN SSO: ADMIN SIFATIDA ASOSIY SAYTGA KIRISH ---
+    if (req.method === 'POST' && pathname === '/api/admin/sso') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      }
+      const users = readJson(FILES.users, []);
+      let adminUser = users.find(u => u.id === 'admin_master' || u.role === 'admin');
+      if (!adminUser) {
+        adminUser = {
+          id: 'admin_master',
+          name: 'Manzil Admin',
+          email: 'admin@manzil.uz',
+          role: 'admin',
+          isAdmin: true,
+          plan: [],
+          favorites: [],
+          createdAt: new Date().toISOString()
+        };
+        users.unshift(adminUser);
+        writeJson(FILES.users, users);
+      }
+      const token = signToken({ sub: adminUser.id, email: adminUser.email, role: 'admin' });
+      return sendJson(res, 200, { ok: true, token, user: adminUser });
+    }
+
+    // --- ADMIN: UMUMIY STATISTIKA VA RO'YXATLAR ---
+    if (req.method === 'GET' && pathname === '/api/admin/overview') {
+      if (!isAdmin(req, urlObj)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      }
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const feedback = readJson(FILES.feedback, []);
+      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
+      const users = FILES.users ? readJson(FILES.users, []) : [];
+
+      const paidList = payments.filter(p => p.status === 'paid' || p.status === 'completed');
+      const grossRevenue = paidList.reduce((s, p) => s + Number(p.amount || p.totalAmount || 0), 0);
+      const commissionRevenue = paidList.reduce((s, p) => {
+        const amt = Number(p.amount || p.totalAmount || 0);
+        return s + Number(p.commissionAmount != null ? p.commissionAmount : amt * COMMISSION_RATE);
+      }, 0);
+
+      return sendJson(res, 200, {
+        ok: true,
+        commissionRate: COMMISSION_RATE,
+        telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+        publicUrl: process.env.PUBLIC_URL || '',
+        stats: {
+          totalGuides: guides.length,
+          approvedGuides: guides.filter(g => g.approved === true).length,
+          pendingGuides: guides.filter(g => g.approved === false && !g.rejected).length,
+          rejectedGuides: guides.filter(g => g.rejected === true).length,
+          totalPayments: payments.length,
+          paidPayments: paidList.length,
+          grossRevenue: Math.round(grossRevenue * 100) / 100,
+          commissionRevenue: Math.round(commissionRevenue * 100) / 100,
+          totalFeedback: feedback.length,
+          totalUsers: users.length
+        },
+        guides,
+        feedback,
+        payments
+      });
+    }
+
+    // --- ADMIN: TELEGRAM WEBHOOK ULASH VA TEST ---
+    if (req.method === 'POST' && pathname === '/api/admin/telegram/sync-webhook') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
+      const result = await syncTelegramWebhook();
+      return sendJson(res, 200, { ok: Boolean(result.ok), result });
+    }
+
+    if (req.method === 'POST' && pathname === '/api/admin/telegram/test') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
+      const result = await sendTelegramAdminAction('🔔 <b>Manzil Admin Panel:</b> Telegram aloqasi muvaffaqiyatli tekshirildi!');
+      return sendJson(res, 200, { ok: Boolean(result.ok), result });
+    }
+
+    // --- ADMIN: YANGI GID QO'SHISH ---
+    if (req.method === 'POST' && pathname === '/api/guides/admin-create') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const name = String(body.name || '').trim();
+      const city = String(body.city || '').trim();
+      const country = String(body.country || "O'zbekiston").trim();
+      const langs = String(body.langs || "O'zbek, Rus").trim();
+      const spec = String(body.spec || '').trim();
+      const tg = String(body.tg || '').trim().replace(/^@/, '');
+      const rate = Math.max(5, Math.min(2000, Number(body.rate) || 50));
+      if (!name || !city || !tg || !spec) {
+        return sendJson(res, 400, { ok: false, error: 'Barcha maydonlarni to‘ldiring' });
+      }
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const newGuide = {
+        id: 'guide_' + crypto.randomBytes(4).toString('hex'),
+        name, city, country, langs, spec, rate, tg,
+        group: String(body.group || '').trim(),
+        about: String(body.about || '').trim(),
+        approved: true,
+        approvedAt: new Date().toISOString(),
+        commissionRate: COMMISSION_RATE,
+        createdAt: new Date().toISOString()
+      };
+      guides.unshift(newGuide);
+      writeJson(FILES.guides, guides);
+      return sendJson(res, 201, { ok: true, guide: newGuide });
+    }
+
+    // --- GUIDES: REJECT & DELETE (Admin) ---
+    const rejectMatch = pathname.match(/^\/api\/guides\/([^/]+)\/reject$/);
+    if (req.method === 'POST' && rejectMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const guideId = decodeURIComponent(rejectMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const guide = guides.find(g => g.id === guideId);
+      if (!guide) return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
+      guide.approved = false;
+      guide.rejected = true;
+      guide.rejectedAt = new Date().toISOString();
+      writeJson(FILES.guides, guides);
+      return sendJson(res, 200, { ok: true, guide });
+    }
+
+    const delGuideMatch = pathname.match(/^\/api\/guides\/([^/]+)\/delete$/);
+    if (req.method === 'POST' && delGuideMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const guideId = decodeURIComponent(delGuideMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const next = guides.filter(g => g.id !== guideId);
+      writeJson(FILES.guides, next);
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- FEEDBACK: DELETE (Admin) ---
+    const delFbMatch = pathname.match(/^\/api\/feedback\/([^/]+)\/delete$/);
+    if (req.method === 'POST' && delFbMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const fbId = decodeURIComponent(delFbMatch[1]);
+      const items = readJson(FILES.feedback, []);
+      writeJson(FILES.feedback, items.filter(f => f.id !== fbId));
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- PAYMENTS: UPDATE STATUS (Admin) ---
+    const payStatusMatch = pathname.match(/^\/api\/payments\/([^/]+)\/status$/);
+    if (req.method === 'POST' && payStatusMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const payId = decodeURIComponent(payStatusMatch[1]);
+      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
+      const item = payments.find(p => p.id === payId);
+      if (!item) return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
+      item.status = String(body.status || 'paid');
+      item.updatedAt = new Date().toISOString();
+      if (FILES.payments) writeJson(FILES.payments, payments);
+      return sendJson(res, 200, { ok: true, payment: item });
+    }
+
+    // --- GUIDES: APPROVE (Admin) ---
+    const approveMatch = pathname.match(/^\/api\/guides\/([^/]+)\/approve$/);
+    if (req.method === 'POST' && approveMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri (X-Admin-Key)' });
+      }
+      const guideId = decodeURIComponent(approveMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const guide = guides.find(g => g.id === guideId);
+      if (!guide) {
+        return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
+      }
+      guide.approved = true;
+      guide.approvedAt = new Date().toISOString();
+      writeJson(FILES.guides, guides);
+
+      await sendTelegram(`✅ <b>Gid tasdiqlandi!</b>\n👤 ${escHtml(guide.name)} (${escHtml(guide.city)})\n✈️ @${escHtml(guide.tg)}`);
+      return sendJson(res, 200, { ok: true, guide });
+    }
+
+    // --- FEEDBACK: CREATE & LIST ---
+    if (req.method === 'POST' && pathname === '/api/feedback') {
+      const body = await parseBody(req);
+      const name = String(body.name || '').trim();
+      const contact = String(body.contact || '').trim();
+      const type = String(body.type || 'taklif').trim();
+      const msg = String(body.msg || '').trim();
+
+      if (!name || !msg) {
+        return sendJson(res, 400, { ok: false, error: 'Ism va xabar matni kiritilishi shart.' });
+      }
+
+      const items = readJson(FILES.feedback, []);
+      const entry = {
+        id: 'fb_' + crypto.randomBytes(4).toString('hex'),
+        name,
+        contact,
+        type,
+        msg,
+        createdAt: new Date().toISOString()
+      };
+      items.unshift(entry);
+      writeJson(FILES.feedback, items);
+
+      const tgMsg = [
+        `💬 <b>Yangi murojaat (${escHtml(type.toUpperCase())})</b>`,
+        `👤 Ism: <b>${escHtml(name)}</b>`,
+        `📞 Aloqa: ${escHtml(contact || 'ko‘rsatilmagan')}`,
+        `📝 Xabar:\n${escHtml(msg)}`
+      ].join('\n');
+      const tgRes = await sendTelegram(tgMsg);
+
+      return sendJson(res, 201, { ok: true, feedback: entry, telegram: tgRes });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/feedback') {
+      if (!isAdmin(req, urlObj)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti talab qilinadi (X-Admin-Key)' });
+      }
+      const items = readJson(FILES.feedback, []);
+      return sendJson(res, 200, { ok: true, total: items.length, feedback: items });
+    }
+
+    // --- REAL AI CHAT (OpenAI & Grok) ---
+    if (req.method === 'POST' && pathname === '/api/ai/chat') {
+      const body = await parseBody(req);
+      const message = String(body.message || '').trim();
+      if (!message) {
+        return sendJson(res, 400, { ok: false, error: 'Xabar matni bo‘sh bo‘lmasligi kerak' });
+      }
+      const result = await generateAiReply(message, body.history, body.context, body.provider);
+
+      // Chat tarixini saqlash
+      const chats = readJson(FILES.chats, []);
+      chats.unshift({
+        id: 'chat_' + crypto.randomBytes(4).toString('hex'),
+        provider: result.providerUsed,
+        model: result.model,
+        userMessage: message.slice(0, 500),
+        aiReply: result.reply.slice(0, 1000),
+        createdAt: new Date().toISOString()
+      });
+      if (chats.length > 300) chats.length = 300;
+      writeJson(FILES.chats, chats);
+
+      return sendJson(res, 200, { ok: true, ...result });
+    }
+
+    // --- USER AUTH: REGISTER ---
+    if (req.method === 'POST' && pathname === '/api/auth/register') {
+      const body = await parseBody(req);
+      const name = String(body.name || '').trim();
+      const emailOrPhone = String(body.emailOrPhone || '').trim().toLowerCase();
+      const password = String(body.password || '');
+      const role = body.role === 'guide' ? 'guide' : 'tourist';
+
+      if (!name || !emailOrPhone || password.length < 4) {
+        return sendJson(res, 400, { ok: false, error: 'Ism, email/telefon va kamida 4 belgili parol kiriting.' });
+      }
+
+      const users = readJson(FILES.users, []);
+      if (users.some(u => u.emailOrPhone === emailOrPhone)) {
+        return sendJson(res, 409, { ok: false, error: 'Bu email yoki telefon raqami allaqachon ro‘yxatdan o‘tgan.' });
+      }
+
+      const user = {
+        id: 'usr_' + crypto.randomBytes(5).toString('hex'),
+        name,
+        emailOrPhone,
+        role,
+        passwordHash: hashPassword(password),
+        savedData: { favorites: [], plan: [], checklist: [] },
+        createdAt: new Date().toISOString()
+      };
+      users.push(user);
+      writeJson(FILES.users, users);
+
+      const token = signToken({ sub: user.id, emailOrPhone: user.emailOrPhone, role: user.role });
+      const { passwordHash, ...safeUser } = user;
+      return sendJson(res, 201, { ok: true, token, user: safeUser });
+    }
+
+    // --- USER AUTH: LOGIN ---
+    if (req.method === 'POST' && pathname === '/api/auth/login') {
+      const body = await parseBody(req);
+      const emailOrPhone = String(body.emailOrPhone || '').trim().toLowerCase();
+      const password = String(body.password || '');
+
+      const users = readJson(FILES.users, []);
+      const user = users.find(u => u.emailOrPhone === emailOrPhone);
+      if (!user || !verifyPassword(password, user.passwordHash)) {
+        return sendJson(res, 401, { ok: false, error: 'Login yoki parol noto‘g‘ri.' });
+      }
+
+      const token = signToken({ sub: user.id, emailOrPhone: user.emailOrPhone, role: user.role });
+      const { passwordHash, ...safeUser } = user;
+      return sendJson(res, 200, { ok: true, token, user: safeUser });
+    }
+
+    // --- USER AUTH: PROFILE & PAYMENTS ---
+    if (req.method === 'GET' && pathname === '/api/auth/me') {
+      const user = getAuthUser(req);
+      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya talab qilinadi' });
+      const payments = readJson(FILES.payments, []).filter(p => p.userId === user.id || p.customerContact === user.emailOrPhone);
+      const { passwordHash, ...safeUser } = user;
+      return sendJson(res, 200, { ok: true, user: safeUser, payments });
+    }
+
+    // --- USER AUTH: SYNC PLAN & FAVORITES ---
+    if (req.method === 'POST' && pathname === '/api/auth/sync') {
+      const user = getAuthUser(req);
+      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya talab qilinadi' });
+      const body = await parseBody(req);
+      const users = readJson(FILES.users, []);
+      const idx = users.findIndex(u => u.id === user.id);
+      if (idx !== -1) {
+        users[idx].savedData = {
+          favorites: Array.isArray(body.favorites) ? body.favorites : [],
+          plan: Array.isArray(body.plan) ? body.plan : [],
+          checklist: Array.isArray(body.checklist) ? body.checklist : [],
+          updatedAt: new Date().toISOString()
+        };
+        writeJson(FILES.users, users);
+        return sendJson(res, 200, { ok: true, savedData: users[idx].savedData });
+      }
+      return sendJson(res, 404, { ok: false, error: 'Foydalanuvchi topilmadi' });
+    }
+
+    // --- PAYMENTS: CREATE ORDER (Click, Payme, Stripe / Sandbox) ---
+    if (req.method === 'POST' && pathname === '/api/payments/create') {
+      const body = await parseBody(req);
+      const authUser = getAuthUser(req);
+      const amountUsd = Math.max(1, Number(body.amountUsd) || 50);
+      const rateUzs = Math.max(1000, Number(body.rateUzs) || 12850);
+      const amountUzs = Math.round(amountUsd * rateUzs);
+      const provider = ['click', 'payme', 'card', 'stripe'].includes(String(body.provider).toLowerCase())
+        ? String(body.provider).toLowerCase()
+        : 'click';
+
+      const commissionUsd = Number((amountUsd * COMMISSION_RATE).toFixed(2));
+      const guidePayoutUsd = Number((amountUsd - commissionUsd).toFixed(2));
+      const orderId = `MZ-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+
+      let checkoutUrl = null;
+      let checkoutMode = 'sandbox';
+
+      if (provider === 'click' && CLICK_SERVICE_ID && CLICK_MERCHANT_ID) {
+        checkoutMode = 'redirect';
+        checkoutUrl = `https://my.click.uz/services/pay?service_id=${encodeURIComponent(CLICK_SERVICE_ID)}&merchant_id=${encodeURIComponent(CLICK_MERCHANT_ID)}&amount=${amountUzs}&transaction_param=${encodeURIComponent(orderId)}&return_url=${encodeURIComponent(`${PUBLIC_URL}/?payment=${orderId}`)}`;
+      } else if (provider === 'payme' && PAYME_MERCHANT_ID) {
+        checkoutMode = 'redirect';
+        const payloadB64 = Buffer.from(`m=${PAYME_MERCHANT_ID};ac.order_id=${orderId};a=${amountUzs * 100}`).toString('base64');
+        checkoutUrl = `https://checkout.paycom.uz/${payloadB64}`;
+      } else if ((provider === 'card' || provider === 'stripe') && STRIPE_SECRET_KEY) {
+        const params = new URLSearchParams();
+        params.append('mode', 'payment');
+        params.append('success_url', `${PUBLIC_URL}/?payment=${orderId}&status=success`);
+        params.append('cancel_url', `${PUBLIC_URL}/?payment=${orderId}&status=cancel`);
+        params.append('line_items[0][price_data][currency]', 'usd');
+        params.append('line_items[0][price_data][product_data][name]', String(body.title || 'Manzil Sayohat Broni'));
+        params.append('line_items[0][price_data][unit_amount]', String(Math.round(amountUsd * 100)));
+        params.append('line_items[0][quantity]', '1');
+        params.append('metadata[orderId]', orderId);
+
+        const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${STRIPE_SECRET_KEY}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params.toString()
+        });
+        const stripeSession = await stripeRes.json();
+        if (stripeRes.ok && stripeSession.url) {
+          checkoutMode = 'redirect';
+          checkoutUrl = stripeSession.url;
+        }
+      }
+
+      const order = {
+        orderId,
+        userId: authUser ? authUser.id : null,
+        itemType: String(body.itemType || 'guide'),
+        title: String(body.title || 'Gid / Tur xizmati'),
+        guideName: String(body.guideName || 'Manzil Hamkor'),
+        guideTg: String(body.guideTg || '').replace(/^@/, ''),
+        city: String(body.city || ''),
+        days: Math.max(1, Number(body.days) || 1),
+        people: Math.max(1, Number(body.people) || 1),
+        customerName: String(body.customerName || (authUser ? authUser.name : 'Mehmon')).trim(),
+        customerContact: String(body.customerContact || (authUser ? authUser.emailOrPhone : '')).trim(),
+        provider,
+        checkoutMode,
+        checkoutUrl,
+        amountUsd,
+        amountUzs,
+        commissionRate: COMMISSION_RATE,
+        commissionUsd,
+        guidePayoutUsd,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+
+      const payments = readJson(FILES.payments, []);
+      payments.unshift(order);
+      writeJson(FILES.payments, payments);
+
+      return sendJson(res, 201, { ok: true, order });
+    }
+
+    // --- PAYMENTS: CONFIRM / WEBHOOK ---
+    if (req.method === 'POST' && (pathname === '/api/payments/confirm' || pathname.startsWith('/api/payments/webhook/'))) {
+      const body = await parseBody(req);
+      const orderId = String(body.orderId || body.transaction_param || body.merchant_trans_id || '').trim();
+      if (!orderId) {
+        return sendJson(res, 400, { ok: false, error: 'orderId ko‘rsatilmagan' });
+      }
+      const payments = readJson(FILES.payments, []);
+      const order = payments.find(p => p.orderId === orderId);
+      if (!order) {
+        return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
+      }
+      if (order.status !== 'paid') {
+        order.status = 'paid';
+        order.paidAt = new Date().toISOString();
+        order.receiptId = 'RCP-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+        writeJson(FILES.payments, payments);
+
+        const tgMsg = [
+          '💳 <b>Yangi to‘lov tasdiqlandi! (Manzil Pay)</b>',
+          `🧾 Chek: <code>${escHtml(order.receiptId)}</code> | Buyurtma: <code>${escHtml(order.orderId)}</code>`,
+          `📦 Xizmat: <b>${escHtml(order.title)}</b>`,
+          `🧭 Gid: ${escHtml(order.guideName)} ${order.guideTg ? `(@${escHtml(order.guideTg)})` : ''}`,
+          `👤 Mijoz: ${escHtml(order.customerName)} (${escHtml(order.customerContact || '-')})`,
+          `💰 Jami: <b>$${order.amountUsd}</b> (~${order.amountUzs.toLocaleString('ru-RU')} so‘m)`,
+          `📊 Platforma komissiyasi (${Math.round(order.commissionRate * 100)}%): <b>$${order.commissionUsd}</b>`,
+          `🤝 Gid ulushi: <b>$${order.guidePayoutUsd}</b>`,
+          `🏦 Usul: ${escHtml(order.provider.toUpperCase())}`
+        ].join('\n');
+        await sendTelegram(tgMsg);
+      }
+      return sendJson(res, 200, { ok: true, order });
+    }
+
+    // --- PAYMENTS: LIST ---
+    if (req.method === 'GET' && pathname === '/api/payments') {
+      const payments = readJson(FILES.payments, []);
+      if (isAdmin(req, urlObj)) {
+        const paid = payments.filter(p => p.status === 'paid');
+        const totalVolumeUsd = Number(paid.reduce((s, p) => s + (p.amountUsd || 0), 0).toFixed(2));
+        const totalCommissionUsd = Number(paid.reduce((s, p) => s + (p.commissionUsd || 0), 0).toFixed(2));
+        return sendJson(res, 200, {
+          ok: true,
+          summary: { totalOrders: payments.length, paidOrders: paid.length, totalVolumeUsd, totalCommissionUsd },
+          payments
+        });
+      }
+      const user = getAuthUser(req);
+      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya yoki Admin kaliti kerak' });
+      const mine = payments.filter(p => p.userId === user.id || p.customerContact === user.emailOrPhone);
+      return sendJson(res, 200, { ok: true, payments: mine });
+    }
+
+    // Unknown API route
+    if (pathname.startsWith('/api/')) {
+      return sendJson(res, 404, { ok: false, error: 'API endpoint topilmadi' });
+    }
+
+    // --- STATIC FRONTEND ---
+    serveStatic(req, res, pathname);
+  } catch (err) {
+    console.error('[Manzil Server Error]', err);
+    sendJson(res, 500, { ok: false, error: err.message || 'Server ichki xatoligi' });
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`\n🚀 Manzil Full-Stack Server ishga tushdi: ${PUBLIC_URL}`);
+  console.log(`   ├─ Health check: ${PUBLIC_URL}/api/health`);
+  console.log(`   ├─ Telegram bot: ${TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID ? '✅ Ulangan' : '⚠️ Sozlanmagan (.env)'}`);
+  console.log(`   ├─ Real AI Chat: ${OPENAI_API_KEY ? '✅ OpenAI' : ''}${GROK_API_KEY ? ' ✅ Grok (xAI)' : ''}${!OPENAI_API_KEY && !GROK_API_KEY ? 'ℹ️ Lokal fallback rejimi' : ''}`);
+  console.log(`   └─ Komissiya stavkasi: ${Math.round(COMMISSION_RATE * 100)}%\n`);
+});
+
+
+
+
+
+setTimeout(async () => {
+  const token = process.env.TELEGRAM_BOT_TOKEN || '';
+  const pubUrl = String(process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+  if (token && pubUrl.startsWith('https://')) {
+    const callTg = (m, b) => fetch('https://api.telegram.org/bot' + token + '/' + m, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(b)
+    }).catch(() => {});
+    await callTg('setWebhook', { url: pubUrl + '/api/telegram/webhook', allowed_updates: ['message', 'callback_query'] });
+    await callTg('setMyCommands', {
+      commands: [
+        { command: 'start', description: 'Botni ishga tushirish va asosiy menyu' },
+        { command: 'guides', description: "Tasdiqlangan mahalliy gidlar ro'yxati" },
+        { command: 'visa', description: "O'zbekistonliklar uchun vizasiz davlatlar" },
+        { command: 'apply', description: "Gid sifatida ro'yxatdan o'tish" },
+        { command: 'support', description: 'Operatorga savol yoki taklif yozish' },
+        { command: 'admin', description: 'Admin statistika va boshqaruv (admin)' }
+      ]
+    });
+    await callTg('setMyDescription', {
+      description:
+        "🧭 Manzil — O'zbekiston va dunyo bo'ylab 105+ sayohat manzillari, tasdiqlangan mahalliy gidlar va AI sayohat yordamchisi.\n\n" +
+        "✅ Tasdiqlangan gidlar bilan bog'lanish va onlayn band qilish\n" +
+        "✅ O'zbekistonliklar uchun vizasiz davlatlar va byudjet hisobi\n" +
+        "✅ Gid sifatida ro'yxatdan o'tish va 24/7 qo'llab-quvvatlash\n\n" +
+        "Boshlash uchun /start tugmasini bosing!"
+    });
+    await callTg('setMyShortDescription', {
+      short_description: "Manzil rasmiy yordamchi boti — mahalliy gidlar, sayohat rejalari va 24/7 qo'llab-quvvatlash: https://manzil-app-1.onrender.com"
+    });
+  }
+}, 3000);
+ + escHtml(g.rate) + '/kun',
+              '✈️ Telegram: @' + escHtml(g.tg),
+              '📝 Yo‘nalish: ' + escHtml(g.spec)
+            ].join('\n');
+            await sendTgTo(chatId, card, {
+              reply_markup: {
+                inline_keyboard: [[
+                  { text: '✅ Tasdiqlash', callback_data: 'approve:' + g.id },
+                  { text: '❌ Rad etish', callback_data: 'reject:' + g.id }
+                ]]
+              }
+            });
+          }
+          return;
+        }
+
+        if (text.startsWith('/start')) {
+          const welcome = [
+            'Assalomu alaykum, <b>' + escHtml(msg.chat.first_name || 'Sayohatchi') + '</b>! 👋',
+            '',
+            '<b>Manzil</b> sayohat ekotizimining rasmiy botiga xush kelibsiz.',
+            'Pastdagi tugmalardan birini tanlang yoki sayohat bo‘yicha savolingizni yozing:'
+          ].join('\n');
+          await sendTgTo(chatId, welcome, {
+            reply_markup: { inline_keyboard: [[{ text: '🌐 Manzil Web-ilovasini ochish', url: siteUrl }]] }
+          });
+          await sendTgTo(chatId, '⬇️ Tezkor menyu faollashtirildi:', { reply_markup: mainKeyboard });
+          return;
+        }
+
+        if (text === '/guides' || text === '🧭 Gidlar katalogi') {
+          const guides = readJson(FILES.guides, SEED_GUIDES).filter(g => g.approved === true);
+          const lines = guides.slice(0, 8).map((g, i) =>
+            (i + 1) + '. <b>' + escHtml(g.name) + '</b> — ' + escHtml(g.city) + ' (
+
+    
+    // --- ADMIN SSO: ADMIN SIFATIDA ASOSIY SAYTGA KIRISH ---
+    if (req.method === 'POST' && pathname === '/api/admin/sso') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      }
+      const users = readJson(FILES.users, []);
+      let adminUser = users.find(u => u.id === 'admin_master' || u.role === 'admin');
+      if (!adminUser) {
+        adminUser = {
+          id: 'admin_master',
+          name: 'Manzil Admin',
+          email: 'admin@manzil.uz',
+          role: 'admin',
+          isAdmin: true,
+          plan: [],
+          favorites: [],
+          createdAt: new Date().toISOString()
+        };
+        users.unshift(adminUser);
+        writeJson(FILES.users, users);
+      }
+      const token = signToken({ sub: adminUser.id, email: adminUser.email, role: 'admin' });
+      return sendJson(res, 200, { ok: true, token, user: adminUser });
+    }
+
+    // --- ADMIN: UMUMIY STATISTIKA VA RO'YXATLAR ---
+    if (req.method === 'GET' && pathname === '/api/admin/overview') {
+      if (!isAdmin(req, urlObj)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      }
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const feedback = readJson(FILES.feedback, []);
+      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
+      const users = FILES.users ? readJson(FILES.users, []) : [];
+
+      const paidList = payments.filter(p => p.status === 'paid' || p.status === 'completed');
+      const grossRevenue = paidList.reduce((s, p) => s + Number(p.amount || p.totalAmount || 0), 0);
+      const commissionRevenue = paidList.reduce((s, p) => {
+        const amt = Number(p.amount || p.totalAmount || 0);
+        return s + Number(p.commissionAmount != null ? p.commissionAmount : amt * COMMISSION_RATE);
+      }, 0);
+
+      return sendJson(res, 200, {
+        ok: true,
+        commissionRate: COMMISSION_RATE,
+        telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+        publicUrl: process.env.PUBLIC_URL || '',
+        stats: {
+          totalGuides: guides.length,
+          approvedGuides: guides.filter(g => g.approved === true).length,
+          pendingGuides: guides.filter(g => g.approved === false && !g.rejected).length,
+          rejectedGuides: guides.filter(g => g.rejected === true).length,
+          totalPayments: payments.length,
+          paidPayments: paidList.length,
+          grossRevenue: Math.round(grossRevenue * 100) / 100,
+          commissionRevenue: Math.round(commissionRevenue * 100) / 100,
+          totalFeedback: feedback.length,
+          totalUsers: users.length
+        },
+        guides,
+        feedback,
+        payments
+      });
+    }
+
+    // --- ADMIN: TELEGRAM WEBHOOK ULASH VA TEST ---
+    if (req.method === 'POST' && pathname === '/api/admin/telegram/sync-webhook') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
+      const result = await syncTelegramWebhook();
+      return sendJson(res, 200, { ok: Boolean(result.ok), result });
+    }
+
+    if (req.method === 'POST' && pathname === '/api/admin/telegram/test') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
+      const result = await sendTelegramAdminAction('🔔 <b>Manzil Admin Panel:</b> Telegram aloqasi muvaffaqiyatli tekshirildi!');
+      return sendJson(res, 200, { ok: Boolean(result.ok), result });
+    }
+
+    // --- ADMIN: YANGI GID QO'SHISH ---
+    if (req.method === 'POST' && pathname === '/api/guides/admin-create') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const name = String(body.name || '').trim();
+      const city = String(body.city || '').trim();
+      const country = String(body.country || "O'zbekiston").trim();
+      const langs = String(body.langs || "O'zbek, Rus").trim();
+      const spec = String(body.spec || '').trim();
+      const tg = String(body.tg || '').trim().replace(/^@/, '');
+      const rate = Math.max(5, Math.min(2000, Number(body.rate) || 50));
+      if (!name || !city || !tg || !spec) {
+        return sendJson(res, 400, { ok: false, error: 'Barcha maydonlarni to‘ldiring' });
+      }
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const newGuide = {
+        id: 'guide_' + crypto.randomBytes(4).toString('hex'),
+        name, city, country, langs, spec, rate, tg,
+        group: String(body.group || '').trim(),
+        about: String(body.about || '').trim(),
+        approved: true,
+        approvedAt: new Date().toISOString(),
+        commissionRate: COMMISSION_RATE,
+        createdAt: new Date().toISOString()
+      };
+      guides.unshift(newGuide);
+      writeJson(FILES.guides, guides);
+      return sendJson(res, 201, { ok: true, guide: newGuide });
+    }
+
+    // --- GUIDES: REJECT & DELETE (Admin) ---
+    const rejectMatch = pathname.match(/^\/api\/guides\/([^/]+)\/reject$/);
+    if (req.method === 'POST' && rejectMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const guideId = decodeURIComponent(rejectMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const guide = guides.find(g => g.id === guideId);
+      if (!guide) return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
+      guide.approved = false;
+      guide.rejected = true;
+      guide.rejectedAt = new Date().toISOString();
+      writeJson(FILES.guides, guides);
+      return sendJson(res, 200, { ok: true, guide });
+    }
+
+    const delGuideMatch = pathname.match(/^\/api\/guides\/([^/]+)\/delete$/);
+    if (req.method === 'POST' && delGuideMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const guideId = decodeURIComponent(delGuideMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const next = guides.filter(g => g.id !== guideId);
+      writeJson(FILES.guides, next);
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- FEEDBACK: DELETE (Admin) ---
+    const delFbMatch = pathname.match(/^\/api\/feedback\/([^/]+)\/delete$/);
+    if (req.method === 'POST' && delFbMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const fbId = decodeURIComponent(delFbMatch[1]);
+      const items = readJson(FILES.feedback, []);
+      writeJson(FILES.feedback, items.filter(f => f.id !== fbId));
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- PAYMENTS: UPDATE STATUS (Admin) ---
+    const payStatusMatch = pathname.match(/^\/api\/payments\/([^/]+)\/status$/);
+    if (req.method === 'POST' && payStatusMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const payId = decodeURIComponent(payStatusMatch[1]);
+      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
+      const item = payments.find(p => p.id === payId);
+      if (!item) return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
+      item.status = String(body.status || 'paid');
+      item.updatedAt = new Date().toISOString();
+      if (FILES.payments) writeJson(FILES.payments, payments);
+      return sendJson(res, 200, { ok: true, payment: item });
+    }
+
+    // --- GUIDES: APPROVE (Admin) ---
+    const approveMatch = pathname.match(/^\/api\/guides\/([^/]+)\/approve$/);
+    if (req.method === 'POST' && approveMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri (X-Admin-Key)' });
+      }
+      const guideId = decodeURIComponent(approveMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const guide = guides.find(g => g.id === guideId);
+      if (!guide) {
+        return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
+      }
+      guide.approved = true;
+      guide.approvedAt = new Date().toISOString();
+      writeJson(FILES.guides, guides);
+
+      await sendTelegram(`✅ <b>Gid tasdiqlandi!</b>\n👤 ${escHtml(guide.name)} (${escHtml(guide.city)})\n✈️ @${escHtml(guide.tg)}`);
+      return sendJson(res, 200, { ok: true, guide });
+    }
+
+    // --- FEEDBACK: CREATE & LIST ---
+    if (req.method === 'POST' && pathname === '/api/feedback') {
+      const body = await parseBody(req);
+      const name = String(body.name || '').trim();
+      const contact = String(body.contact || '').trim();
+      const type = String(body.type || 'taklif').trim();
+      const msg = String(body.msg || '').trim();
+
+      if (!name || !msg) {
+        return sendJson(res, 400, { ok: false, error: 'Ism va xabar matni kiritilishi shart.' });
+      }
+
+      const items = readJson(FILES.feedback, []);
+      const entry = {
+        id: 'fb_' + crypto.randomBytes(4).toString('hex'),
+        name,
+        contact,
+        type,
+        msg,
+        createdAt: new Date().toISOString()
+      };
+      items.unshift(entry);
+      writeJson(FILES.feedback, items);
+
+      const tgMsg = [
+        `💬 <b>Yangi murojaat (${escHtml(type.toUpperCase())})</b>`,
+        `👤 Ism: <b>${escHtml(name)}</b>`,
+        `📞 Aloqa: ${escHtml(contact || 'ko‘rsatilmagan')}`,
+        `📝 Xabar:\n${escHtml(msg)}`
+      ].join('\n');
+      const tgRes = await sendTelegram(tgMsg);
+
+      return sendJson(res, 201, { ok: true, feedback: entry, telegram: tgRes });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/feedback') {
+      if (!isAdmin(req, urlObj)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti talab qilinadi (X-Admin-Key)' });
+      }
+      const items = readJson(FILES.feedback, []);
+      return sendJson(res, 200, { ok: true, total: items.length, feedback: items });
+    }
+
+    // --- REAL AI CHAT (OpenAI & Grok) ---
+    if (req.method === 'POST' && pathname === '/api/ai/chat') {
+      const body = await parseBody(req);
+      const message = String(body.message || '').trim();
+      if (!message) {
+        return sendJson(res, 400, { ok: false, error: 'Xabar matni bo‘sh bo‘lmasligi kerak' });
+      }
+      const result = await generateAiReply(message, body.history, body.context, body.provider);
+
+      // Chat tarixini saqlash
+      const chats = readJson(FILES.chats, []);
+      chats.unshift({
+        id: 'chat_' + crypto.randomBytes(4).toString('hex'),
+        provider: result.providerUsed,
+        model: result.model,
+        userMessage: message.slice(0, 500),
+        aiReply: result.reply.slice(0, 1000),
+        createdAt: new Date().toISOString()
+      });
+      if (chats.length > 300) chats.length = 300;
+      writeJson(FILES.chats, chats);
+
+      return sendJson(res, 200, { ok: true, ...result });
+    }
+
+    // --- USER AUTH: REGISTER ---
+    if (req.method === 'POST' && pathname === '/api/auth/register') {
+      const body = await parseBody(req);
+      const name = String(body.name || '').trim();
+      const emailOrPhone = String(body.emailOrPhone || '').trim().toLowerCase();
+      const password = String(body.password || '');
+      const role = body.role === 'guide' ? 'guide' : 'tourist';
+
+      if (!name || !emailOrPhone || password.length < 4) {
+        return sendJson(res, 400, { ok: false, error: 'Ism, email/telefon va kamida 4 belgili parol kiriting.' });
+      }
+
+      const users = readJson(FILES.users, []);
+      if (users.some(u => u.emailOrPhone === emailOrPhone)) {
+        return sendJson(res, 409, { ok: false, error: 'Bu email yoki telefon raqami allaqachon ro‘yxatdan o‘tgan.' });
+      }
+
+      const user = {
+        id: 'usr_' + crypto.randomBytes(5).toString('hex'),
+        name,
+        emailOrPhone,
+        role,
+        passwordHash: hashPassword(password),
+        savedData: { favorites: [], plan: [], checklist: [] },
+        createdAt: new Date().toISOString()
+      };
+      users.push(user);
+      writeJson(FILES.users, users);
+
+      const token = signToken({ sub: user.id, emailOrPhone: user.emailOrPhone, role: user.role });
+      const { passwordHash, ...safeUser } = user;
+      return sendJson(res, 201, { ok: true, token, user: safeUser });
+    }
+
+    // --- USER AUTH: LOGIN ---
+    if (req.method === 'POST' && pathname === '/api/auth/login') {
+      const body = await parseBody(req);
+      const emailOrPhone = String(body.emailOrPhone || '').trim().toLowerCase();
+      const password = String(body.password || '');
+
+      const users = readJson(FILES.users, []);
+      const user = users.find(u => u.emailOrPhone === emailOrPhone);
+      if (!user || !verifyPassword(password, user.passwordHash)) {
+        return sendJson(res, 401, { ok: false, error: 'Login yoki parol noto‘g‘ri.' });
+      }
+
+      const token = signToken({ sub: user.id, emailOrPhone: user.emailOrPhone, role: user.role });
+      const { passwordHash, ...safeUser } = user;
+      return sendJson(res, 200, { ok: true, token, user: safeUser });
+    }
+
+    // --- USER AUTH: PROFILE & PAYMENTS ---
+    if (req.method === 'GET' && pathname === '/api/auth/me') {
+      const user = getAuthUser(req);
+      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya talab qilinadi' });
+      const payments = readJson(FILES.payments, []).filter(p => p.userId === user.id || p.customerContact === user.emailOrPhone);
+      const { passwordHash, ...safeUser } = user;
+      return sendJson(res, 200, { ok: true, user: safeUser, payments });
+    }
+
+    // --- USER AUTH: SYNC PLAN & FAVORITES ---
+    if (req.method === 'POST' && pathname === '/api/auth/sync') {
+      const user = getAuthUser(req);
+      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya talab qilinadi' });
+      const body = await parseBody(req);
+      const users = readJson(FILES.users, []);
+      const idx = users.findIndex(u => u.id === user.id);
+      if (idx !== -1) {
+        users[idx].savedData = {
+          favorites: Array.isArray(body.favorites) ? body.favorites : [],
+          plan: Array.isArray(body.plan) ? body.plan : [],
+          checklist: Array.isArray(body.checklist) ? body.checklist : [],
+          updatedAt: new Date().toISOString()
+        };
+        writeJson(FILES.users, users);
+        return sendJson(res, 200, { ok: true, savedData: users[idx].savedData });
+      }
+      return sendJson(res, 404, { ok: false, error: 'Foydalanuvchi topilmadi' });
+    }
+
+    // --- PAYMENTS: CREATE ORDER (Click, Payme, Stripe / Sandbox) ---
+    if (req.method === 'POST' && pathname === '/api/payments/create') {
+      const body = await parseBody(req);
+      const authUser = getAuthUser(req);
+      const amountUsd = Math.max(1, Number(body.amountUsd) || 50);
+      const rateUzs = Math.max(1000, Number(body.rateUzs) || 12850);
+      const amountUzs = Math.round(amountUsd * rateUzs);
+      const provider = ['click', 'payme', 'card', 'stripe'].includes(String(body.provider).toLowerCase())
+        ? String(body.provider).toLowerCase()
+        : 'click';
+
+      const commissionUsd = Number((amountUsd * COMMISSION_RATE).toFixed(2));
+      const guidePayoutUsd = Number((amountUsd - commissionUsd).toFixed(2));
+      const orderId = `MZ-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+
+      let checkoutUrl = null;
+      let checkoutMode = 'sandbox';
+
+      if (provider === 'click' && CLICK_SERVICE_ID && CLICK_MERCHANT_ID) {
+        checkoutMode = 'redirect';
+        checkoutUrl = `https://my.click.uz/services/pay?service_id=${encodeURIComponent(CLICK_SERVICE_ID)}&merchant_id=${encodeURIComponent(CLICK_MERCHANT_ID)}&amount=${amountUzs}&transaction_param=${encodeURIComponent(orderId)}&return_url=${encodeURIComponent(`${PUBLIC_URL}/?payment=${orderId}`)}`;
+      } else if (provider === 'payme' && PAYME_MERCHANT_ID) {
+        checkoutMode = 'redirect';
+        const payloadB64 = Buffer.from(`m=${PAYME_MERCHANT_ID};ac.order_id=${orderId};a=${amountUzs * 100}`).toString('base64');
+        checkoutUrl = `https://checkout.paycom.uz/${payloadB64}`;
+      } else if ((provider === 'card' || provider === 'stripe') && STRIPE_SECRET_KEY) {
+        const params = new URLSearchParams();
+        params.append('mode', 'payment');
+        params.append('success_url', `${PUBLIC_URL}/?payment=${orderId}&status=success`);
+        params.append('cancel_url', `${PUBLIC_URL}/?payment=${orderId}&status=cancel`);
+        params.append('line_items[0][price_data][currency]', 'usd');
+        params.append('line_items[0][price_data][product_data][name]', String(body.title || 'Manzil Sayohat Broni'));
+        params.append('line_items[0][price_data][unit_amount]', String(Math.round(amountUsd * 100)));
+        params.append('line_items[0][quantity]', '1');
+        params.append('metadata[orderId]', orderId);
+
+        const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${STRIPE_SECRET_KEY}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params.toString()
+        });
+        const stripeSession = await stripeRes.json();
+        if (stripeRes.ok && stripeSession.url) {
+          checkoutMode = 'redirect';
+          checkoutUrl = stripeSession.url;
+        }
+      }
+
+      const order = {
+        orderId,
+        userId: authUser ? authUser.id : null,
+        itemType: String(body.itemType || 'guide'),
+        title: String(body.title || 'Gid / Tur xizmati'),
+        guideName: String(body.guideName || 'Manzil Hamkor'),
+        guideTg: String(body.guideTg || '').replace(/^@/, ''),
+        city: String(body.city || ''),
+        days: Math.max(1, Number(body.days) || 1),
+        people: Math.max(1, Number(body.people) || 1),
+        customerName: String(body.customerName || (authUser ? authUser.name : 'Mehmon')).trim(),
+        customerContact: String(body.customerContact || (authUser ? authUser.emailOrPhone : '')).trim(),
+        provider,
+        checkoutMode,
+        checkoutUrl,
+        amountUsd,
+        amountUzs,
+        commissionRate: COMMISSION_RATE,
+        commissionUsd,
+        guidePayoutUsd,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+
+      const payments = readJson(FILES.payments, []);
+      payments.unshift(order);
+      writeJson(FILES.payments, payments);
+
+      return sendJson(res, 201, { ok: true, order });
+    }
+
+    // --- PAYMENTS: CONFIRM / WEBHOOK ---
+    if (req.method === 'POST' && (pathname === '/api/payments/confirm' || pathname.startsWith('/api/payments/webhook/'))) {
+      const body = await parseBody(req);
+      const orderId = String(body.orderId || body.transaction_param || body.merchant_trans_id || '').trim();
+      if (!orderId) {
+        return sendJson(res, 400, { ok: false, error: 'orderId ko‘rsatilmagan' });
+      }
+      const payments = readJson(FILES.payments, []);
+      const order = payments.find(p => p.orderId === orderId);
+      if (!order) {
+        return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
+      }
+      if (order.status !== 'paid') {
+        order.status = 'paid';
+        order.paidAt = new Date().toISOString();
+        order.receiptId = 'RCP-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+        writeJson(FILES.payments, payments);
+
+        const tgMsg = [
+          '💳 <b>Yangi to‘lov tasdiqlandi! (Manzil Pay)</b>',
+          `🧾 Chek: <code>${escHtml(order.receiptId)}</code> | Buyurtma: <code>${escHtml(order.orderId)}</code>`,
+          `📦 Xizmat: <b>${escHtml(order.title)}</b>`,
+          `🧭 Gid: ${escHtml(order.guideName)} ${order.guideTg ? `(@${escHtml(order.guideTg)})` : ''}`,
+          `👤 Mijoz: ${escHtml(order.customerName)} (${escHtml(order.customerContact || '-')})`,
+          `💰 Jami: <b>$${order.amountUsd}</b> (~${order.amountUzs.toLocaleString('ru-RU')} so‘m)`,
+          `📊 Platforma komissiyasi (${Math.round(order.commissionRate * 100)}%): <b>$${order.commissionUsd}</b>`,
+          `🤝 Gid ulushi: <b>$${order.guidePayoutUsd}</b>`,
+          `🏦 Usul: ${escHtml(order.provider.toUpperCase())}`
+        ].join('\n');
+        await sendTelegram(tgMsg);
+      }
+      return sendJson(res, 200, { ok: true, order });
+    }
+
+    // --- PAYMENTS: LIST ---
+    if (req.method === 'GET' && pathname === '/api/payments') {
+      const payments = readJson(FILES.payments, []);
+      if (isAdmin(req, urlObj)) {
+        const paid = payments.filter(p => p.status === 'paid');
+        const totalVolumeUsd = Number(paid.reduce((s, p) => s + (p.amountUsd || 0), 0).toFixed(2));
+        const totalCommissionUsd = Number(paid.reduce((s, p) => s + (p.commissionUsd || 0), 0).toFixed(2));
+        return sendJson(res, 200, {
+          ok: true,
+          summary: { totalOrders: payments.length, paidOrders: paid.length, totalVolumeUsd, totalCommissionUsd },
+          payments
+        });
+      }
+      const user = getAuthUser(req);
+      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya yoki Admin kaliti kerak' });
+      const mine = payments.filter(p => p.userId === user.id || p.customerContact === user.emailOrPhone);
+      return sendJson(res, 200, { ok: true, payments: mine });
+    }
+
+    // Unknown API route
+    if (pathname.startsWith('/api/')) {
+      return sendJson(res, 404, { ok: false, error: 'API endpoint topilmadi' });
+    }
+
+    // --- STATIC FRONTEND ---
+    serveStatic(req, res, pathname);
+  } catch (err) {
+    console.error('[Manzil Server Error]', err);
+    sendJson(res, 500, { ok: false, error: err.message || 'Server ichki xatoligi' });
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`\n🚀 Manzil Full-Stack Server ishga tushdi: ${PUBLIC_URL}`);
+  console.log(`   ├─ Health check: ${PUBLIC_URL}/api/health`);
+  console.log(`   ├─ Telegram bot: ${TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID ? '✅ Ulangan' : '⚠️ Sozlanmagan (.env)'}`);
+  console.log(`   ├─ Real AI Chat: ${OPENAI_API_KEY ? '✅ OpenAI' : ''}${GROK_API_KEY ? ' ✅ Grok (xAI)' : ''}${!OPENAI_API_KEY && !GROK_API_KEY ? 'ℹ️ Lokal fallback rejimi' : ''}`);
+  console.log(`   └─ Komissiya stavkasi: ${Math.round(COMMISSION_RATE * 100)}%\n`);
+});
+
+
+
+
+
+setTimeout(async () => {
+  const token = process.env.TELEGRAM_BOT_TOKEN || '';
+  const pubUrl = String(process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+  if (token && pubUrl.startsWith('https://')) {
+    const callTg = (m, b) => fetch('https://api.telegram.org/bot' + token + '/' + m, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(b)
+    }).catch(() => {});
+    await callTg('setWebhook', { url: pubUrl + '/api/telegram/webhook', allowed_updates: ['message', 'callback_query'] });
+    await callTg('setMyCommands', {
+      commands: [
+        { command: 'start', description: 'Botni ishga tushirish va asosiy menyu' },
+        { command: 'guides', description: "Tasdiqlangan mahalliy gidlar ro'yxati" },
+        { command: 'visa', description: "O'zbekistonliklar uchun vizasiz davlatlar" },
+        { command: 'apply', description: "Gid sifatida ro'yxatdan o'tish" },
+        { command: 'support', description: 'Operatorga savol yoki taklif yozish' },
+        { command: 'admin', description: 'Admin statistika va boshqaruv (admin)' }
+      ]
+    });
+    await callTg('setMyDescription', {
+      description:
+        "🧭 Manzil — O'zbekiston va dunyo bo'ylab 105+ sayohat manzillari, tasdiqlangan mahalliy gidlar va AI sayohat yordamchisi.\n\n" +
+        "✅ Tasdiqlangan gidlar bilan bog'lanish va onlayn band qilish\n" +
+        "✅ O'zbekistonliklar uchun vizasiz davlatlar va byudjet hisobi\n" +
+        "✅ Gid sifatida ro'yxatdan o'tish va 24/7 qo'llab-quvvatlash\n\n" +
+        "Boshlash uchun /start tugmasini bosing!"
+    });
+    await callTg('setMyShortDescription', {
+      short_description: "Manzil rasmiy yordamchi boti — mahalliy gidlar, sayohat rejalari va 24/7 qo'llab-quvvatlash: https://manzil-app-1.onrender.com"
+    });
+  }
+}, 3000);
+ + g.rate + '/kun)\n   🗣 ' + escHtml(g.langs) + ' | ✈️ @' + escHtml(g.tg)
+          );
+          await sendTgTo(chatId, '🧭 <b>Tasdiqlangan mahalliy gidlar (' + guides.length + ' ta):</b>\n\n' + lines.join('\n\n'), {
+            reply_markup: { inline_keyboard: [[{ text: '🌐 Barcha gidlar va band qilish', url: siteUrl }]] }
+          });
+          return;
+        }
+
+        if (text === '/visa' || text === '🛂 Vizasiz davlatlar') {
+          const visaText = [
+            '🛂 <b>O‘zbekiston fuqarolari uchun asosiy vizasiz davlatlar:</b>',
+            '🇹🇷 Turkiya (90 kun) | 🇬🇪 Gruziya (1 yil) | 🇦🇪 BAA (30 kun)',
+            '🇨🇳 Xitoy (30 kun) | 🇹🇭 Tailand (60 kun) | 🇲🇻 Maldiv (30 kun)',
+            '🇰🇿 Qozog‘iston (30 kun) | 🇰🇬 Qirg‘iziston (60 kun) | 🇹🇯 Tojikiston (30 kun)'
+          ].join('\n');
+          await sendTgTo(chatId, visaText, {
+            reply_markup: { inline_keyboard: [[{ text: '🌐 Saytda byudjet hisoblash', url: siteUrl }]] }
+          });
+          return;
+        }
+
+        if (text === '/apply' || text === "💼 Gid bo‘lish") {
+          await sendTgTo(chatId, '💼 <b>Gid sifatida qo‘shilish bepul!</b>\nHar bir buyurtmadan <b>88% daromad</b> sizga qoladi (12% komissiya).', {
+            reply_markup: { inline_keyboard: [[{ text: '📝 Gidlikka ariza topshirish', url: siteUrl }]] }
+          });
+          return;
+        }
+
+        if (text === '/support' || text === '💬 Operatorga yozish') {
+          await sendTgTo(chatId, '💬 Savolingiz yoki taklifingizni shu yerga yozib yuboring — xabaringiz operatorga yetkaziladi.');
+          return;
+        }
+
+        if (text) {
+          const aiRes = await generateAiReply(text, [], {}, 'auto');
+          await sendTgTo(chatId, '🤖 ' + escHtml(aiRes.reply));
+          if (!isOwner) {
+            const uName = [msg.chat.first_name, msg.chat.last_name].filter(Boolean).join(' ') || 'Foydalanuvchi';
+            const uTag = msg.chat.username ? '@' + msg.chat.username : 'username yo‘q';
+            await sendTelegramAdminAction(
+              '📩 <b>Botga yangi xabar keldi</b>\n🆔 ID: <code>' + chatId + '</code>\n👤 Mijoz: <b>' + escHtml(uName) + '</b> (' + escHtml(uTag) + ')\n💬 Xabar: ' + escHtml(text) + '\n\n<i>↩️ Javob berish uchun shu xabarga Reply qiling.</i>'
+            );
+          }
+        }
+      }
+    }
+
+    // --- TELEGRAM WEBHOOK ---
+    if (req.method === 'POST' && pathname === '/api/telegram/webhook') {
+      const body = await parseBody(req);
+      await processTelegramUpdate(body);
+      return sendJson(res, 200, { ok: true });
+    }
+
+    
+    // --- ADMIN SSO: ADMIN SIFATIDA ASOSIY SAYTGA KIRISH ---
+    if (req.method === 'POST' && pathname === '/api/admin/sso') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      }
+      const users = readJson(FILES.users, []);
+      let adminUser = users.find(u => u.id === 'admin_master' || u.role === 'admin');
+      if (!adminUser) {
+        adminUser = {
+          id: 'admin_master',
+          name: 'Manzil Admin',
+          email: 'admin@manzil.uz',
+          role: 'admin',
+          isAdmin: true,
+          plan: [],
+          favorites: [],
+          createdAt: new Date().toISOString()
+        };
+        users.unshift(adminUser);
+        writeJson(FILES.users, users);
+      }
+      const token = signToken({ sub: adminUser.id, email: adminUser.email, role: 'admin' });
+      return sendJson(res, 200, { ok: true, token, user: adminUser });
+    }
+
+    // --- ADMIN: UMUMIY STATISTIKA VA RO'YXATLAR ---
+    if (req.method === 'GET' && pathname === '/api/admin/overview') {
+      if (!isAdmin(req, urlObj)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      }
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const feedback = readJson(FILES.feedback, []);
+      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
+      const users = FILES.users ? readJson(FILES.users, []) : [];
+
+      const paidList = payments.filter(p => p.status === 'paid' || p.status === 'completed');
+      const grossRevenue = paidList.reduce((s, p) => s + Number(p.amount || p.totalAmount || 0), 0);
+      const commissionRevenue = paidList.reduce((s, p) => {
+        const amt = Number(p.amount || p.totalAmount || 0);
+        return s + Number(p.commissionAmount != null ? p.commissionAmount : amt * COMMISSION_RATE);
+      }, 0);
+
+      return sendJson(res, 200, {
+        ok: true,
+        commissionRate: COMMISSION_RATE,
+        telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+        publicUrl: process.env.PUBLIC_URL || '',
+        stats: {
+          totalGuides: guides.length,
+          approvedGuides: guides.filter(g => g.approved === true).length,
+          pendingGuides: guides.filter(g => g.approved === false && !g.rejected).length,
+          rejectedGuides: guides.filter(g => g.rejected === true).length,
+          totalPayments: payments.length,
+          paidPayments: paidList.length,
+          grossRevenue: Math.round(grossRevenue * 100) / 100,
+          commissionRevenue: Math.round(commissionRevenue * 100) / 100,
+          totalFeedback: feedback.length,
+          totalUsers: users.length
+        },
+        guides,
+        feedback,
+        payments
+      });
+    }
+
+    // --- ADMIN: TELEGRAM WEBHOOK ULASH VA TEST ---
+    if (req.method === 'POST' && pathname === '/api/admin/telegram/sync-webhook') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
+      const result = await syncTelegramWebhook();
+      return sendJson(res, 200, { ok: Boolean(result.ok), result });
+    }
+
+    if (req.method === 'POST' && pathname === '/api/admin/telegram/test') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
+      const result = await sendTelegramAdminAction('🔔 <b>Manzil Admin Panel:</b> Telegram aloqasi muvaffaqiyatli tekshirildi!');
+      return sendJson(res, 200, { ok: Boolean(result.ok), result });
+    }
+
+    // --- ADMIN: YANGI GID QO'SHISH ---
+    if (req.method === 'POST' && pathname === '/api/guides/admin-create') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const name = String(body.name || '').trim();
+      const city = String(body.city || '').trim();
+      const country = String(body.country || "O'zbekiston").trim();
+      const langs = String(body.langs || "O'zbek, Rus").trim();
+      const spec = String(body.spec || '').trim();
+      const tg = String(body.tg || '').trim().replace(/^@/, '');
+      const rate = Math.max(5, Math.min(2000, Number(body.rate) || 50));
+      if (!name || !city || !tg || !spec) {
+        return sendJson(res, 400, { ok: false, error: 'Barcha maydonlarni to‘ldiring' });
+      }
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const newGuide = {
+        id: 'guide_' + crypto.randomBytes(4).toString('hex'),
+        name, city, country, langs, spec, rate, tg,
+        group: String(body.group || '').trim(),
+        about: String(body.about || '').trim(),
+        approved: true,
+        approvedAt: new Date().toISOString(),
+        commissionRate: COMMISSION_RATE,
+        createdAt: new Date().toISOString()
+      };
+      guides.unshift(newGuide);
+      writeJson(FILES.guides, guides);
+      return sendJson(res, 201, { ok: true, guide: newGuide });
+    }
+
+    // --- GUIDES: REJECT & DELETE (Admin) ---
+    const rejectMatch = pathname.match(/^\/api\/guides\/([^/]+)\/reject$/);
+    if (req.method === 'POST' && rejectMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const guideId = decodeURIComponent(rejectMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const guide = guides.find(g => g.id === guideId);
+      if (!guide) return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
+      guide.approved = false;
+      guide.rejected = true;
+      guide.rejectedAt = new Date().toISOString();
+      writeJson(FILES.guides, guides);
+      return sendJson(res, 200, { ok: true, guide });
+    }
+
+    const delGuideMatch = pathname.match(/^\/api\/guides\/([^/]+)\/delete$/);
+    if (req.method === 'POST' && delGuideMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const guideId = decodeURIComponent(delGuideMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const next = guides.filter(g => g.id !== guideId);
+      writeJson(FILES.guides, next);
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- FEEDBACK: DELETE (Admin) ---
+    const delFbMatch = pathname.match(/^\/api\/feedback\/([^/]+)\/delete$/);
+    if (req.method === 'POST' && delFbMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const fbId = decodeURIComponent(delFbMatch[1]);
+      const items = readJson(FILES.feedback, []);
+      writeJson(FILES.feedback, items.filter(f => f.id !== fbId));
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- PAYMENTS: UPDATE STATUS (Admin) ---
+    const payStatusMatch = pathname.match(/^\/api\/payments\/([^/]+)\/status$/);
+    if (req.method === 'POST' && payStatusMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const payId = decodeURIComponent(payStatusMatch[1]);
+      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
+      const item = payments.find(p => p.id === payId);
+      if (!item) return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
+      item.status = String(body.status || 'paid');
+      item.updatedAt = new Date().toISOString();
+      if (FILES.payments) writeJson(FILES.payments, payments);
+      return sendJson(res, 200, { ok: true, payment: item });
+    }
+
+    // --- GUIDES: APPROVE (Admin) ---
+    const approveMatch = pathname.match(/^\/api\/guides\/([^/]+)\/approve$/);
+    if (req.method === 'POST' && approveMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri (X-Admin-Key)' });
+      }
+      const guideId = decodeURIComponent(approveMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const guide = guides.find(g => g.id === guideId);
+      if (!guide) {
+        return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
+      }
+      guide.approved = true;
+      guide.approvedAt = new Date().toISOString();
+      writeJson(FILES.guides, guides);
+
+      await sendTelegram(`✅ <b>Gid tasdiqlandi!</b>\n👤 ${escHtml(guide.name)} (${escHtml(guide.city)})\n✈️ @${escHtml(guide.tg)}`);
+      return sendJson(res, 200, { ok: true, guide });
+    }
+
+    // --- FEEDBACK: CREATE & LIST ---
+    if (req.method === 'POST' && pathname === '/api/feedback') {
+      const body = await parseBody(req);
+      const name = String(body.name || '').trim();
+      const contact = String(body.contact || '').trim();
+      const type = String(body.type || 'taklif').trim();
+      const msg = String(body.msg || '').trim();
+
+      if (!name || !msg) {
+        return sendJson(res, 400, { ok: false, error: 'Ism va xabar matni kiritilishi shart.' });
+      }
+
+      const items = readJson(FILES.feedback, []);
+      const entry = {
+        id: 'fb_' + crypto.randomBytes(4).toString('hex'),
+        name,
+        contact,
+        type,
+        msg,
+        createdAt: new Date().toISOString()
+      };
+      items.unshift(entry);
+      writeJson(FILES.feedback, items);
+
+      const tgMsg = [
+        `💬 <b>Yangi murojaat (${escHtml(type.toUpperCase())})</b>`,
+        `👤 Ism: <b>${escHtml(name)}</b>`,
+        `📞 Aloqa: ${escHtml(contact || 'ko‘rsatilmagan')}`,
+        `📝 Xabar:\n${escHtml(msg)}`
+      ].join('\n');
+      const tgRes = await sendTelegram(tgMsg);
+
+      return sendJson(res, 201, { ok: true, feedback: entry, telegram: tgRes });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/feedback') {
+      if (!isAdmin(req, urlObj)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti talab qilinadi (X-Admin-Key)' });
+      }
+      const items = readJson(FILES.feedback, []);
+      return sendJson(res, 200, { ok: true, total: items.length, feedback: items });
+    }
+
+    // --- REAL AI CHAT (OpenAI & Grok) ---
+    if (req.method === 'POST' && pathname === '/api/ai/chat') {
+      const body = await parseBody(req);
+      const message = String(body.message || '').trim();
+      if (!message) {
+        return sendJson(res, 400, { ok: false, error: 'Xabar matni bo‘sh bo‘lmasligi kerak' });
+      }
+      const result = await generateAiReply(message, body.history, body.context, body.provider);
+
+      // Chat tarixini saqlash
+      const chats = readJson(FILES.chats, []);
+      chats.unshift({
+        id: 'chat_' + crypto.randomBytes(4).toString('hex'),
+        provider: result.providerUsed,
+        model: result.model,
+        userMessage: message.slice(0, 500),
+        aiReply: result.reply.slice(0, 1000),
+        createdAt: new Date().toISOString()
+      });
+      if (chats.length > 300) chats.length = 300;
+      writeJson(FILES.chats, chats);
+
+      return sendJson(res, 200, { ok: true, ...result });
+    }
+
+    // --- USER AUTH: REGISTER ---
+    if (req.method === 'POST' && pathname === '/api/auth/register') {
+      const body = await parseBody(req);
+      const name = String(body.name || '').trim();
+      const emailOrPhone = String(body.emailOrPhone || '').trim().toLowerCase();
+      const password = String(body.password || '');
+      const role = body.role === 'guide' ? 'guide' : 'tourist';
+
+      if (!name || !emailOrPhone || password.length < 4) {
+        return sendJson(res, 400, { ok: false, error: 'Ism, email/telefon va kamida 4 belgili parol kiriting.' });
+      }
+
+      const users = readJson(FILES.users, []);
+      if (users.some(u => u.emailOrPhone === emailOrPhone)) {
+        return sendJson(res, 409, { ok: false, error: 'Bu email yoki telefon raqami allaqachon ro‘yxatdan o‘tgan.' });
+      }
+
+      const user = {
+        id: 'usr_' + crypto.randomBytes(5).toString('hex'),
+        name,
+        emailOrPhone,
+        role,
+        passwordHash: hashPassword(password),
+        savedData: { favorites: [], plan: [], checklist: [] },
+        createdAt: new Date().toISOString()
+      };
+      users.push(user);
+      writeJson(FILES.users, users);
+
+      const token = signToken({ sub: user.id, emailOrPhone: user.emailOrPhone, role: user.role });
+      const { passwordHash, ...safeUser } = user;
+      return sendJson(res, 201, { ok: true, token, user: safeUser });
+    }
+
+    // --- USER AUTH: LOGIN ---
+    if (req.method === 'POST' && pathname === '/api/auth/login') {
+      const body = await parseBody(req);
+      const emailOrPhone = String(body.emailOrPhone || '').trim().toLowerCase();
+      const password = String(body.password || '');
+
+      const users = readJson(FILES.users, []);
+      const user = users.find(u => u.emailOrPhone === emailOrPhone);
+      if (!user || !verifyPassword(password, user.passwordHash)) {
+        return sendJson(res, 401, { ok: false, error: 'Login yoki parol noto‘g‘ri.' });
+      }
+
+      const token = signToken({ sub: user.id, emailOrPhone: user.emailOrPhone, role: user.role });
+      const { passwordHash, ...safeUser } = user;
+      return sendJson(res, 200, { ok: true, token, user: safeUser });
+    }
+
+    // --- USER AUTH: PROFILE & PAYMENTS ---
+    if (req.method === 'GET' && pathname === '/api/auth/me') {
+      const user = getAuthUser(req);
+      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya talab qilinadi' });
+      const payments = readJson(FILES.payments, []).filter(p => p.userId === user.id || p.customerContact === user.emailOrPhone);
+      const { passwordHash, ...safeUser } = user;
+      return sendJson(res, 200, { ok: true, user: safeUser, payments });
+    }
+
+    // --- USER AUTH: SYNC PLAN & FAVORITES ---
+    if (req.method === 'POST' && pathname === '/api/auth/sync') {
+      const user = getAuthUser(req);
+      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya talab qilinadi' });
+      const body = await parseBody(req);
+      const users = readJson(FILES.users, []);
+      const idx = users.findIndex(u => u.id === user.id);
+      if (idx !== -1) {
+        users[idx].savedData = {
+          favorites: Array.isArray(body.favorites) ? body.favorites : [],
+          plan: Array.isArray(body.plan) ? body.plan : [],
+          checklist: Array.isArray(body.checklist) ? body.checklist : [],
+          updatedAt: new Date().toISOString()
+        };
+        writeJson(FILES.users, users);
+        return sendJson(res, 200, { ok: true, savedData: users[idx].savedData });
+      }
+      return sendJson(res, 404, { ok: false, error: 'Foydalanuvchi topilmadi' });
+    }
+
+    // --- PAYMENTS: CREATE ORDER (Click, Payme, Stripe / Sandbox) ---
+    if (req.method === 'POST' && pathname === '/api/payments/create') {
+      const body = await parseBody(req);
+      const authUser = getAuthUser(req);
+      const amountUsd = Math.max(1, Number(body.amountUsd) || 50);
+      const rateUzs = Math.max(1000, Number(body.rateUzs) || 12850);
+      const amountUzs = Math.round(amountUsd * rateUzs);
+      const provider = ['click', 'payme', 'card', 'stripe'].includes(String(body.provider).toLowerCase())
+        ? String(body.provider).toLowerCase()
+        : 'click';
+
+      const commissionUsd = Number((amountUsd * COMMISSION_RATE).toFixed(2));
+      const guidePayoutUsd = Number((amountUsd - commissionUsd).toFixed(2));
+      const orderId = `MZ-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+
+      let checkoutUrl = null;
+      let checkoutMode = 'sandbox';
+
+      if (provider === 'click' && CLICK_SERVICE_ID && CLICK_MERCHANT_ID) {
+        checkoutMode = 'redirect';
+        checkoutUrl = `https://my.click.uz/services/pay?service_id=${encodeURIComponent(CLICK_SERVICE_ID)}&merchant_id=${encodeURIComponent(CLICK_MERCHANT_ID)}&amount=${amountUzs}&transaction_param=${encodeURIComponent(orderId)}&return_url=${encodeURIComponent(`${PUBLIC_URL}/?payment=${orderId}`)}`;
+      } else if (provider === 'payme' && PAYME_MERCHANT_ID) {
+        checkoutMode = 'redirect';
+        const payloadB64 = Buffer.from(`m=${PAYME_MERCHANT_ID};ac.order_id=${orderId};a=${amountUzs * 100}`).toString('base64');
+        checkoutUrl = `https://checkout.paycom.uz/${payloadB64}`;
+      } else if ((provider === 'card' || provider === 'stripe') && STRIPE_SECRET_KEY) {
+        const params = new URLSearchParams();
+        params.append('mode', 'payment');
+        params.append('success_url', `${PUBLIC_URL}/?payment=${orderId}&status=success`);
+        params.append('cancel_url', `${PUBLIC_URL}/?payment=${orderId}&status=cancel`);
+        params.append('line_items[0][price_data][currency]', 'usd');
+        params.append('line_items[0][price_data][product_data][name]', String(body.title || 'Manzil Sayohat Broni'));
+        params.append('line_items[0][price_data][unit_amount]', String(Math.round(amountUsd * 100)));
+        params.append('line_items[0][quantity]', '1');
+        params.append('metadata[orderId]', orderId);
+
+        const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${STRIPE_SECRET_KEY}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params.toString()
+        });
+        const stripeSession = await stripeRes.json();
+        if (stripeRes.ok && stripeSession.url) {
+          checkoutMode = 'redirect';
+          checkoutUrl = stripeSession.url;
+        }
+      }
+
+      const order = {
+        orderId,
+        userId: authUser ? authUser.id : null,
+        itemType: String(body.itemType || 'guide'),
+        title: String(body.title || 'Gid / Tur xizmati'),
+        guideName: String(body.guideName || 'Manzil Hamkor'),
+        guideTg: String(body.guideTg || '').replace(/^@/, ''),
+        city: String(body.city || ''),
+        days: Math.max(1, Number(body.days) || 1),
+        people: Math.max(1, Number(body.people) || 1),
+        customerName: String(body.customerName || (authUser ? authUser.name : 'Mehmon')).trim(),
+        customerContact: String(body.customerContact || (authUser ? authUser.emailOrPhone : '')).trim(),
+        provider,
+        checkoutMode,
+        checkoutUrl,
+        amountUsd,
+        amountUzs,
+        commissionRate: COMMISSION_RATE,
+        commissionUsd,
+        guidePayoutUsd,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+
+      const payments = readJson(FILES.payments, []);
+      payments.unshift(order);
+      writeJson(FILES.payments, payments);
+
+      return sendJson(res, 201, { ok: true, order });
+    }
+
+    // --- PAYMENTS: CONFIRM / WEBHOOK ---
+    if (req.method === 'POST' && (pathname === '/api/payments/confirm' || pathname.startsWith('/api/payments/webhook/'))) {
+      const body = await parseBody(req);
+      const orderId = String(body.orderId || body.transaction_param || body.merchant_trans_id || '').trim();
+      if (!orderId) {
+        return sendJson(res, 400, { ok: false, error: 'orderId ko‘rsatilmagan' });
+      }
+      const payments = readJson(FILES.payments, []);
+      const order = payments.find(p => p.orderId === orderId);
+      if (!order) {
+        return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
+      }
+      if (order.status !== 'paid') {
+        order.status = 'paid';
+        order.paidAt = new Date().toISOString();
+        order.receiptId = 'RCP-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+        writeJson(FILES.payments, payments);
+
+        const tgMsg = [
+          '💳 <b>Yangi to‘lov tasdiqlandi! (Manzil Pay)</b>',
+          `🧾 Chek: <code>${escHtml(order.receiptId)}</code> | Buyurtma: <code>${escHtml(order.orderId)}</code>`,
+          `📦 Xizmat: <b>${escHtml(order.title)}</b>`,
+          `🧭 Gid: ${escHtml(order.guideName)} ${order.guideTg ? `(@${escHtml(order.guideTg)})` : ''}`,
+          `👤 Mijoz: ${escHtml(order.customerName)} (${escHtml(order.customerContact || '-')})`,
+          `💰 Jami: <b>$${order.amountUsd}</b> (~${order.amountUzs.toLocaleString('ru-RU')} so‘m)`,
+          `📊 Platforma komissiyasi (${Math.round(order.commissionRate * 100)}%): <b>$${order.commissionUsd}</b>`,
+          `🤝 Gid ulushi: <b>$${order.guidePayoutUsd}</b>`,
+          `🏦 Usul: ${escHtml(order.provider.toUpperCase())}`
+        ].join('\n');
+        await sendTelegram(tgMsg);
+      }
+      return sendJson(res, 200, { ok: true, order });
+    }
+
+    // --- PAYMENTS: LIST ---
+    if (req.method === 'GET' && pathname === '/api/payments') {
+      const payments = readJson(FILES.payments, []);
+      if (isAdmin(req, urlObj)) {
+        const paid = payments.filter(p => p.status === 'paid');
+        const totalVolumeUsd = Number(paid.reduce((s, p) => s + (p.amountUsd || 0), 0).toFixed(2));
+        const totalCommissionUsd = Number(paid.reduce((s, p) => s + (p.commissionUsd || 0), 0).toFixed(2));
+        return sendJson(res, 200, {
+          ok: true,
+          summary: { totalOrders: payments.length, paidOrders: paid.length, totalVolumeUsd, totalCommissionUsd },
+          payments
+        });
+      }
+      const user = getAuthUser(req);
+      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya yoki Admin kaliti kerak' });
+      const mine = payments.filter(p => p.userId === user.id || p.customerContact === user.emailOrPhone);
+      return sendJson(res, 200, { ok: true, payments: mine });
+    }
+
+    // Unknown API route
+    if (pathname.startsWith('/api/')) {
+      return sendJson(res, 404, { ok: false, error: 'API endpoint topilmadi' });
+    }
+
+    // --- STATIC FRONTEND ---
+    serveStatic(req, res, pathname);
+  } catch (err) {
+    console.error('[Manzil Server Error]', err);
+    sendJson(res, 500, { ok: false, error: err.message || 'Server ichki xatoligi' });
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`\n🚀 Manzil Full-Stack Server ishga tushdi: ${PUBLIC_URL}`);
+  console.log(`   ├─ Health check: ${PUBLIC_URL}/api/health`);
+  console.log(`   ├─ Telegram bot: ${TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID ? '✅ Ulangan' : '⚠️ Sozlanmagan (.env)'}`);
+  console.log(`   ├─ Real AI Chat: ${OPENAI_API_KEY ? '✅ OpenAI' : ''}${GROK_API_KEY ? ' ✅ Grok (xAI)' : ''}${!OPENAI_API_KEY && !GROK_API_KEY ? 'ℹ️ Lokal fallback rejimi' : ''}`);
+  console.log(`   └─ Komissiya stavkasi: ${Math.round(COMMISSION_RATE * 100)}%\n`);
+});
+
+
+
+
+
+setTimeout(async () => {
+  const token = process.env.TELEGRAM_BOT_TOKEN || '';
+  const pubUrl = String(process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+  if (token && pubUrl.startsWith('https://')) {
+    const callTg = (m, b) => fetch('https://api.telegram.org/bot' + token + '/' + m, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(b)
+    }).catch(() => {});
+    await callTg('setWebhook', { url: pubUrl + '/api/telegram/webhook', allowed_updates: ['message', 'callback_query'] });
+    await callTg('setMyCommands', {
+      commands: [
+        { command: 'start', description: 'Botni ishga tushirish va asosiy menyu' },
+        { command: 'guides', description: "Tasdiqlangan mahalliy gidlar ro'yxati" },
+        { command: 'visa', description: "O'zbekistonliklar uchun vizasiz davlatlar" },
+        { command: 'apply', description: "Gid sifatida ro'yxatdan o'tish" },
+        { command: 'support', description: 'Operatorga savol yoki taklif yozish' },
+        { command: 'admin', description: 'Admin statistika va boshqaruv (admin)' }
+      ]
+    });
+    await callTg('setMyDescription', {
+      description:
+        "🧭 Manzil — O'zbekiston va dunyo bo'ylab 105+ sayohat manzillari, tasdiqlangan mahalliy gidlar va AI sayohat yordamchisi.\n\n" +
+        "✅ Tasdiqlangan gidlar bilan bog'lanish va onlayn band qilish\n" +
+        "✅ O'zbekistonliklar uchun vizasiz davlatlar va byudjet hisobi\n" +
+        "✅ Gid sifatida ro'yxatdan o'tish va 24/7 qo'llab-quvvatlash\n\n" +
+        "Boshlash uchun /start tugmasini bosing!"
+    });
+    await callTg('setMyShortDescription', {
+      short_description: "Manzil rasmiy yordamchi boti — mahalliy gidlar, sayohat rejalari va 24/7 qo'llab-quvvatlash: https://manzil-app-1.onrender.com"
+    });
+  }
+}, 3000);
+
+
+// Render uyqudan uyg'onganda yoki webhook o'chgan bo'lsa, navbatdagi xabarlarni ham o'qib javob qaytarish
+let _tgOffset = 0;
+async function pollPendingTelegram() {
+  const token = process.env.TELEGRAM_BOT_TOKEN || '';
+  if (!token) return;
+  try {
+    const whInfo = await fetch('https://api.telegram.org/bot' + token + '/getWebhookInfo').then(r => r.json());
+    if (!whInfo.ok) return;
+    // Agar webhook ulanmagan bo'lsa yoki navbatda xabar yig'ilib qolgan bo'lsa
+    if (!whInfo.result.url || whInfo.result.pending_update_count > 0) {
+      if (whInfo.result.url) {
+        await fetch('https://api.telegram.org/bot' + token + '/deleteWebhook', { method: 'POST' });
+      }
+      const res = await fetch('https://api.telegram.org/bot' + token + '/getUpdates?timeout=1&offset=' + _tgOffset).then(r => r.json());
+      if (res.ok && Array.isArray(res.result)) {
+        for (const upd of res.result) {
+          _tgOffset = upd.update_id + 1;
+          await processTelegramUpdate(upd);
+        }
+      }
+      const pubUrl = String(process.env.PUBLIC_URL || 'https://manzil-app-1.onrender.com').replace(/\/+$/, '');
+      if (pubUrl.startsWith('https://')) {
+        await fetch('https://api.telegram.org/bot' + token + '/setWebhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: pubUrl + '/api/telegram/webhook', allowed_updates: ['message', 'callback_query'] })
+        });
+      }
+    }
+  } catch (e) {}
+}
+setTimeout(pollPendingTelegram, 4000);
