@@ -345,7 +345,7 @@ const MIME_TYPES = {
 };
 
 function serveStatic(req, res, pathname) {
-  let reqPath = pathname === '/' ? '/index.html' : pathname;
+  let reqPath = pathname === '/' ? '/index.html' : (pathname === '/admin' || pathname === '/admin/' ? '/admin.html' : pathname);
   reqPath = decodeURIComponent(reqPath);
   const safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, '');
   let filePath = path.join(PUBLIC_DIR, safePath);
@@ -473,8 +473,260 @@ const server = http.createServer(async (req, res) => {
         `\n✅ Tasdiqlash: <code>POST /api/guides/${newGuide.id}/approve</code>`
       ].filter(Boolean).join('\n');
 
-      const tgRes = await sendTelegram(tgMsg);
+      const tgRes = await sendTelegramAdminAction(tgMsg, {
+          inline_keyboard: [[
+            { text: '✅ Tasdiqlash', callback_data: 'approve:' + newGuide.id },
+            { text: '❌ Rad etish', callback_data: 'reject:' + newGuide.id }
+          ]]
+        });
       return sendJson(res, 201, { ok: true, guide: newGuide, telegram: tgRes });
+    }
+
+    
+    // --- TELEGRAM INLINE TUGMALAR VA WEBHOOK YORDAMCHILARI ---
+    async function sendTelegramAdminAction(text, replyMarkup = null) {
+      const token = process.env.TELEGRAM_BOT_TOKEN || '';
+      const chatId = process.env.TELEGRAM_CHAT_ID || '';
+      if (!token || !chatId) return { ok: false, skipped: true };
+      try {
+        const payload = { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true };
+        if (replyMarkup) payload.reply_markup = replyMarkup;
+        const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        return await r.json();
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+
+    async function syncTelegramWebhook() {
+      const token = process.env.TELEGRAM_BOT_TOKEN || '';
+      const pubUrl = String(process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+      if (!token || !pubUrl.startsWith('https://')) {
+        return { ok: false, error: 'HTTPS PUBLIC_URL yoki TELEGRAM_BOT_TOKEN topilmadi' };
+      }
+      try {
+        const r = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: `${pubUrl}/api/telegram/webhook`,
+            allowed_updates: ['callback_query']
+          })
+        });
+        return await r.json();
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+
+    // --- TELEGRAM WEBHOOK (1-bosishda tasdiqlash/rad etish) ---
+    if (req.method === 'POST' && pathname === '/api/telegram/webhook') {
+      const body = await parseBody(req);
+      const cb = body && body.callback_query;
+      if (cb && cb.data) {
+        const token = process.env.TELEGRAM_BOT_TOKEN || '';
+        const adminChatId = String(process.env.TELEGRAM_CHAT_ID || '');
+        const fromId = String(cb.from && cb.from.id ? cb.from.id : '');
+
+        if (adminChatId && fromId !== adminChatId) {
+          if (token) {
+            await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ callback_query_id: cb.id, text: 'Ruxsat yo‘q!', show_alert: true })
+            }).catch(() => {});
+          }
+          return sendJson(res, 200, { ok: true });
+        }
+
+        const [action, guideId] = String(cb.data).split(':');
+        const guides = readJson(FILES.guides, SEED_GUIDES);
+        const guide = guides.find(g => g.id === guideId);
+        let toastText = 'Ariza topilmadi';
+        let statusTag = '';
+
+        if (guide && (action === 'approve' || action === 'reject')) {
+          if (action === 'approve') {
+            guide.approved = true;
+            guide.rejected = false;
+            guide.approvedAt = new Date().toISOString();
+            toastText = '✅ Gid tasdiqlandi!';
+            statusTag = '\n\n✅ <b>HOLAT: TASDIQLANDI</b>';
+          } else {
+            guide.approved = false;
+            guide.rejected = true;
+            guide.rejectedAt = new Date().toISOString();
+            toastText = '❌ Ariza rad etildi';
+            statusTag = '\n\n❌ <b>HOLAT: RAD ETILDI</b>';
+          }
+          writeJson(FILES.guides, guides);
+        }
+
+        if (token) {
+          await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ callback_query_id: cb.id, text: toastText })
+          }).catch(() => {});
+
+          if (cb.message && cb.message.chat && statusTag) {
+            const origText = cb.message.text || '';
+            await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: cb.message.chat.id,
+                message_id: cb.message.message_id,
+                text: origText + statusTag,
+                parse_mode: 'HTML'
+              })
+            }).catch(() => {});
+          }
+        }
+      }
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- ADMIN: UMUMIY STATISTIKA VA RO'YXATLAR ---
+    if (req.method === 'GET' && pathname === '/api/admin/overview') {
+      if (!isAdmin(req, urlObj)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      }
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const feedback = readJson(FILES.feedback, []);
+      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
+      const users = FILES.users ? readJson(FILES.users, []) : [];
+
+      const paidList = payments.filter(p => p.status === 'paid' || p.status === 'completed');
+      const grossRevenue = paidList.reduce((s, p) => s + Number(p.amount || p.totalAmount || 0), 0);
+      const commissionRevenue = paidList.reduce((s, p) => {
+        const amt = Number(p.amount || p.totalAmount || 0);
+        return s + Number(p.commissionAmount != null ? p.commissionAmount : amt * COMMISSION_RATE);
+      }, 0);
+
+      return sendJson(res, 200, {
+        ok: true,
+        commissionRate: COMMISSION_RATE,
+        telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+        publicUrl: process.env.PUBLIC_URL || '',
+        stats: {
+          totalGuides: guides.length,
+          approvedGuides: guides.filter(g => g.approved === true).length,
+          pendingGuides: guides.filter(g => g.approved === false && !g.rejected).length,
+          rejectedGuides: guides.filter(g => g.rejected === true).length,
+          totalPayments: payments.length,
+          paidPayments: paidList.length,
+          grossRevenue: Math.round(grossRevenue * 100) / 100,
+          commissionRevenue: Math.round(commissionRevenue * 100) / 100,
+          totalFeedback: feedback.length,
+          totalUsers: users.length
+        },
+        guides,
+        feedback,
+        payments
+      });
+    }
+
+    // --- ADMIN: TELEGRAM WEBHOOK ULASH VA TEST ---
+    if (req.method === 'POST' && pathname === '/api/admin/telegram/sync-webhook') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
+      const result = await syncTelegramWebhook();
+      return sendJson(res, 200, { ok: Boolean(result.ok), result });
+    }
+
+    if (req.method === 'POST' && pathname === '/api/admin/telegram/test') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
+      const result = await sendTelegramAdminAction('🔔 <b>Manzil Admin Panel:</b> Telegram aloqasi muvaffaqiyatli tekshirildi!');
+      return sendJson(res, 200, { ok: Boolean(result.ok), result });
+    }
+
+    // --- ADMIN: YANGI GID QO'SHISH ---
+    if (req.method === 'POST' && pathname === '/api/guides/admin-create') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const name = String(body.name || '').trim();
+      const city = String(body.city || '').trim();
+      const country = String(body.country || "O'zbekiston").trim();
+      const langs = String(body.langs || "O'zbek, Rus").trim();
+      const spec = String(body.spec || '').trim();
+      const tg = String(body.tg || '').trim().replace(/^@/, '');
+      const rate = Math.max(5, Math.min(2000, Number(body.rate) || 50));
+      if (!name || !city || !tg || !spec) {
+        return sendJson(res, 400, { ok: false, error: 'Barcha maydonlarni to‘ldiring' });
+      }
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const newGuide = {
+        id: 'guide_' + crypto.randomBytes(4).toString('hex'),
+        name, city, country, langs, spec, rate, tg,
+        group: String(body.group || '').trim(),
+        about: String(body.about || '').trim(),
+        approved: true,
+        approvedAt: new Date().toISOString(),
+        commissionRate: COMMISSION_RATE,
+        createdAt: new Date().toISOString()
+      };
+      guides.unshift(newGuide);
+      writeJson(FILES.guides, guides);
+      return sendJson(res, 201, { ok: true, guide: newGuide });
+    }
+
+    // --- GUIDES: REJECT & DELETE (Admin) ---
+    const rejectMatch = pathname.match(/^\/api\/guides\/([^/]+)\/reject$/);
+    if (req.method === 'POST' && rejectMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const guideId = decodeURIComponent(rejectMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const guide = guides.find(g => g.id === guideId);
+      if (!guide) return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
+      guide.approved = false;
+      guide.rejected = true;
+      guide.rejectedAt = new Date().toISOString();
+      writeJson(FILES.guides, guides);
+      return sendJson(res, 200, { ok: true, guide });
+    }
+
+    const delGuideMatch = pathname.match(/^\/api\/guides\/([^/]+)\/delete$/);
+    if (req.method === 'POST' && delGuideMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const guideId = decodeURIComponent(delGuideMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const next = guides.filter(g => g.id !== guideId);
+      writeJson(FILES.guides, next);
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- FEEDBACK: DELETE (Admin) ---
+    const delFbMatch = pathname.match(/^\/api\/feedback\/([^/]+)\/delete$/);
+    if (req.method === 'POST' && delFbMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const fbId = decodeURIComponent(delFbMatch[1]);
+      const items = readJson(FILES.feedback, []);
+      writeJson(FILES.feedback, items.filter(f => f.id !== fbId));
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // --- PAYMENTS: UPDATE STATUS (Admin) ---
+    const payStatusMatch = pathname.match(/^\/api\/payments\/([^/]+)\/status$/);
+    if (req.method === 'POST' && payStatusMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const payId = decodeURIComponent(payStatusMatch[1]);
+      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
+      const item = payments.find(p => p.id === payId);
+      if (!item) return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
+      item.status = String(body.status || 'paid');
+      item.updatedAt = new Date().toISOString();
+      if (FILES.payments) writeJson(FILES.payments, payments);
+      return sendJson(res, 200, { ok: true, payment: item });
     }
 
     // --- GUIDES: APPROVE (Admin) ---
@@ -801,3 +1053,16 @@ server.listen(PORT, () => {
   console.log(`   ├─ Real AI Chat: ${OPENAI_API_KEY ? '✅ OpenAI' : ''}${GROK_API_KEY ? ' ✅ Grok (xAI)' : ''}${!OPENAI_API_KEY && !GROK_API_KEY ? 'ℹ️ Lokal fallback rejimi' : ''}`);
   console.log(`   └─ Komissiya stavkasi: ${Math.round(COMMISSION_RATE * 100)}%\n`);
 });
+
+
+setTimeout(() => {
+  const token = process.env.TELEGRAM_BOT_TOKEN || '';
+  const pubUrl = String(process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+  if (token && pubUrl.startsWith('https://')) {
+    fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: `${pubUrl}/api/telegram/webhook`, allowed_updates: ['callback_query'] })
+    }).catch(() => {});
+  }
+}, 3000);
