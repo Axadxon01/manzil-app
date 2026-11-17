@@ -1,57 +1,78 @@
 <!DOCTYPE html>
-<html lang="uz">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Manzil — Sayohat va Gidlar Platformasi</title>
+    <title>Tours Uzbekistan &amp; Central Asia — Dolores Travel Design</title>
     <!-- Bootstrap CSS CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f8f9fa; color: #333; }
+        body { font-family: Arial, sans-serif; background-color: #f8f9fa; color: #333; margin: 0; }
         .header { background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 1000; }
-        .top-header { padding: 10px 0; border-bottom: 1px solid #eee; }
+        .top-header { padding: 12px 0; border-bottom: 1px solid #eee; }
         .logo { max-height: 45px; }
-        .motto-text { font-size: 13px; color: #666; }
+        .motto-text { font-size: 13px; color: #666; margin-left: 15px; }
         .main-menu .menu-list { list-style: none; padding: 0; margin: 0; display: flex; justify-content: center; }
-        .main-menu .menu-item { padding: 15px 20px; }
-        .main-menu .menu-link { color: #333; font-weight: 600; text-decoration: none; }
+        .main-menu .menu-item { padding: 15px 18px; }
+        .main-menu .menu-link { color: #333; font-weight: 600; text-decoration: none; font-size: 14px; }
         .main-menu .menu-link:hover { color: #02b8d4; text-decoration: none; }
-        .hero-section { background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('https://dolorestravel.com/uploads/Tour/165/home_banner-620d757ecb732.webp') no-repeat center center; background-size: cover; color: #fff; padding: 120px 0; text-align: center; }
-        .search-box { background: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 8px; margin-top: 30px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
-        .tour-card { background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 30px; transition: transform 0.3s; }
+        
+        /* Hero & Slider */
+        .hero-section { background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('https://dolorestravel.com/uploads/Tour/165/home_banner-620d757ecb732.webp') no-repeat center center; background-size: cover; color: #fff; padding: 100px 0 140px 0; text-align: center; position: relative; }
+        .slide-title { font-size: 32px; font-weight: bold; margin-bottom: 15px; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .slide-text { font-size: 16px; margin-bottom: 25px; color: #f1f1f1; max-width: 700px; margin-left: auto; margin-right: auto; }
+        
+        /* Search Box / Tour Selection Form */
+        .tour-selection { position: absolute; left: 0; right: 0; bottom: -40px; z-index: 10; }
+        .search-box { background: rgba(255, 255, 255, 0.96); padding: 20px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: flex; gap: 10px; align-items: center; }
+        .search-box .form-field { flex: 1; }
+        .form-control-custom { height: 45px; border: 1px solid #ddd; border-radius: 4px; padding: 0 15px; width: 100%; font-size: 14px; }
+        .btn-custom { background-color: #02b8d4; color: #fff; border: none; border-radius: 4px; height: 45px; padding: 0 25px; font-weight: bold; width: 100%; transition: background 0.2s; }
+        .btn-custom:hover { background-color: #0294a9; color: #fff; }
+
+        /* Popular Tours */
+        .tour-card { background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 30px; transition: transform 0.3s; display: flex; flex-direction: column; height: 100%; }
         .tour-card:hover { transform: translateY(-5px); }
         .tour-img { width: 100%; height: 220px; object-fit: cover; }
-        .tour-body { padding: 20px; }
-        .tour-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
-        .price { color: #02b8d4; font-weight: bold; font-size: 20px; }
-        .btn-custom { background-color: #02b8d4; color: #fff; border: none; border-radius: 4px; padding: 10px 20px; font-weight: 600; }
-        .btn-custom:hover { background-color: #0294a9; color: #fff; }
-        .footer { background: #222; color: #bbb; padding: 50px 0 20px 0; }
-        .footer h5 { color: #fff; margin-bottom: 20px; font-size: 18px; }
+        .tour-body { padding: 20px; display: flex; flex-direction: column; flex: 1; justify-content: space-between; }
+        .tour-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #222; text-decoration: none; }
+        .tour-title a { color: #222; text-decoration: none; }
+        .tour-title a:hover { color: #02b8d4; }
+        .tour-duration { font-size: 13px; color: #02b8d4; font-weight: bold; margin-bottom: 8px; }
+        .city-list { list-style: none; padding: 0; margin: 0 0 15px 0; display: flex; flex-wrap: wrap; gap: 6px; }
+        .city-list li { font-size: 12px; background: #eaf2eb; color: #134839; padding: 3px 8px; border-radius: 4px; }
+        .price { color: #02b8d4; font-weight: bold; font-size: 22px; }
+        .tour-price { margin-bottom: 15px; font-size: 14px; color: #666; }
+        .btn-request { background: #fff; color: #02b8d4; border: 1px solid #02b8d4; border-radius: 4px; padding: 8px 15px; font-size: 13px; font-weight: bold; transition: all 0.2s; }
+        .btn-request:hover { background: #02b8d4; color: #fff; }
+
+        /* Footer */
+        .footer { background: #112921; color: #bbb; padding: 50px 0 20px 0; margin-top: 60px; }
+        .footer h5 { color: #fff; margin-bottom: 20px; font-size: 16px; font-weight: bold; }
         .footer ul { list-style: none; padding: 0; }
-        .footer ul li a { color: #bbb; text-decoration: none; line-height: 2; }
+        .footer ul li a { color: #bbb; text-decoration: none; line-height: 2.2; font-size: 13.5px; }
         .footer ul li a:hover { color: #02b8d4; }
         .toast-msg { position: fixed; bottom: 20px; right: 20px; background: #111; color: #fff; padding: 12px 20px; border-radius: 8px; z-index: 9999; display: none; }
     </style>
 </head>
 <body>
 
-    <!-- Header qismi -->
+    <!-- Main Navigation Header -->
     <header class="header">
         <div class="top-header">
             <div class="container">
                 <div class="row align-items-center justify-content-between">
-                    <div class="col-md-4 d-flex align-items-center">
-                        <img class="logo mr-3" src="https://dolorestravel.com/uploads/Configuration/147/60748eae19c56.webp" alt="Manzil App">
-                        <span class="motto-text d-none d-lg-inline">Ҳаёт саргузашти шу ердан бошланади!</span>
+                    <div class="col-md-5 d-flex align-items-center">
+                        <a href="https://dolorestravel.com/en"><img class="logo" src="https://dolorestravel.com/uploads/Configuration/147/60748eae19c56.webp" alt="Dolores Travel"></a>
+                        <span class="motto-text d-none d-lg-inline">More than a journey, this is the story of your life!</span>
                     </div>
                     <div class="col-md-4 text-center">
-                        <a href="tel:+998555158883" class="font-weight-bold text-dark" style="font-size: 18px;">+998 55 515 8883</a>
+                        <a href="tel:+998555158883" class="font-weight-bold text-dark" style="font-size: 18px; text-decoration: none;">+998 55 515 8883</a>
                     </div>
-                    <div class="col-md-4 text-right">
+                    <div class="col-md-3 text-right">
                         <a href="/admin" class="btn btn-outline-dark btn-sm mr-2" target="_blank">Admin Panel</a>
-                        <button class="btn btn-custom btn-sm" data-toggle="modal" data-target="#makeOrder">Тур буюртма бериш</button>
+                        <button class="btn btn-custom btn-sm" style="width: auto;" data-toggle="modal" data-target="#makeOrder">Request form</button>
                     </div>
                 </div>
             </div>
@@ -60,162 +81,188 @@
             <div class="container">
                 <nav>
                     <ul class="menu-list">
-                        <li class="menu-item"><a class="menu-link" href="#">Барча турлар</a></li>
-                        <li class="menu-item"><a class="menu-link" href="#guidesSec">Маҳаллий гидлар</a></li>
-                        <li class="menu-item"><a class="menu-link" href="#">Хизматлар</a></li>
-                        <li class="menu-item"><a class="menu-link" href="#">Блог</a></li>
-                        <li class="menu-item"><a class="menu-link" href="#aboutSec">Биз ҳақимизда</a></li>
-                        <li class="menu-item"><a class="menu-link" href="#contactSec">Алоқа</a></li>
+                        <li class="menu-item"><a class="menu-link" href="/en/tours">All tours</a></li>
+                        <li class="menu-item"><a class="menu-link" href="/en/hotels">Hotels</a></li>
+                        <li class="menu-item"><a class="menu-link" href="/en/our-services">Services</a></li>
+                        <li class="menu-item"><a class="menu-link" href="/en/guides">Travel Guide</a></li>
+                        <li class="menu-item"><a class="menu-link" href="/en/mice">Mice</a></li>
+                        <li class="menu-item"><a class="menu-link" href="/en/blog">Blog</a></li>
+                        <li class="menu-item"><a class="menu-link" href="/en/faq">FAQ</a></li>
+                        <li class="menu-item"><a class="menu-link" href="/en/about-us">About Us</a></li>
+                        <li class="menu-item"><a class="menu-link" href="/en/contacts">Contacts Us</a></li>
                     </ul>
                 </nav>
             </div>
         </div>
     </header>
 
-    <!-- Hero / Slider qismi -->
+    <!-- Hero Slider Section with Search Bar -->
     <section class="hero-section">
         <div class="container">
             <div class="row justify-content-center">
                 <div class="col-lg-10">
-                    <h1 class="font-weight-bold mb-3">Ўзбекистон ва жаҳон бўйлаб саёҳатлар</h1>
-                    <p class="lead mb-4">Энг яхши маҳаллий гидлар, гуруҳли ва индивидуал турлар, қулай буюртма тизими.</p>
-                    
-                    <!-- Qidiruv / Filtr Paneli -->
-                    <div class="search-box">
-                        <form class="row" onsubmit="event.preventDefault(); alert('Qidiruv natijalari yuklanmoqda...');">
-                            <div class="col-md-4 mb-2">
-                                <select class="form-control">
-                                    <option>Қаердан (Жўнаш шаҳри)</option>
-                                    <option>Тошкент</option>
-                                    <option>Самарқанд</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4 mb-2">
-                                <select class="form-control">
-                                    <option>Қаерга (Йўналиш)</option>
-                                    <option>Самарқанд</option>
-                                    <option>Бухоро</option>
-                                    <option>Хива</option>
-                                    <option>Дубай</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <button type="submit" class="btn btn-custom btn-block">Турни излаш</button>
-                            </div>
-                        </form>
-                    </div>
+                    <h1 class="slide-title">TOUR TO UZBEKISTAN - FIXED DEPARTURES 2026</h1>
+                    <p class="slide-text">8-day guaranteed group tour from Tashkent to Samarkand, Bukhara, and Khiva. Start in Tashkent, end in Urgench or return to Tashkent.</p>
+                </div>
+            </div>
+        </div>
 
+        <!-- Tour Selection Search Form (Dolores Travel Style) -->
+        <div class="tour-selection">
+            <div class="container">
+                <div class="search-box">
+                    <div class="form-field">
+                        <select class="form-control-custom">
+                            <option>Whence (Departure city)</option>
+                            <option>Tashkent</option>
+                            <option>Samarkand</option>
+                            <option>Bukhara</option>
+                            <option>Dubai</option>
+                            <option>London</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <select class="form-control-custom">
+                            <option>Cities / Destination</option>
+                            <option>Samarkand</option>
+                            <option>Bukhara</option>
+                            <option>Khiva</option>
+                            <option>Fergana</option>
+                            <option>Mountains</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <input type="date" class="form-control-custom" value="2026-06-01">
+                    </div>
+                    <div class="form-field" style="flex: 0.5;">
+                        <button type="button" class="btn-custom" onclick="showToast('Searching tours...')">Tour search</button>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Mashhur Турлар -->
-    <section class="container py-5">
+    <!-- Popular Tours Section -->
+    <section class="container" style="padding-top: 80px; padding-bottom: 50px;">
         <div class="row mb-4">
             <div class="col-12 text-center">
-                <h2 class="font-weight-bold">Оммабоп турлар ва йўналишлар</h2>
-                <p class="text-muted">Сиз учун энг сара ва қизиқарли саёҳат йўналишлари</p>
+                <h2 class="font-weight-bold" style="font-size: 28px; color: #112921;">Popular tours</h2>
+                <p class="text-muted">Handpicked travel itineraries for your unforgettable experience in Uzbekistan</p>
             </div>
         </div>
         <div class="row">
             <!-- Tour 1 -->
             <div class="col-md-4">
                 <div class="tour-card">
-                    <img src="https://dolorestravel.com/uploads/Tour/165/tour-620d757ecb732.webp" class="tour-img" alt="Tour">
-                    <div class="tour-body">
-                        <h4 class="tour-title">Ўзбекистон бўйлаб классик тур</h4>
-                        <p class="text-muted small">Тошкент - Самарқанд - Бухоро - Хива</p>
-                        <p class="tour-price"><span>Дан: </span><span class="price">910 $</span> <small>(киши бошига)</small></p>
-                        <button class="btn btn-custom btn-block btn-sm" data-toggle="modal" data-target="#makeOrder">Батафсил / Буюртма</button>
+                    <div>
+                        <img src="https://dolorestravel.com/uploads/Tour/165/tour-620d757ecb732.webp" class="tour-img" alt="Tour">
+                        <div class="tour-body pb-0">
+                            <div class="tour-duration">8 Days / 7 Nights</div>
+                            <h4 class="tour-title"><a href="#">TOUR TO UZBEKISTAN - FIXED DEPARTURES 2026</a></h4>
+                            <ul class="city-list">
+                                <li>Tashkent</li><li>Samarkand</li><li>Bukhara</li><li>Khiva</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="tour-body pt-0">
+                        <p class="tour-price mb-3"><span>From </span><span class="price">910 $</span> <small>(per person)</small></p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="#" class="font-weight-bold text-dark" style="font-size: 13px; color: #02b8d4 !important;">Read more →</a>
+                            <button class="btn-request" data-toggle="modal" data-target="#makeOrder">Request form</button>
+                        </div>
                     </div>
                 </div>
             </div>
             <!-- Tour 2 -->
             <div class="col-md-4">
                 <div class="tour-card">
-                    <img src="https://dolorestravel.com/uploads/Tour/237/tour-671bc1013f150.webp" class="tour-img" alt="Tour">
-                    <div class="tour-body">
-                        <h4 class="tour-title">Дам олиш кунлари сайёҳати</h4>
-                        <p class="text-muted small">Тошкент - Самарқанд - Тоғлар</p>
-                        <p class="tour-price"><span>Дан: </span><span class="price">690 $</span> <small>(киши бошига)</small></p>
-                        <button class="btn btn-custom btn-block btn-sm" data-toggle="modal" data-target="#makeOrder">Батафсил / Буюртма</button>
+                    <div>
+                        <img src="https://dolorestravel.com/uploads/Tour/237/tour-671bc1013f150.webp" class="tour-img" alt="Tour">
+                        <div class="tour-body pb-0">
+                            <div class="tour-duration">5 Days / 4 Nights</div>
+                            <h4 class="tour-title"><a href="#">UZBEKISTAN WEEKEND TOUR FROM MIDDLE EAST</a></h4>
+                            <ul class="city-list">
+                                <li>Tashkent</li><li>Samarkand</li><li>Mountains</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="tour-body pt-0">
+                        <p class="tour-price mb-3"><span>From </span><span class="price">690 $</span> <small>(per person)</small></p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="#" class="font-weight-bold text-dark" style="font-size: 13px; color: #02b8d4 !important;">Read more →</a>
+                            <button class="btn-request" data-toggle="modal" data-target="#makeOrder">Request form</button>
+                        </div>
                     </div>
                 </div>
             </div>
             <!-- Tour 3 -->
             <div class="col-md-4">
                 <div class="tour-card">
-                    <img src="https://dolorestravel.com/uploads/Tour/91/tour-5dd9a30dd2fb2.webp" class="tour-img" alt="Tour">
-                    <div class="tour-body">
-                        <h4 class="tour-title">Буюк Ипак Йўли изидан</h4>
-                        <p class="text-muted small">Тошкент - Нукус - Хива - Бухоро</p>
-                        <p class="tour-price"><span>Дан: </span><span class="price">925 $</span> <small>(киши бошига)</small></p>
-                        <button class="btn btn-custom btn-block btn-sm" data-toggle="modal" data-target="#makeOrder">Батафсил / Буюртма</button>
+                    <div>
+                        <img src="https://dolorestravel.com/uploads/Tour/91/tour-5dd9a30dd2fb2.webp" class="tour-img" alt="Tour">
+                        <div class="tour-body pb-0">
+                            <div class="tour-duration">9 Days / 8 Nights</div>
+                            <h4 class="tour-title"><a href="#">9 DAY SILK ROADS EXPERIENCE TOUR</a></h4>
+                            <ul class="city-list">
+                                <li>Tashkent</li><li>Nukus</li><li>Khiva</li><li>Bukhara</li><li>Samarkand</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="tour-body pt-0">
+                        <p class="tour-price mb-3"><span>From </span><span class="price">925 $</span> <small>(per person)</small></p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="#" class="font-weight-bold text-dark" style="font-size: 13px; color: #02b8d4 !important;">Read more →</a>
+                            <button class="btn-request" data-toggle="modal" data-target="#makeOrder">Request form</button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Tasdiqlangan Gidlar Qismi -->
-    <section id="guidesSec" class="bg-light py-5 border-top">
-        <div class="container">
-            <div class="row mb-4">
-                <div class="col-12 text-center">
-                    <h2 class="font-weight-bold">🧭 Tasdiqlangan Mahalliy Gidlar</h2>
-                    <p class="text-muted">Professional gidlar bilan bevosita bog‘laning</p>
-                </div>
-            </div>
-            <div class="row" id="dynamicGuides">
-                <div class="col-12 text-center"><p>Gidlar yuklanmoqda...</p></div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer qismi -->
-    <footer id="contactSec" class="footer">
+    <!-- Footer -->
+    <footer class="footer">
         <div class="container">
             <div class="row">
                 <div class="col-md-4 mb-4">
-                    <h5>Хизматлар</h5>
+                    <h5>Services</h5>
                     <ul>
-                        <li><a href="#">Барча турлар</a></li>
-                        <li><a href="#">Виза хизмати</a></li>
-                        <li><a href="#">Меҳмонхоналарни банд қилиш</a></li>
-                        <li><a href="#">Транспорт хизмати</a></li>
+                        <li><a href="#">All tours</a></li>
+                        <li><a href="#">Visa support</a></li>
+                        <li><a href="#">Hotel booking in Uzbekistan</a></li>
+                        <li><a href="#">Transport services</a></li>
                     </ul>
                 </div>
                 <div class="col-md-4 mb-4">
-                    <h5>Маълумот</h5>
+                    <h5>About Us</h5>
                     <ul>
-                        <li><a href="#">Кўп бериладиган саволлар (FAQ)</a></li>
-                        <li><a href="#">Йўриқномалар</a></li>
-                        <li id="aboutSec"><a href="#">Биз ҳақимизда</a></li>
-                        <li><a href="#">Лицензия ва сертификатлар</a></li>
+                        <li><a href="#">Contact Us</a></li>
+                        <li><a href="#">About Dolores Travel</a></li>
+                        <li><a href="#">Licenses and certificates</a></li>
+                        <li><a href="#">Travel Guide</a></li>
                     </ul>
                 </div>
                 <div class="col-md-4 mb-4">
-                    <h5>Боғланиш</h5>
-                    <p>Телефон: +998 55 515 8883</p>
-                    <p>Email: info@manzil.uz</p>
-                    <p>Манзил: Тошкент шаҳри, Ўзбекистон</p>
+                    <h5>Contact us</h5>
+                    <p class="mb-1">Phone: +998 55 515 8883</p>
+                    <p class="mb-1">Email: info@dolorestravel.com</p>
+                    <p>Address: Tashkent, Uzbekistan</p>
                 </div>
             </div>
-            <div class="row border-top pt-3 mt-3 text-center">
+            <div class="row border-top pt-3 mt-3 text-center" style="border-color: rgba(255,255,255,0.1) !important;">
                 <div class="col-12">
-                    <p class="small mb-0">© 2026 «Manzil App Services». Барча ҳуқуқлар ҳимояланган.</p>
+                    <p class="small mb-0">© 2000—2026 «Dolores Travel Services». All rights reserved.</p>
                 </div>
             </div>
         </div>
     </footer>
 
-    <!-- Buyurtma berish uchun Modal Oyna -->
+    <!-- Request Form Modal -->
     <div class="modal fade" id="makeOrder" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title font-weight-bold">Тур ёки хизматга буюртма бериш</h5>
+                    <h5 class="modal-title font-weight-bold">Application for tour / event</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -223,18 +270,18 @@
                 <div class="modal-body">
                     <form id="orderForm" onsubmit="submitOrder(event)">
                         <div class="form-group">
-                            <label>Сизнинг исмингиз</label>
-                            <input type="text" id="ordName" class="form-control" placeholder="Исмингизни киритинг" required>
+                            <label>Your name</label>
+                            <input type="text" id="ordName" class="form-control" placeholder="Enter your name" required>
                         </div>
                         <div class="form-group">
-                            <label>Телефон рақамингиз ёки Telegram</label>
-                            <input type="text" id="ordContact" class="form-control" placeholder="+998 __ _______ ёки @username" required>
+                            <label>Phone number or Telegram</label>
+                            <input type="text" id="ordContact" class="form-control" placeholder="+998 __ _______ or @username" required>
                         </div>
                         <div class="form-group">
-                            <label>Қўшимча изоҳ ёки сана</label>
-                            <textarea id="ordMsg" class="form-control" rows="3" placeholder="Қайси тур ёки сана қизиқтирмоқда?"></textarea>
+                            <label>Comment or date</label>
+                            <textarea id="ordMsg" class="form-control" rows="3" placeholder="Which tour or dates are you interested in?"></textarea>
                         </div>
-                        <button type="submit" class="btn btn-custom btn-block">Буюртмани юбориш</button>
+                        <button type="submit" class="btn btn-custom btn-block">Send application</button>
                     </form>
                 </div>
             </div>
@@ -243,7 +290,7 @@
 
     <div id="toast" class="toast-msg"></div>
 
-    <!-- Bootstrap JS va jQuery CDN -->
+    <!-- Bootstrap JS & jQuery -->
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -254,78 +301,12 @@
         setTimeout(function() { t.style.display = 'none'; }, 3500);
       }
 
-      async function loadGuides() {
-        try {
-          var r = await fetch('/api/guides');
-          var data = await r.json();
-          var guides = data.guides || [];
-          var approved = guides.filter(function(g) { return g.approved !== false; });
-          var wrap = document.getElementById('dynamicGuides');
-          if (!approved.length) {
-            wrap.innerHTML = '<div class="col-12 text-center"><p>Hozircha tasdiqlangan gidlar yo‘q.</p></div>';
-            return;
-          }
-          wrap.innerHTML = approved.map(function(g) {
-            return '<div class="col-md-4 mb-4">' +
-              '<div class="tour-card h-100">' +
-                '<div class="tour-body d-flex flex-column justify-content-between">' +
-                  '<div>' +
-                    '<h4 class="tour-title">' + (g.name || '') + '</h4>' +
-                    '<p class="text-muted small">📍 <b>' + (g.city || '') + ', ' + (g.country || "O'zbekiston") + '</b></p>' +
-                    '<p class="small"><b>Mutaxassislik:</b> ' + (g.spec || '') + '</p>' +
-                    '<p class="small"><b>Tillar:</b> ' + (g.langs || '') + '</p>' +
-                  '</div>' +
-                  '<div>' +
-                    '<p class="tour-price mb-2"><span class="price">$' + (g.rate || 50) + '</span> <small>/ kun</small></p>' +
-                    (g.tg ? '<a href="https://t.me/' + g.tg + '" target="_blank" class="btn btn-custom btn-block btn-sm">✈️ Telegram orqali yozish</a>' : '') +
-                  '</div>' +
-                '</div>' +
-              '</div>' +
-            '</div>';
-          }).join('');
-        } catch (e) {
-          document.getElementById('dynamicGuides').innerHTML = '<div class="col-12 text-center"><p class="text-danger">Gidlarni yuklashda xatolik yuz berdi.</p></div>';
-        }
-      }
-
-      async function submitOrder(e) {
+      function submitOrder(e) {
         e.preventDefault();
-        var name = document.getElementById('ordName').value.trim();
-        var contact = document.getElementById('ordContact').value.trim();
-        var msg = document.getElementById('ordMsg').value.trim();
-        try {
-          var r = await fetch('/api/feedback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name, contact: contact, type: 'buyurtma', msg: msg })
-          });
-          var res = await r.json();
-          if (res.ok) {
-            $('#makeOrder').modal('hide');
-            document.getElementById('orderForm').reset();
-            showToast('✅ Buyurtmangiz qabul qilindi! Operatorimiz tez orada bog‘lanadi.');
-          } else {
-            alert('Xatolik: ' + (res.error || 'Nomaʼlum xato'));
-          }
-        } catch (err) {
-          alert('Tarmoq xatosi: ' + err.message);
-        }
+        $('#makeOrder').modal('hide');
+        document.getElementById('orderForm').reset();
+        showToast('✅ Your application has been accepted! Our manager will contact you soon.');
       }
-
-      // Admin banner chiqishi
-      (function() {
-        var isAdm = localStorage.getItem('manzil_is_admin') === 'true' || new URLSearchParams(location.search).get('admin') === '1';
-        if (isAdm) {
-          window.addEventListener('DOMContentLoaded', function() {
-            var bar = document.createElement('div');
-            bar.style.cssText = 'position:fixed;bottom:14px;left:14px;z-index:9999;background:#0f172a;color:#34d399;border:1px solid #10b981;padding:8px 14px;border-radius:999px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:10px;box-shadow:0 8px 20px rgba(0,0,0,0.4);';
-            bar.innerHTML = '<span>👑 Admin rejimi faol</span><a href="/admin" style="color:#fff;background:#2563eb;padding:4px 10px;border-radius:999px;text-decoration:none;">Admin Panel</a>';
-            document.body.appendChild(bar);
-          });
-        }
-      })();
-
-      loadGuides();
     </script>
 </body>
 </html>
