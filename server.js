@@ -679,7 +679,8 @@ const server = http.createServer(async (req, res) => {
             '🟡 Kutilayotgan gid arizalari: <b>' + pending + ' ta</b>',
             '🟢 Tasdiqlangan gidlar: <b>' + approved + ' ta</b>',
             '💳 Jami buyurtmalar: <b>' + payments.length + ' ta</b> (To‘langan: ' + paid.length + ')',
-            '💰 Umumiy aylanma: <b>
+            '💰 Umumiy aylanma: <b>$' + gross + '</b>',
+            '🏦 Platforma komissiyasi (12%): <b>$' + comm + '</b>',
     const approveMatch = pathname.match(/^\/api\/guides\/([^/]+)\/approve$/);
     if (req.method === 'POST' && approveMatch) {
       const body = await parseBody(req);
