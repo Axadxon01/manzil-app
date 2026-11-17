@@ -1,6 +1,7 @@
 /**
  * Manzil — To'liq Backend Server (Zero npm dependencies, Node.js 18+)
  * O'z ichiga oladi:
+ *  - Manzillar bazasi va Admin CRUD (/api/destinations, /api/admin/destinations)
  *  - Gidlar bazasi va ariza topshirish (GET /api/guides, POST /api/guides/apply, POST /api/guides/:id/approve)
  *  - Taklif va shikoyatlar + Telegram xabarnoma (POST /api/feedback, GET /api/feedback)
  *  - Real AI Chat: OpenAI & Grok (xAI) + aqlli lokal fallback (POST /api/ai/chat)
@@ -65,6 +66,7 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const DATA_DIR = path.join(__dirname, 'data');
 
 const FILES = {
+  destinations: path.join(DATA_DIR, 'destinations.json'),
   guides: path.join(DATA_DIR, 'guides.json'),
   feedback: path.join(DATA_DIR, 'feedback.json'),
   users: path.join(DATA_DIR, 'users.json'),
@@ -73,19 +75,20 @@ const FILES = {
 };
 
 const SEED_GUIDES = [
-  { id: 'guide_seed_1', name: 'Azizbek Karimov', city: 'Samarqand', country: "O'zbekiston", langs: "O'zbek, Rus, Ingliz", spec: 'Tarixiy obidalar va Registon sirlari', rate: 45, tg: 'azizbek_samarkand_guide', group: '28-noyabr · Samarqand + Shahrisabz (3 joy qoldi)', approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_2', name: 'Nilufar Raximova', city: 'Buxoro', country: "O'zbekiston", langs: "O'zbek, Ingliz, Fransuz", spec: "Eski shahar me'morchiligi va gastronomiya", rate: 40, tg: 'nilufar_bukhara', group: '', approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_3', name: 'Temur Jumaniyozov', city: "Mo'ynoq va Orolbo'yi", country: "O'zbekiston", langs: "O'zbek, Qoraqalpoq, Rus", spec: "4x4 Ustyurt kanyonlari va Orolbo'yi ekspeditsiyasi", rate: 95, tg: 'aral_expedition_uz', group: "5-dekabr · Nukus → Ustyurt → Mo'ynoq (2 joy qoldi)", approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_4', name: 'Emre Yilmaz', city: 'Istanbul', country: 'Turkiya', langs: "O'zbek, Turk, Rus", spec: 'Istanbul sirlari, Bosfor va xarid turlari', rate: 75, tg: 'emre_istanbul_uz', group: 'Har shanba · Sultonahmet va Osiyo qismi piyoda turi', approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_5', name: 'Giorgi Beridze', city: 'Tbilisi va Qozbegi', country: 'Gruziya', langs: 'Rus, Ingliz, Gruzin', spec: "Qozbegi tog'lari, Kaxetiya va oilaviy turlar", rate: 70, tg: 'giorgi_georgia_tour', group: '12-dekabr · Tbilisi → Ananuri → Qozbegi', approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_6', name: 'Sardor Toshmatov', city: 'Dubay', country: 'BAA', langs: "O'zbek, Rus, Ingliz", spec: "VIP transfer, Cho'l safari va Abu-Dabi turi", rate: 90, tg: 'dubai_uz_guide', group: '', approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_7', name: 'Madina Alimova', city: 'Parij', country: 'Fransiya', langs: "O'zbek, Fransuz, Ingliz", spec: 'Luvr, Monmartr va fotosessiya turlari', rate: 110, tg: 'madina_paris_guide', group: '', approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_8', name: 'Bekzod Xolmatov', city: 'Seul', country: 'Janubiy Koreya', langs: "O'zbek, Koreys, Rus", spec: 'Seul saroylari, K-pop va tibbiy/xarid turlari', rate: 85, tg: 'bekzod_seoul', group: '', approved: true, commissionRate: COMMISSION_RATE }
+  { id: 'guide_seed_1', name: 'Azizbek Karimov', city: 'Samarqand', country: "O'zbekiston", langs: "O'zbek, Rus, Ingliz", spec: 'Tarixiy obidalar va Registon sirlari', rate: 45, exp: 7, tg: 'azizbek_samarkand_guide', group: '28-noyabr · Samarqand + Shahrisabz (3 joy qoldi)', approved: true, commissionRate: COMMISSION_RATE },
+  { id: 'guide_seed_2', name: 'Nilufar Raximova', city: 'Buxoro', country: "O'zbekiston", langs: "O'zbek, Ingliz, Fransuz", spec: "Eski shahar me'morchiligi va gastronomiya", rate: 40, exp: 5, tg: 'nilufar_bukhara', group: '', approved: true, commissionRate: COMMISSION_RATE },
+  { id: 'guide_seed_3', name: 'Temur Jumaniyozov', city: "Mo'ynoq va Orolbo'yi", country: "O'zbekiston", langs: "O'zbek, Qoraqalpoq, Rus", spec: "4x4 Ustyurt kanyonlari va Orolbo'yi ekspeditsiyasi", rate: 95, exp: 8, tg: 'aral_expedition_uz', group: "5-dekabr · Nukus → Ustyurt → Mo'ynoq (2 joy qoldi)", approved: true, commissionRate: COMMISSION_RATE },
+  { id: 'guide_seed_4', name: 'Emre Yilmaz', city: 'Istanbul', country: 'Turkiya', langs: "O'zbek, Turk, Rus", spec: 'Istanbul sirlari, Bosfor va xarid turlari', rate: 75, exp: 6, tg: 'emre_istanbul_uz', group: 'Har shanba · Sultonahmet va Osiyo qismi piyoda turi', approved: true, commissionRate: COMMISSION_RATE },
+  { id: 'guide_seed_5', name: 'Giorgi Beridze', city: 'Tbilisi va Qozbegi', country: 'Gruziya', langs: 'Rus, Ingliz, Gruzin', spec: "Qozbegi tog'lari, Kaxetiya va oilaviy turlar", rate: 70, exp: 6, tg: 'giorgi_georgia_tour', group: '12-dekabr · Tbilisi → Ananuri → Qozbegi', approved: true, commissionRate: COMMISSION_RATE },
+  { id: 'guide_seed_6', name: 'Sardor Toshmatov', city: 'Dubay', country: 'BAA', langs: "O'zbek, Rus, Ingliz", spec: "VIP transfer, Cho'l safari va Abu-Dabi turi", rate: 90, exp: 5, tg: 'dubai_uz_guide', group: '', approved: true, commissionRate: COMMISSION_RATE },
+  { id: 'guide_seed_7', name: 'Madina Alimova', city: 'Parij', country: 'Fransiya', langs: "O'zbek, Fransuz, Ingliz", spec: 'Luvr, Monmartr va fotosessiya turlari', rate: 110, exp: 5, tg: 'madina_paris_guide', group: '', approved: true, commissionRate: COMMISSION_RATE },
+  { id: 'guide_seed_8', name: 'Bekzod Xolmatov', city: 'Seul', country: 'Janubiy Koreya', langs: "O'zbek, Koreys, Rus", spec: 'Seul saroylari, K-pop va tibbiy/xarid turlari', rate: 85, exp: 4, tg: 'bekzod_seoul', group: '', approved: true, commissionRate: COMMISSION_RATE }
 ];
 
 // 3. JSON Ma'lumotlar bazasi yordamchilari
 function ensureDataStore() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (!fs.existsSync(FILES.destinations)) fs.writeFileSync(FILES.destinations, '[]', 'utf8');
   if (!fs.existsSync(FILES.guides)) fs.writeFileSync(FILES.guides, JSON.stringify(SEED_GUIDES, null, 2), 'utf8');
   if (!fs.existsSync(FILES.feedback)) fs.writeFileSync(FILES.feedback, '[]', 'utf8');
   if (!fs.existsSync(FILES.users)) fs.writeFileSync(FILES.users, '[]', 'utf8');
@@ -105,6 +108,22 @@ function readJson(filePath, fallback = []) {
 
 function writeJson(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+}
+
+// Frontend va Backend gid obyektini birxillashtirish
+function normalizeGuideForClient(g) {
+  const status = g.rejected ? 'rejected' : (g.approved === false ? 'pending' : 'approved');
+  return {
+    ...g,
+    price: Number(g.price ?? g.rate ?? 50),
+    rate: Number(g.rate ?? g.price ?? 50),
+    exp: Number(g.exp ?? 3),
+    contact: g.contact || (g.tg ? '@' + String(g.tg).replace(/^@/, '') : ''),
+    tg: String(g.tg || g.contact || '').replace(/^@/, ''),
+    bio: g.bio || g.spec || g.about || '',
+    spec: g.spec || g.bio || '',
+    status
+  };
 }
 
 // 4. Telegram xabarnoma yuboruvchi
@@ -187,7 +206,9 @@ function getAuthUser(req) {
 }
 
 function isAdmin(req, urlObj, bodyObj = {}) {
-  const key = req.headers['x-admin-key'] || urlObj.searchParams.get('key') || bodyObj.adminKey || '';
+  const authHeader = req.headers['authorization'] || '';
+  const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const key = req.headers['x-admin-key'] || bearer || urlObj.searchParams.get('key') || bodyObj.adminKey || '';
   return key === ADMIN_KEY;
 }
 
@@ -200,18 +221,18 @@ function buildLocalAiFallback(message, context = {}) {
     return 'Assalomu alaykum! Men Manzil AI yordamchisiman. Sizga 105+ sayohat manzili, O‘zbekistonliklar uchun viza tartibi, byudjet hisob-kitobi, mahalliy gid topish yoki tur-paket band qilishda yordam beraman. Qayerga sayohat qilishni rejalashtiryapsiz?';
   }
   if (/viza|vizasiz/.test(t)) {
-    return 'O‘zbekiston fuqarolari uchun vizasiz davlatlar: Turkiya (90 kun), Gruziya (1 yil), BAA (30 kun), Qozog‘iston (30 kun), Qirg‘iziston (60 kun), Tojikiston (30 kun), Tailand (60 kun), Maldiv (30 kun), Indoneziya (30 kun VOA), Ummon (14 kun) va Xitoy (30 kun). Asosiy ekranda «🛂 Vizasiz davlatlar» tugmasini bosing.';
+    return 'O‘zbekiston fuqarolari uchun vizasiz davlatlar: Turkiya (90 kun), Gruziya (1 yil), BAA (30 kun), Qozog‘iston (30 kun), Qirg‘iziston (60 kun), Tojikiston (30 kun), Tailand (60 kun), Maldiv (30 kun), Indoneziya (30 kun VOA), Ummon (14 kun) va Xitoy (30 kun). Asosiy ekranda «🛂 Vizasiz» tugmasini bosing.';
   }
   if (/byudjet|narx|qancha|pul|so‘m|som/.test(t)) {
     return `Hozirgi tanlangan ${days} kunlik safar va 1$ = ${Number(rate).toLocaleString('ru-RU')} so‘m kursi bo‘yicha mustaqil (DIY) sayohat o‘rtacha 35% arzonroq tushadi. Har bir manzil kartochkasida dollar va so‘mdagi aniq taxminiy byudjet ko‘rsatilgan.`;
   }
   if (/gid|qo‘shil|qoshil|operator|komissiya/.test(t)) {
-    return '«🧭 Gidlar & Turlar» bo‘limidan hududiy gidlarni topishingiz, Telegramda yozishingiz yoki «💳 Band qilish» orqali onlayn bron qilishingiz mumkin. Gid sifatida qo‘shilish bepul — platforma har bir sotilgan paketdan 12% komissiya oladi, 88% gidga qoladi.';
+    return '«🧭 Gidlar» bo‘limidan hududiy gidlarni topishingiz, aloqaga chiqishingiz yoki onlayn band qilishingiz mumkin. Gid sifatida qo‘shilish bepul — platforma har bir sotilgan paketdan 12% komissiya oladi, 88% gidga qoladi.';
   }
   if (/to‘lov|tolov|click|payme|karta|stripe/.test(t)) {
     return 'Platformada Click, Payme va xalqaro Visa/Mastercard (Stripe) orqali gid xizmati yoki tur-paketni oldindan band qilish mumkin. Har bir to‘lovdan so‘ng raqamli chek va Telegram xabarnoma yuboriladi.';
   }
-  return `Savolingiz bo‘yicha tavsiya: ${days} kunlik sayohatingiz uchun «✦ Rejam» bo‘limiga 2–3 ta manzil qo‘shing, byudjetni DIY yoki Tur-paket rejimida solishtiring va kerak bo‘lsa hududiy gidni tanlang. Aniq shahar nomini yozsangiz, viza va xarajatlar bo‘yicha batafsil ma’lumot beraman!`;
+  return `Savolingiz bo‘yicha tavsiya: ${days} kunlik sayohatingiz uchun manzillarni marshrutga qo‘shing, byudjetni DIY yoki Tur-paket rejimida solishtiring va kerak bo‘lsa hududiy gidni tanlang. Aniq shahar nomini yozsangiz, viza va xarajatlar bo‘icha batafsil ma’lumot beraman!`;
 }
 
 async function generateAiReply(message, history = [], context = {}, requestedProvider = 'auto') {
@@ -249,7 +270,7 @@ async function generateAiReply(message, history = [], context = {}, requestedPro
     "Siz Manzil sayohat ekotizimining (105+ mahalliy va xalqaro manzillar, gidlar katalogi, aviachipta qidiruvi va tur-paketlar platformasi) rasmiy AI sayohat maslahatchisisiz.",
     "Foydalanuvchilarga o'zbek tilida (agar boshqa tilda yozsa, o'sha tilda) aniq, samimiy, lo'nda va amaliy javob bering.",
     "O'zbekiston fuqarolari uchun viza tartiblari, byudjet rejalashtirish, mustaqil (DIY) va tur-paket farqlari, mahalliy gidlar (12% platforma komissiyasi) haqida aniq ma'lumot bering.",
-    `Foydalanuvchi joriy konteksti: Safar kunlari = ${context.days || 5} kun, Valyuta kursi: 1$ = ${context.rate || 12850} so'm, Joriy reja: ${planSummary}.`
+    `Foydalanuvchi joriy konteksti: Uchish shahri = ${context.origin || 'TAS'}, Safar kunlari = ${context.days || 5} kun, Sayohatchilar = ${context.travelers || 2} kishi, Oy = ${context.month || 'Istalgan oy'}, Joriy reja: ${planSummary}.`
   ].join('\n');
 
   const cleanHistory = Array.isArray(history)
@@ -356,11 +377,15 @@ function serveStatic(req, res, pathname) {
     return res.end('Forbidden');
   }
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+    // Agar admin.html alohida fayl bo'lmasa index.html ni ochadi
     filePath = path.join(PUBLIC_DIR, 'index.html');
+    if (!fs.existsSync(filePath)) {
+      filePath = path.join(__dirname, 'index.html');
+    }
   }
   if (!fs.existsSync(filePath)) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-    return res.end('public/index.html topilmadi');
+    return res.end('index.html topilmadi');
   }
 
   const ext = path.extname(filePath).toLowerCase();
@@ -377,7 +402,7 @@ const BOT_META = {
     "✅ Gid sifatida ro'yxatdan o'tish va 24/7 qo'llab-quvvatlash\n\n" +
     "Boshlash uchun /start tugmasini bosing!",
   shortDescription:
-    "Manzil rasmiy yordamchi boti — mahalliy gidlar, sayohat rejalari va 24/7 qo'llab-quvvatlash: https://manzil-app-1.onrender.com",
+    "Manzil rasmiy yordamchi boti — mahalliy gidlar, sayohat rejalari va 24/7 qo'llab-quvvatlash",
   commands: [
     { command: 'start', description: 'Botni ishga tushirish va asosiy menyu' },
     { command: 'guides', description: "Tasdiqlangan mahalliy gidlar ro'yxati" },
@@ -475,7 +500,7 @@ async function processTelegramUpdate(body) {
 
     const [action, guideId] = String(cb.data).split(':');
     const guides = readJson(FILES.guides, SEED_GUIDES);
-    const guide = guides.find(g => g.id === guideId);
+    const guide = guides.find(g => String(g.id) === String(guideId));
     let toastText = 'Ariza topilmadi';
     let statusTag = '';
 
@@ -550,7 +575,7 @@ async function processTelegramUpdate(body) {
 
     if (isOwner && (text === '/admin' || text === '/stats')) {
       const guides = readJson(FILES.guides, SEED_GUIDES);
-      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
+      const payments = readJson(FILES.payments, []);
       const subs = readJson(BOT_USERS_FILE, []);
       const pending = guides.filter(g => g.approved === false && !g.rejected).length;
       const approved = guides.filter(g => g.approved === true).length;
@@ -573,7 +598,7 @@ async function processTelegramUpdate(body) {
 
       await sendTgTo(chatId, statMsg, {
         reply_markup: {
-          inline_keyboard: [[{ text: '🖥 Admin Panelni ochish', url: siteUrl + '/admin' }]]
+          inline_keyboard: [[{ text: '🖥 Web-saytni ochish', url: siteUrl }]]
         }
       });
       return;
@@ -591,10 +616,10 @@ async function processTelegramUpdate(body) {
           '🟡 <b>Kutilayotgan ariza</b>',
           '🆔 ID: <code>' + escHtml(g.id) + '</code>',
           '👤 Ism: <b>' + escHtml(g.name) + '</b>',
-          '📍 Hudud: ' + escHtml(g.city) + ', ' + escHtml(g.country),
-          '💰 Stavka: $' + escHtml(g.rate) + '/kun',
+          '📍 Hudud: ' + escHtml(g.city) + ', ' + escHtml(g.country || ''),
+          '💰 Stavka: $' + escHtml(g.rate || g.price) + '/kun',
           '✈️ Telegram: @' + escHtml(g.tg),
-          '📝 Yo‘nalish: ' + escHtml(g.spec)
+          '📝 Yo‘nalish: ' + escHtml(g.spec || g.bio)
         ].join('\n');
         await sendTgTo(chatId, card, {
           reply_markup: {
@@ -623,9 +648,9 @@ async function processTelegramUpdate(body) {
     }
 
     if (text === '/guides' || text === '🧭 Gidlar katalogi') {
-      const guides = readJson(FILES.guides, SEED_GUIDES).filter(g => g.approved === true);
+      const guides = readJson(FILES.guides, SEED_GUIDES).filter(g => g.approved !== false);
       const lines = guides.slice(0, 8).map((g, i) =>
-        (i + 1) + '. <b>' + escHtml(g.name) + '</b> — ' + escHtml(g.city) + ' ($' + g.rate + '/kun)\n   🗣 ' + escHtml(g.langs) + ' | ✈️ @' + escHtml(g.tg)
+        (i + 1) + '. <b>' + escHtml(g.name) + '</b> — ' + escHtml(g.city) + ' ($' + (g.rate || g.price) + '/kun)\n   🗣 ' + escHtml(g.langs) + ' | ✈️ @' + escHtml(g.tg)
       );
       await sendTgTo(chatId, '🧭 <b>Tasdiqlangan mahalliy gidlar (' + guides.length + ' ta):</b>\n\n' + lines.join('\n\n'), {
         reply_markup: { inline_keyboard: [[{ text: '🌐 Barcha gidlar va band qilish', url: siteUrl }]] }
@@ -696,9 +721,11 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, {
         ok: true,
         service: 'manzil-backend',
-        version: '2.0.0',
+        version: '2.1.0',
         uptimeSec: Math.round(process.uptime()),
         commissionRate: COMMISSION_RATE,
+        openai: Boolean(OPENAI_API_KEY),
+        grok: Boolean(GROK_API_KEY),
         integrations: {
           telegram: Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID),
           openai: Boolean(OPENAI_API_KEY),
@@ -717,11 +744,74 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // --- DESTINATIONS: PUBLIC LIST & ADMIN CRUD ---
+    if (req.method === 'GET' && pathname === '/api/destinations') {
+      const destinations = readJson(FILES.destinations, []);
+      return sendJson(res, 200, { ok: true, destinations });
+    }
+
+    if (req.method === 'POST' && pathname === '/api/admin/destinations') {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin ruxsati talab qilinadi' });
+      }
+      const list = readJson(FILES.destinations, []);
+      const newDest = {
+        id: Number(body.id) || Date.now(),
+        name: String(body.name || '').trim(),
+        country: String(body.country || "O'zbekiston").trim(),
+        region: String(body.region || "O'zbekiston").trim(),
+        scope: body.scope === 'world' ? 'world' : 'uz',
+        lat: Number(body.lat) || 41.3,
+        lng: Number(body.lng) || 69.2,
+        flightBase: Number(body.flightBase) || 0,
+        hotelNight: Number(body.hotelNight) || 40,
+        foodDay: Number(body.foodDay) || 18,
+        transportDay: Number(body.transportDay) || 12,
+        activitiesDay: Number(body.activitiesDay) || 10,
+        tourBase5d: Number(body.tourBase5d) || 240,
+        bestMonths: Array.isArray(body.bestMonths) ? body.bestMonths : [4, 5, 9, 10],
+        tags: Array.isArray(body.tags) ? body.tags : ['diy-win'],
+        desc: String(body.desc || '').trim(),
+        createdAt: new Date().toISOString()
+      };
+      if (!newDest.name) return sendJson(res, 400, { ok: false, error: 'Manzil nomi kiritilmagan' });
+      list.push(newDest);
+      writeJson(FILES.destinations, list);
+      return sendJson(res, 201, { ok: true, destination: newDest });
+    }
+
+    const adminDestMatch = pathname.match(/^\/api\/admin\/destinations\/([^/]+)$/);
+    if (adminDestMatch && (req.method === 'PUT' || req.method === 'DELETE')) {
+      const body = req.method === 'PUT' ? await parseBody(req) : {};
+      if (!isAdmin(req, urlObj, body)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin ruxsati talab qilinadi' });
+      }
+      const destId = decodeURIComponent(adminDestMatch[1]);
+      let list = readJson(FILES.destinations, []);
+      if (req.method === 'DELETE') {
+        list = list.filter(d => String(d.id) !== destId);
+        writeJson(FILES.destinations, list);
+        return sendJson(res, 200, { ok: true });
+      }
+      const idx = list.findIndex(d => String(d.id) === destId);
+      if (idx === -1) {
+        // Agar frontenddagi 85 ta statik manzildan biri tahrirlansa, server bazasiga ham saqlaymiz
+        const upserted = { ...body, id: Number(destId) || destId, updatedAt: new Date().toISOString() };
+        list.push(upserted);
+        writeJson(FILES.destinations, list);
+        return sendJson(res, 200, { ok: true, destination: upserted });
+      }
+      list[idx] = { ...list[idx], ...body, id: list[idx].id, updatedAt: new Date().toISOString() };
+      writeJson(FILES.destinations, list);
+      return sendJson(res, 200, { ok: true, destination: list[idx] });
+    }
+
     // --- GUIDES: LIST ---
     if (req.method === 'GET' && pathname === '/api/guides') {
-      const guides = readJson(FILES.guides, SEED_GUIDES);
-      const onlyApproved = urlObj.searchParams.get('approved') === 'true';
-      const filtered = onlyApproved ? guides.filter(g => g.approved !== false) : guides;
+      const guides = readJson(FILES.guides, SEED_GUIDES).map(normalizeGuideForClient);
+      const onlyApproved = urlObj.searchParams.get('approved') !== 'false';
+      const filtered = onlyApproved ? guides.filter(g => g.status === 'approved') : guides;
       return sendJson(res, 200, {
         ok: true,
         commissionRate: COMMISSION_RATE,
@@ -729,20 +819,21 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // --- GUIDES: APPLY ---
+    // --- GUIDES: APPLY (Frontend va eski forma formatlariga mos) ---
     if (req.method === 'POST' && pathname === '/api/guides/apply') {
       const body = await parseBody(req);
       const name = String(body.name || '').trim();
       const city = String(body.city || '').trim();
       const country = String(body.country || "O'zbekiston").trim();
-      const langs = String(body.langs || '').trim();
-      const spec = String(body.spec || '').trim();
-      const tg = String(body.tg || '').trim().replace(/^@/, '');
-      const rate = Math.max(5, Math.min(2000, Number(body.rate) || 50));
-      const about = String(body.about || '').trim();
+      const langs = String(body.langs || "O'zbek, Rus").trim();
+      const spec = String(body.spec || body.bio || '').trim();
+      const tg = String(body.tg || body.contact || '').trim().replace(/^@/, '');
+      const rate = Math.max(5, Math.min(2000, Number(body.rate || body.price) || 50));
+      const exp = Math.max(1, Math.min(50, Number(body.exp) || 3));
+      const about = String(body.about || body.bio || '').trim();
 
       if (!name || !city || !tg || !spec) {
-        return sendJson(res, 400, { ok: false, error: 'Ism, shahar, mutaxassislik va Telegram username majburiy.' });
+        return sendJson(res, 400, { ok: false, error: 'Ism, shahar, aloqa va tavsif majburiy.' });
       }
 
       const guides = readJson(FILES.guides, SEED_GUIDES);
@@ -751,10 +842,14 @@ const server = http.createServer(async (req, res) => {
         name,
         city,
         country,
-        langs: langs || "O'zbek, Rus",
+        langs,
         spec,
+        bio: spec,
         rate,
+        price: rate,
+        exp,
         tg,
+        contact: '@' + tg,
         group: String(body.group || '').trim(),
         about,
         approved: false,
@@ -771,11 +866,9 @@ const server = http.createServer(async (req, res) => {
         `📍 Hudud: ${escHtml(city)}, ${escHtml(country)}`,
         `🗣 Tillar: ${escHtml(newGuide.langs)}`,
         `💰 Stavka: $${rate}/kun (Komissiya: ${Math.round(COMMISSION_RATE * 100)}%)`,
-        `✈️ Telegram: @${escHtml(tg)}`,
-        `📝 Yo'nalish: ${escHtml(spec)}`,
-        about ? `ℹ️ Tajriba: ${escHtml(about)}` : '',
-        `\n✅ Tasdiqlash: <code>POST /api/guides/${newGuide.id}/approve</code>`
-      ].filter(Boolean).join('\n');
+        `✈️ Aloqa: @${escHtml(tg)}`,
+        `📝 Yo'nalish: ${escHtml(spec)}`
+      ].join('\n');
 
       const tgRes = await sendTelegramAdminAction(tgMsg, {
         inline_keyboard: [[
@@ -783,7 +876,7 @@ const server = http.createServer(async (req, res) => {
           { text: '❌ Rad etish', callback_data: 'reject:' + newGuide.id }
         ]]
       });
-      return sendJson(res, 201, { ok: true, guide: newGuide, telegram: tgRes });
+      return sendJson(res, 201, { ok: true, guide: normalizeGuideForClient(newGuide), telegram: tgRes });
     }
 
     // --- TELEGRAM WEBHOOK ---
@@ -819,33 +912,45 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true, token, user: adminUser });
     }
 
-    // --- ADMIN: OVERVIEW ---
-    if (req.method === 'GET' && pathname === '/api/admin/overview') {
+    // --- ADMIN: STATS & OVERVIEW ---
+    if (req.method === 'GET' && (pathname === '/api/admin/stats' || pathname === '/api/admin/overview')) {
       if (!isAdmin(req, urlObj)) {
         return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
       }
-      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const customDests = readJson(FILES.destinations, []);
+      const guides = readJson(FILES.guides, SEED_GUIDES).map(normalizeGuideForClient);
       const feedback = readJson(FILES.feedback, []);
-      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
-      const users = FILES.users ? readJson(FILES.users, []) : [];
+      const payments = readJson(FILES.payments, []);
+      const users = readJson(FILES.users, []);
 
       const paidList = payments.filter(p => p.status === 'paid' || p.status === 'completed');
       const grossRevenue = paidList.reduce((s, p) => s + Number(p.amountUsd || p.amount || p.totalAmount || 0), 0);
       const commissionRevenue = paidList.reduce((s, p) => {
         const amt = Number(p.amountUsd || p.amount || p.totalAmount || 0);
-        return s + Number(p.commissionUsd != null ? p.commissionUsd : (p.commissionAmount != null ? p.commissionAmount : amt * COMMISSION_RATE));
+        return s + Number(p.commissionUsd != null ? p.commissionUsd : amt * COMMISSION_RATE);
       }, 0);
+
+      const approvedGuidesCount = guides.filter(g => g.status === 'approved').length;
+      const pendingGuidesCount = guides.filter(g => g.status === 'pending').length;
 
       return sendJson(res, 200, {
         ok: true,
         commissionRate: COMMISSION_RATE,
-        telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
-        publicUrl: process.env.PUBLIC_URL || 'https://manzil-app-1.onrender.com',
+        telegramConfigured: Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID),
+        publicUrl: PUBLIC_URL,
+        // index.html admin modal uchun flat maydonlar
+        destinationsCount: 85 + customDests.length,
+        approvedGuidesCount,
+        pendingGuidesCount,
+        paymentsCount: payments.length,
+        feedbackCount: feedback.length,
+        usersCount: users.length,
+        // kengaytirilgan stats
         stats: {
           totalGuides: guides.length,
-          approvedGuides: guides.filter(g => g.approved === true).length,
-          pendingGuides: guides.filter(g => g.approved === false && !g.rejected).length,
-          rejectedGuides: guides.filter(g => g.rejected === true).length,
+          approvedGuides: approvedGuidesCount,
+          pendingGuides: pendingGuidesCount,
+          rejectedGuides: guides.filter(g => g.status === 'rejected').length,
           totalPayments: payments.length,
           paidPayments: paidList.length,
           grossRevenue: Math.round(grossRevenue * 100) / 100,
@@ -857,6 +962,59 @@ const server = http.createServer(async (req, res) => {
         feedback,
         payments
       });
+    }
+
+    // --- ADMIN: GUIDES LIST, APPROVE, DELETE ---
+    if (req.method === 'GET' && pathname === '/api/admin/guides') {
+      if (!isAdmin(req, urlObj)) return sendJson(res, 401, { ok: false, error: 'Admin ruxsati kerak' });
+      const guides = readJson(FILES.guides, SEED_GUIDES).map(normalizeGuideForClient);
+      return sendJson(res, 200, { ok: true, guides });
+    }
+
+    const adminApproveMatch = pathname.match(/^\/api\/(?:admin\/)?guides\/([^/]+)\/approve$/);
+    if (req.method === 'POST' && adminApproveMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) {
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      }
+      const guideId = decodeURIComponent(adminApproveMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const guide = guides.find(g => String(g.id) === guideId);
+      if (!guide) {
+        return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
+      }
+      guide.approved = true;
+      guide.rejected = false;
+      guide.approvedAt = new Date().toISOString();
+      writeJson(FILES.guides, guides);
+
+      await sendTelegram(`✅ <b>Gid tasdiqlandi!</b>\n👤 ${escHtml(guide.name)} (${escHtml(guide.city)})\n✈️ @${escHtml(guide.tg || '')}`);
+      return sendJson(res, 200, { ok: true, guide: normalizeGuideForClient(guide) });
+    }
+
+    const rejectMatch = pathname.match(/^\/api\/(?:admin\/)?guides\/([^/]+)\/reject$/);
+    if (req.method === 'POST' && rejectMatch) {
+      const body = await parseBody(req);
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const guideId = decodeURIComponent(rejectMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      const guide = guides.find(g => String(g.id) === guideId);
+      if (!guide) return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
+      guide.approved = false;
+      guide.rejected = true;
+      guide.rejectedAt = new Date().toISOString();
+      writeJson(FILES.guides, guides);
+      return sendJson(res, 200, { ok: true, guide: normalizeGuideForClient(guide) });
+    }
+
+    const delGuideMatch = pathname.match(/^\/api\/(?:admin\/)?guides\/([^/]+)(?:\/delete)?$/);
+    if ((req.method === 'DELETE' || (req.method === 'POST' && pathname.endsWith('/delete'))) && delGuideMatch) {
+      const body = req.method === 'POST' ? await parseBody(req) : {};
+      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
+      const guideId = decodeURIComponent(delGuideMatch[1]);
+      const guides = readJson(FILES.guides, SEED_GUIDES);
+      writeJson(FILES.guides, guides.filter(g => String(g.id) !== guideId));
+      return sendJson(res, 200, { ok: true });
     }
 
     // --- ADMIN: TELEGRAM WEBHOOK ULASH VA TEST ---
@@ -874,92 +1032,15 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: Boolean(result.ok), result });
     }
 
-    // --- ADMIN: YANGI GID QO'SHISH ---
-    if (req.method === 'POST' && pathname === '/api/guides/admin-create') {
-      const body = await parseBody(req);
-      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
-      const name = String(body.name || '').trim();
-      const city = String(body.city || '').trim();
-      const country = String(body.country || "O'zbekiston").trim();
-      const langs = String(body.langs || "O'zbek, Rus").trim();
-      const spec = String(body.spec || '').trim();
-      const tg = String(body.tg || '').trim().replace(/^@/, '');
-      const rate = Math.max(5, Math.min(2000, Number(body.rate) || 50));
-      if (!name || !city || !tg || !spec) {
-        return sendJson(res, 400, { ok: false, error: 'Barcha maydonlarni to‘ldiring' });
-      }
-      const guides = readJson(FILES.guides, SEED_GUIDES);
-      const newGuide = {
-        id: 'guide_' + crypto.randomBytes(4).toString('hex'),
-        name, city, country, langs, spec, rate, tg,
-        group: String(body.group || '').trim(),
-        about: String(body.about || '').trim(),
-        approved: true,
-        approvedAt: new Date().toISOString(),
-        commissionRate: COMMISSION_RATE,
-        createdAt: new Date().toISOString()
-      };
-      guides.unshift(newGuide);
-      writeJson(FILES.guides, guides);
-      return sendJson(res, 201, { ok: true, guide: newGuide });
-    }
-
-    // --- GUIDES: APPROVE, REJECT & DELETE (Admin) ---
-    const approveMatch = pathname.match(/^\/api\/guides\/([^/]+)\/approve$/);
-    if (req.method === 'POST' && approveMatch) {
-      const body = await parseBody(req);
-      if (!isAdmin(req, urlObj, body)) {
-        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri (X-Admin-Key)' });
-      }
-      const guideId = decodeURIComponent(approveMatch[1]);
-      const guides = readJson(FILES.guides, SEED_GUIDES);
-      const guide = guides.find(g => g.id === guideId);
-      if (!guide) {
-        return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
-      }
-      guide.approved = true;
-      guide.rejected = false;
-      guide.approvedAt = new Date().toISOString();
-      writeJson(FILES.guides, guides);
-
-      await sendTelegram(`✅ <b>Gid tasdiqlandi!</b>\n👤 ${escHtml(guide.name)} (${escHtml(guide.city)})\n✈️ @${escHtml(guide.tg)}`);
-      return sendJson(res, 200, { ok: true, guide });
-    }
-
-    const rejectMatch = pathname.match(/^\/api\/guides\/([^/]+)\/reject$/);
-    if (req.method === 'POST' && rejectMatch) {
-      const body = await parseBody(req);
-      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
-      const guideId = decodeURIComponent(rejectMatch[1]);
-      const guides = readJson(FILES.guides, SEED_GUIDES);
-      const guide = guides.find(g => g.id === guideId);
-      if (!guide) return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
-      guide.approved = false;
-      guide.rejected = true;
-      guide.rejectedAt = new Date().toISOString();
-      writeJson(FILES.guides, guides);
-      return sendJson(res, 200, { ok: true, guide });
-    }
-
-    const delGuideMatch = pathname.match(/^\/api\/guides\/([^/]+)\/delete$/);
-    if (req.method === 'POST' && delGuideMatch) {
-      const body = await parseBody(req);
-      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
-      const guideId = decodeURIComponent(delGuideMatch[1]);
-      const guides = readJson(FILES.guides, SEED_GUIDES);
-      writeJson(FILES.guides, guides.filter(g => g.id !== guideId));
-      return sendJson(res, 200, { ok: true });
-    }
-
     // --- FEEDBACK: CREATE, LIST & DELETE ---
     if (req.method === 'POST' && pathname === '/api/feedback') {
       const body = await parseBody(req);
       const name = String(body.name || '').trim();
       const contact = String(body.contact || '').trim();
       const type = String(body.type || 'taklif').trim();
-      const msg = String(body.msg || '').trim();
+      const message = String(body.message || body.msg || '').trim();
 
-      if (!name || !msg) {
+      if (!name || !message) {
         return sendJson(res, 400, { ok: false, error: 'Ism va xabar matni kiritilishi shart.' });
       }
 
@@ -969,7 +1050,8 @@ const server = http.createServer(async (req, res) => {
         name,
         contact,
         type,
-        msg,
+        msg: message,
+        message,
         createdAt: new Date().toISOString()
       };
       items.unshift(entry);
@@ -979,28 +1061,31 @@ const server = http.createServer(async (req, res) => {
         `💬 <b>Yangi murojaat (${escHtml(type.toUpperCase())})</b>`,
         `👤 Ism: <b>${escHtml(name)}</b>`,
         `📞 Aloqa: ${escHtml(contact || 'ko‘rsatilmagan')}`,
-        `📝 Xabar:\n${escHtml(msg)}`
+        `📝 Xabar:\n${escHtml(message)}`
       ].join('\n');
       const tgRes = await sendTelegram(tgMsg);
 
       return sendJson(res, 201, { ok: true, feedback: entry, telegram: tgRes });
     }
 
-    if (req.method === 'GET' && pathname === '/api/feedback') {
+    if (req.method === 'GET' && (pathname === '/api/feedback' || pathname === '/api/admin/feedback')) {
       if (!isAdmin(req, urlObj)) {
-        return sendJson(res, 401, { ok: false, error: 'Admin kaliti talab qilinadi (X-Admin-Key)' });
+        return sendJson(res, 401, { ok: false, error: 'Admin kaliti talab qilinadi' });
       }
-      const items = readJson(FILES.feedback, []);
+      const items = readJson(FILES.feedback, []).map(f => ({
+        ...f,
+        message: f.message || f.msg || ''
+      }));
       return sendJson(res, 200, { ok: true, total: items.length, feedback: items });
     }
 
-    const delFbMatch = pathname.match(/^\/api\/feedback\/([^/]+)\/delete$/);
-    if (req.method === 'POST' && delFbMatch) {
-      const body = await parseBody(req);
+    const delFbMatch = pathname.match(/^\/api\/(?:admin\/)?feedback\/([^/]+)(?:\/delete)?$/);
+    if ((req.method === 'DELETE' || (req.method === 'POST' && pathname.endsWith('/delete'))) && delFbMatch) {
+      const body = req.method === 'POST' ? await parseBody(req) : {};
       if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
       const fbId = decodeURIComponent(delFbMatch[1]);
       const items = readJson(FILES.feedback, []);
-      writeJson(FILES.feedback, items.filter(f => f.id !== fbId));
+      writeJson(FILES.feedback, items.filter(f => String(f.id) !== fbId));
       return sendJson(res, 200, { ok: true });
     }
 
@@ -1032,7 +1117,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && pathname === '/api/auth/register') {
       const body = await parseBody(req);
       const name = String(body.name || '').trim();
-      const emailOrPhone = String(body.emailOrPhone || '').trim().toLowerCase();
+      const emailOrPhone = String(body.emailOrPhone || body.email || '').trim().toLowerCase();
       const password = String(body.password || '');
       const role = body.role === 'guide' ? 'guide' : 'tourist';
 
@@ -1041,17 +1126,25 @@ const server = http.createServer(async (req, res) => {
       }
 
       const users = readJson(FILES.users, []);
-      if (users.some(u => u.emailOrPhone === emailOrPhone)) {
+      if (users.some(u => (u.emailOrPhone || u.email) === emailOrPhone)) {
         return sendJson(res, 409, { ok: false, error: 'Bu email yoki telefon raqami allaqachon ro‘yxatdan o‘tgan.' });
       }
 
       const user = {
         id: 'usr_' + crypto.randomBytes(5).toString('hex'),
         name,
+        email: emailOrPhone,
         emailOrPhone,
         role,
         passwordHash: hashPassword(password),
-        savedData: { favorites: [], plan: [], checklist: [] },
+        favorites: Array.isArray(body.favorites) ? body.favorites : [],
+        route: Array.isArray(body.route) ? body.route : [],
+        savedData: {
+          favorites: Array.isArray(body.favorites) ? body.favorites : [],
+          route: Array.isArray(body.route) ? body.route : [],
+          plan: [],
+          checklist: []
+        },
         createdAt: new Date().toISOString()
       };
       users.push(user);
@@ -1065,11 +1158,11 @@ const server = http.createServer(async (req, res) => {
     // --- USER AUTH: LOGIN ---
     if (req.method === 'POST' && pathname === '/api/auth/login') {
       const body = await parseBody(req);
-      const emailOrPhone = String(body.emailOrPhone || '').trim().toLowerCase();
+      const emailOrPhone = String(body.emailOrPhone || body.email || '').trim().toLowerCase();
       const password = String(body.password || '');
 
       const users = readJson(FILES.users, []);
-      const user = users.find(u => u.emailOrPhone === emailOrPhone);
+      const user = users.find(u => (u.emailOrPhone || u.email) === emailOrPhone);
       if (!user || !verifyPassword(password, user.passwordHash)) {
         return sendJson(res, 401, { ok: false, error: 'Login yoki parol noto‘g‘ri.' });
       }
@@ -1096,8 +1189,13 @@ const server = http.createServer(async (req, res) => {
       const users = readJson(FILES.users, []);
       const idx = users.findIndex(u => u.id === user.id);
       if (idx !== -1) {
+        const favs = Array.isArray(body.favorites) ? body.favorites : [];
+        const route = Array.isArray(body.route) ? body.route : [];
+        users[idx].favorites = favs;
+        users[idx].route = route;
         users[idx].savedData = {
-          favorites: Array.isArray(body.favorites) ? body.favorites : [],
+          favorites: favs,
+          route,
           plan: Array.isArray(body.plan) ? body.plan : [],
           checklist: Array.isArray(body.checklist) ? body.checklist : [],
           updatedAt: new Date().toISOString()
@@ -1108,14 +1206,14 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 404, { ok: false, error: 'Foydalanuvchi topilmadi' });
     }
 
-    // --- PAYMENTS: CREATE ORDER (Click, Payme, Stripe / Sandbox) ---
+    // --- PAYMENTS: CREATE ORDER ---
     if (req.method === 'POST' && pathname === '/api/payments/create') {
       const body = await parseBody(req);
       const authUser = getAuthUser(req);
       const amountUsd = Math.max(1, Number(body.amountUsd) || 50);
       const rateUzs = Math.max(1000, Number(body.rateUzs) || 12850);
       const amountUzs = Math.round(amountUsd * rateUzs);
-      const provider = ['click', 'payme', 'card', 'stripe'].includes(String(body.provider).toLowerCase())
+      const provider = ['click', 'payme', 'uzum', 'card', 'stripe'].includes(String(body.provider).toLowerCase())
         ? String(body.provider).toLowerCase()
         : 'click';
 
@@ -1159,7 +1257,9 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      const contactVal = String(body.contact || body.customerContact || (authUser ? authUser.emailOrPhone : '')).trim();
       const order = {
+        id: orderId,
         orderId,
         userId: authUser ? authUser.id : null,
         itemType: String(body.itemType || 'guide'),
@@ -1170,7 +1270,8 @@ const server = http.createServer(async (req, res) => {
         days: Math.max(1, Number(body.days) || 1),
         people: Math.max(1, Number(body.people) || 1),
         customerName: String(body.customerName || (authUser ? authUser.name : 'Mehmon')).trim(),
-        customerContact: String(body.customerContact || (authUser ? authUser.emailOrPhone : '')).trim(),
+        contact: contactVal,
+        customerContact: contactVal,
         provider,
         checkoutMode,
         checkoutUrl,
@@ -1187,7 +1288,7 @@ const server = http.createServer(async (req, res) => {
       payments.unshift(order);
       writeJson(FILES.payments, payments);
 
-      return sendJson(res, 201, { ok: true, order });
+      return sendJson(res, 201, { ok: true, payment: order, order });
     }
 
     // --- PAYMENTS: CONFIRM / WEBHOOK ---
@@ -1198,7 +1299,7 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 400, { ok: false, error: 'orderId ko‘rsatilmagan' });
       }
       const payments = readJson(FILES.payments, []);
-      const order = payments.find(p => p.orderId === orderId);
+      const order = payments.find(p => p.orderId === orderId || p.id === orderId);
       if (!order) {
         return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
       }
@@ -1212,11 +1313,9 @@ const server = http.createServer(async (req, res) => {
           '💳 <b>Yangi to‘lov tasdiqlandi! (Manzil Pay)</b>',
           `🧾 Chek: <code>${escHtml(order.receiptId)}</code> | Buyurtma: <code>${escHtml(order.orderId)}</code>`,
           `📦 Xizmat: <b>${escHtml(order.title)}</b>`,
-          `🧭 Gid: ${escHtml(order.guideName)} ${order.guideTg ? `(@${escHtml(order.guideTg)})` : ''}`,
           `👤 Mijoz: ${escHtml(order.customerName)} (${escHtml(order.customerContact || '-')})`,
           `💰 Jami: <b>$${order.amountUsd}</b> (~${order.amountUzs.toLocaleString('ru-RU')} so‘m)`,
           `📊 Platforma komissiyasi (${Math.round(order.commissionRate * 100)}%): <b>$${order.commissionUsd}</b>`,
-          `🤝 Gid ulushi: <b>$${order.guidePayoutUsd}</b>`,
           `🏦 Usul: ${escHtml(order.provider.toUpperCase())}`
         ].join('\n');
         await sendTelegram(tgMsg);
@@ -1225,23 +1324,27 @@ const server = http.createServer(async (req, res) => {
     }
 
     // --- PAYMENTS: UPDATE STATUS (Admin) ---
-    const payStatusMatch = pathname.match(/^\/api\/payments\/([^/]+)\/status$/);
+    const payStatusMatch = pathname.match(/^\/api\/(?:admin\/)?payments\/([^/]+)\/status$/);
     if (req.method === 'POST' && payStatusMatch) {
       const body = await parseBody(req);
       if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
       const payId = decodeURIComponent(payStatusMatch[1]);
-      const payments = FILES.payments ? readJson(FILES.payments, []) : [];
-      const item = payments.find(p => p.orderId === payId || p.id === payId);
+      const payments = readJson(FILES.payments, []);
+      const item = payments.find(p => String(p.orderId) === payId || String(p.id) === payId);
       if (!item) return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
       item.status = String(body.status || 'paid');
       item.updatedAt = new Date().toISOString();
-      if (FILES.payments) writeJson(FILES.payments, payments);
+      writeJson(FILES.payments, payments);
       return sendJson(res, 200, { ok: true, payment: item });
     }
 
     // --- PAYMENTS: LIST ---
-    if (req.method === 'GET' && pathname === '/api/payments') {
-      const payments = readJson(FILES.payments, []);
+    if (req.method === 'GET' && (pathname === '/api/payments' || pathname === '/api/admin/payments')) {
+      const payments = readJson(FILES.payments, []).map(p => ({
+        ...p,
+        id: p.id || p.orderId,
+        contact: p.contact || p.customerContact || ''
+      }));
       if (isAdmin(req, urlObj)) {
         const paid = payments.filter(p => p.status === 'paid');
         const totalVolumeUsd = Number(paid.reduce((s, p) => s + (p.amountUsd || 0), 0).toFixed(2));
