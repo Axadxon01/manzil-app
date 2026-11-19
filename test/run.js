@@ -182,9 +182,9 @@ async function v32Flow() {
   const http = require('http'), crypto = require('crypto');
   const md5 = s => crypto.createHash('md5').update(String(s)).digest('hex');
   const P3 = PORT + 900, B3 = `http://localhost:${P3}`, TGP = PORT + 950;
-  const tgSent = [];
-  const mock = http.createServer((q, s) => { let d = ''; q.on('data', c => d += c); q.on('end', () => { const m = q.url.split('/').pop(); let body = {}; try { body = JSON.parse(d); } catch (_) {} if (m === 'sendMessage') tgSent.push(body);
-    s.setHeader('Content-Type', 'application/json'); s.end(JSON.stringify({ ok: true, result: m === 'getMe' ? { id: 1, username: 'manzil_test_bot' } : (m === 'sendMessage' ? { message_id: tgSent.length + 100 } : true) })); }); });
+  const tgSent = [], tgEdits = [], tgPhotos = [], tgCopies = [];
+  const mock = http.createServer((q, s) => { let d = ''; q.on('data', c => d += c); q.on('end', () => { const m = q.url.split('/').pop(); let body = {}; try { body = JSON.parse(d); } catch (_) {} if (m === 'sendMessage') tgSent.push(body); if (m === 'editMessageText') tgEdits.push(body); if (m === 'sendPhoto') tgPhotos.push(body); if (m === 'copyMessage') tgCopies.push(body);
+    s.setHeader('Content-Type', 'application/json'); s.end(JSON.stringify({ ok: true, result: m === 'getMe' ? { id: 1, username: 'manzil_test_bot' } : (['sendMessage', 'sendPhoto', 'copyMessage'].includes(m) ? { message_id: tgSent.length + tgPhotos.length + 100 } : true) })); }); });
   await new Promise(r => mock.listen(TGP, r));
   const ENV = { CLICK_SERVICE_ID: '111', CLICK_MERCHANT_ID: '222', CLICK_SECRET_KEY: 'click-secret', PAYME_MERCHANT_ID: 'pm-merchant', PAYME_KEY: 'payme-key',
     TELEGRAM_BOT_TOKEN: '1:TEST', TELEGRAM_API_BASE: `http://localhost:${TGP}`, TELEGRAM_WEBHOOK_SECRET: 'wh-secret-test', PUBLIC_URL: B3 };
@@ -326,6 +326,41 @@ async function v32Flow() {
     await new Promise(r => setTimeout(r, 200));
     ok(tgSent.some(m => String(m.chat_id) === "777" && m.text.includes('Salom, yordam beramiz')), 'javob mijozning Telegram\'iga yetib bordi');
     r = await c(boss, 'POST', `/api/admin/tickets/${tk.id}/close`, {}); ok(r.s === 200, 'murojaat yopildi');
+
+    console.log('\n[Telegram bot: manzillar, kalkulyator, FAQ, support guruhi]');
+    const W = { 'X-Telegram-Bot-Api-Secret-Token': 'wh-secret-test' };
+    const say = (text, id = 777, extra = {}) => c(null, 'POST', '/api/telegram/webhook', { update_id: Date.now(), message: { message_id: Math.floor(Math.random() * 1e6), date: 1, text, chat: { id, type: 'private' }, from: { id, first_name: 'Zarina', language_code: 'ru' }, ...extra } }, W);
+    const tap = (data, id = 777, photo = false) => c(null, 'POST', '/api/telegram/webhook', { update_id: Date.now(), callback_query: { id: 'cq' + Date.now(), data, from: { id }, message: { message_id: 55, chat: { id, type: 'private' }, ...(photo ? { photo: [{}] } : {}) } } }, W);
+    const wait = () => new Promise(r => setTimeout(r, 250));
+    tgSent.length = 0; await say('/explore'); await wait();
+    ok(tgSent.some(m => m.reply_markup && JSON.stringify(m.reply_markup).includes('rg:europe:0')), 'bot: /explore — mintaqalar tugmalari');
+    tgSent.length = 0; await tap('rg:asia:0'); await wait();
+    const tgAll = () => tgSent.concat(tgEdits);
+    ok(tgAll().some(m => JSON.stringify(m.reply_markup || {}).includes('"d:')), 'bot: mintaqa ichidagi manzillar ro\'yxati');
+    tgPhotos.length = 0; await tap('d:kyoto-and-osaka'); await wait();
+    ok(tgPhotos.some(m => /images\.unsplash|wikimedia/.test(m.photo) && /Киото|Kyoto/.test(m.caption) && JSON.stringify(m.reply_markup).includes('cd:kyoto-and-osaka')), 'bot: manzil kartasi rasm, narx va tugmalar bilan');
+    tgEdits.length = 0; await tap('cr:kyoto-and-osaka:5:2'); await wait();
+    ok(tgEdits.some(m => /\$[\d,]+/.test(m.text) && /5/.test(m.text)), 'bot: byudjet kalkulyatori natijasi');
+    tgPhotos.length = 0; await say('Самарканд'); await wait();
+    ok(tgPhotos.some(m => /Самарканд/.test(m.caption)), 'bot: joy nomini yozish → manzil kartasi');
+    tgSent.length = 0; await say('/faq'); await wait(); await tap('f:cancel'); await wait();
+    ok(tgSent.some(m => /100%/.test(m.text)), 'bot: FAQ — bekor qilish siyosati');
+    tgSent.length = 0; await tap('rq:samarkand'); await wait(); await say('Нужен гид на 3 дня в мае'); await wait();
+    const rqT = (await c(boss, 'GET', '/api/admin/tickets')).tickets.find(t => (t.firstText || '').includes('[samarkand]'));
+    ok(!!rqT, 'bot: manzil kartasidan gid so\'rovi → murojaat');
+    tgSent.length = 0; await say('/tickets'); await wait();
+    ok(tgSent.some(m => m.text.includes(rqT && rqT.code)), 'bot: /tickets — murojaatlar ro\'yxati');
+    // Support guruhi: ulash, /open, /stats, /r
+    const grp = (text, extra = {}) => c(null, 'POST', '/api/telegram/webhook', { update_id: Date.now(), message: { message_id: 9, date: 1, text, chat: { id: -100500, type: 'supergroup', title: 'Support' }, from: { id: 42, first_name: 'Ali' }, ...extra } }, W);
+    const tgInfo = await c(boss, 'GET', '/api/admin/telegram');
+    tgSent.length = 0; await grp('/support_here ' + tgInfo.supportCode); await wait();
+    ok(tgSent.some(m => String(m.chat_id) === '-100500' && m.text.includes('ulandi')), 'support guruhi kod bilan ulandi');
+    tgSent.length = 0; await grp('/open'); await grp('/stats'); await wait();
+    ok(tgSent.some(m => m.text.includes(rqT.code)) && tgSent.some(m => m.text.includes('7 kun')), 'support: /open va /stats');
+    tgSent.length = 0; await grp('/r ' + rqT.code + ' Gid topildi, ertaga yozamiz'); await wait();
+    ok(tgSent.some(m => String(m.chat_id) === '777' && m.text.includes('Gid topildi')), 'support: /r KOD — javob mijozga yetdi');
+    tgCopies.length = 0; await say('', 777, { photo: [{ file_id: 'x' }], caption: 'pasport' }); await wait();
+    ok(tgCopies.some(m => String(m.chat_id) === '-100500'), 'bot: mijoz rasmi support guruhiga yuborildi');
 
     console.log('\n[SEO]');
     let h = await c(anon, 'GET', '/', undefined, {}, true); ok(h.s === 200 && /<html lang="uz"/.test(h.text) && h.text.includes('hreflang="ar"') && h.text.includes('application/ld+json'), 'bosh sahifa: lang, hreflang, JSON-LD');
