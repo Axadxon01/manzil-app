@@ -181,7 +181,7 @@
         <option value="UZS">so'm UZS</option>
       </select>
       <button class="btn btn-sm" id="favFilterBtn">❤️ Saqlangan (<span id="favCount">0</span>)</button>
-      <button class="btn btn-sm" id="adminOpenBtn" title="Admin panel (Ctrl+Shift+A)">🔐 Admin</button>
+      <a class="btn btn-sm" href="/admin" rel="noopener" title="Xodimlar uchun">🔐 Xodimlar</a>
       <button class="btn btn-primary btn-sm" id="authBtn">👤 Kirish / Kabinet</button>
     </div>
   </div>
@@ -461,22 +461,6 @@
   </div>
 </div>
 
-<!-- ADMIN PANEL MODAL -->
-<div class="modal-backdrop" id="adminModal">
-  <div class="modal modal-xl">
-    <div class="modal-head">
-      <div>
-        <h3 style="margin:0">🔐 Manzil Admin Boshqaruv Paneli</h3>
-        <small style="color:var(--muted)">Manzillar, gid arizalari, to'lovlar va murojaatlarni boshqarish</small>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn btn-sm btn-danger" id="adminLogoutBtn" style="display:none" onclick="adminLogout()">Chiqish</button>
-        <button class="btn btn-sm" onclick="closeModal('adminModal')">✕ Yopish</button>
-      </div>
-    </div>
-    <div id="adminBody"></div>
-  </div>
-</div>
 
 <div class="toast" id="toast"></div>
 
@@ -629,8 +613,6 @@ let state = {
   visibleCount: 18,
   guides: [...DEFAULT_GUIDES],
   user: null,
-  token: localStorage.getItem("manzil_token") || "",
-  adminToken: localStorage.getItem("manzil_admin_token") || "",
   adminTab: "stats",
   editingDestId: null
 };
@@ -668,7 +650,7 @@ function getFallbackImg(dest) {
   const colors = ["#0f5c4d","#1b4965","#5c4d7d","#8c5a2b","#2b6cb0"];
   const bg = colors[dest.id % colors.length];
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='800' height='520'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='${bg}'/><stop offset='100%' stop-color='#132a24'/></linearGradient></defs><rect width='800' height='520' fill='url(#g)'/><text x='50%' y='47%' fill='#ffffff' font-family='Georgia,serif' font-size='38' font-weight='bold' text-anchor='middle'>${dest.name}</text><text x='50%' y='57%' fill='#d6e2de' font-family='Arial,sans-serif' font-size='20' text-anchor='middle'>${dest.country} • ${dest.region}</text></svg>`;
-  return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+  return "data:image/svg+xml;utf8," + encodeURIComponent(svg).replace(/'/g, "%27");
 }
 
 function calculateCosts(dest) {
@@ -987,7 +969,7 @@ function renderGuides() {
         <strong>${formatMoney(g.price)} / kun</strong>
       </div>
       <div style="display:flex;gap:7px">
-        <button class="btn btn-primary btn-sm" style="flex:1;justify-content:center" onclick="openPaymentModal('Gid xizmati: ${g.name} (${g.city})', ${g.price})">Gidni band qilish</button>
+        <button class="btn btn-primary btn-sm" style="flex:1;justify-content:center" onclick="openPaymentModal('Gid xizmati: ${String(g.name).replace(/[^\p{L}\p{N} .-]/gu,'')} (${String(g.city).replace(/[^\p{L}\p{N} .-]/gu,'')})', ${g.price}, '${String(g.id).replace(/[^\w-]/g,'')}', '')">Gidni band qilish</button>
         <button class="btn btn-sm" onclick="showToast('Aloqa: ${g.contact}')">📞 Aloqa</button>
       </div>
     </div>
@@ -1110,11 +1092,11 @@ function updateAuthButton() {
 }
 
 async function syncCloudState() {
-  if (!state.token) return;
+  if (!state.user) return;
   try {
     await fetch("/api/auth/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${state.token}` },
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ favorites: state.favorites, route: state.route })
     });
   } catch {}
@@ -1160,430 +1142,111 @@ async function handleAuth(mode) {
   const name = ($("uName")?.value || email.split("@")[0]).trim();
   try {
     const res = await fetch(`/api/auth/${mode}`, {
-      method: "POST",
+      method: "POST", credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password, favorites: state.favorites, route: state.route })
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) return showToast(data.error || "Xatolik yuz berdi");
-    state.token = data.token;
     state.user = data.user;
-    localStorage.setItem("manzil_token", state.token);
-    if (Array.isArray(data.user.favorites)) state.favorites = data.user.favorites;
-    if (Array.isArray(data.user.route)) state.route = data.user.route;
+    await loadMe();
     updateAuthButton();
     renderCards();
     renderRouteList();
     closeModal("authModal");
     showToast(`Xush kelibsiz, ${state.user.name}!`);
   } catch {
-    state.user = { name, email };
-    updateAuthButton();
-    closeModal("authModal");
-    showToast("Offline kabinet rejimi faollashdi!");
+    // Server bilan aloqa yo'q: hisob YARATILMAYDI va kirish berilmaydi
+    showToast("Serverga ulanib bo'lmadi. Internetni tekshirib, qayta urining.");
   }
 }
 
-function logoutUser() {
+async function loadMe() {
+  try {
+    const r = await fetch("/api/auth/me", { credentials: "same-origin" });
+    if (!r.ok) return false;
+    const me = await r.json();
+    state.user = me.user;
+    if (me.data && Array.isArray(me.data.favorites) && me.data.favorites.length) state.favorites = me.data.favorites;
+    if (me.data && Array.isArray(me.data.route) && me.data.route.length) state.route = me.data.route;
+    return true;
+  } catch { return false; }
+}
+
+async function logoutUser() {
+  try { await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch {}
   state.user = null;
-  state.token = "";
-  localStorage.removeItem("manzil_token");
   updateAuthButton();
   closeModal("authModal");
   showToast("Tizimdan chiqdingiz");
 }
 
 // PAYMENT
-function openPaymentModal(title, amountUsd) {
+function openPaymentModal(title, amountUsd, guideId = "", city = "") {
+  const isGuide = !!guideId;
+  const minDate = new Date().toISOString().slice(0, 10);
   $("paymentBody").innerHTML = `
-    <p style="margin-top:0">Xizmat: <strong>${title}</strong></p>
-    <p>To'lov summasi: <strong style="font-size:20px;color:var(--teal)">${formatMoney(amountUsd)}</strong></p>
+    <p style="margin-top:0">Xizmat: <strong id="payTitle"></strong></p>
+    <p>${isGuide ? "Narx kunlar va kishilar soniga qarab <b>serverda hisoblanadi</b>." : "To'lov summasi"}: <strong style="font-size:20px;color:var(--teal)">${isGuide ? "" : formatMoney(amountUsd)}</strong>
+       ${isGuide ? "" : '<span style="font-size:12px;color:var(--muted)">(taxminiy — operator tasdiqlashdan oldin tekshiradi)</span>'}</p>
     <div class="grid-2">
+      <div class="field"><label>Ism</label><input id="payName" required value="${(state.user && state.user.name) || ""}" /></div>
+      <div class="field"><label>Telefon yoki Email</label><input id="payContact" required value="${(state.user && state.user.email) || ""}" placeholder="+998 90 123 45 67" /></div>
+      ${isGuide ? `<div class="field"><label>Sayohat sanasi</label><input id="payDate" type="date" min="${minDate}" required /></div>
+      <div class="field"><label>Kunlar</label><input id="payDays" type="number" min="1" max="60" value="1" /></div>` : ""}
       <div class="field"><label>To'lov tizimi</label>
         <select id="payProvider">
-          <option value="click">Click Evolution (UZS)</option>
+          <option value="click">Click (UZS)</option>
           <option value="payme">Payme (UZS)</option>
-          <option value="uzum">Uzum Bank (UZS)</option>
           <option value="stripe">Visa / Mastercard (USD)</option>
         </select>
       </div>
-      <div class="field"><label>Telefon yoki Email (chek uchun)</label><input id="payContact" required placeholder="+998 90 123 45 67" /></div>
     </div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="processPayment('${title.replace(/'/g,"")}', ${amountUsd})">To'lovni tasdiqlash</button>
+    <button class="btn btn-primary" id="payBtn" style="width:100%;justify-content:center">To'lovga o'tish</button>
     <div id="payReceipt" style="margin-top:12px"></div>
   `;
+  $("payTitle").textContent = title;
+  $("payBtn").onclick = () => processPayment(title, amountUsd, guideId, city);
   $("paymentModal").classList.add("open");
 }
 
-async function processPayment(title, amountUsd) {
-  const provider = $("payProvider").value;
-  const contact = $("payContact").value.trim() || "Mijoz";
-  try {
-    const res = await fetch("/api/payments/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, amountUsd, provider, contact })
-    });
-    const data = await res.json();
-    $("payReceipt").innerHTML = `<div style="padding:12px;background:#e6f4f0;border-radius:12px;border:1px solid #b6ded2">
-      ✅ To'lov sessiyasi yaratildi! ID: <strong>${data.payment?.id || "PAY-" + Date.now()}</strong><br/>
-      Provayder: <b>${provider.toUpperCase()}</b> • Summa: <b>${formatMoney(amountUsd)}</b>
-    </div>`;
-  } catch {
-    $("payReceipt").innerHTML = `<div style="padding:12px;background:#e6f4f0;border-radius:12px">✅ Demo chek yaratildi: <b>PAY-${Date.now()}</b> (${provider.toUpperCase()})</div>`;
-  }
-}
-
-// ==========================================
-// ADMIN PANEL INTEGRATSIYASI
-// ==========================================
-function adminHeaders() {
-  return {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${state.adminToken}`
+async function processPayment(title, amountUsd, guideId, city) {
+  const btn = $("payBtn");
+  const box = $("payReceipt");
+  const body = {
+    title, city, provider: $("payProvider").value,
+    customerName: $("payName").value.trim(), contact: $("payContact").value.trim(),
+    people: Number(($("travelersCount") && $("travelersCount").value) || 1) || 1
   };
-}
-
-function openAdminModal() {
-  $("adminModal").classList.add("open");
-  if (!state.adminToken) {
-    $("adminLogoutBtn").style.display = "none";
-    renderAdminLogin();
-  } else {
-    $("adminLogoutBtn").style.display = "inline-flex";
-    loadAdminDashboard();
-  }
-}
-
-function renderAdminLogin() {
-  $("adminBody").innerHTML = `
-    <div style="max-width:420px;margin:14px auto;padding:18px;background:var(--bg);border:1px solid var(--line);border-radius:16px">
-      <h4 style="margin:0 0 6px">Admin avtorizatsiyasi</h4>
-      <p style="margin:0 0 12px;font-size:13px;color:var(--muted)"><code>server.js</code> dagi <code>ADMIN_SECRET</code> parolini kiriting (standart: <code>manzil-admin-2026</code>).</p>
-      <form id="adminLoginForm">
-        <div class="field">
-          <label>Admin Parol / Token</label>
-          <input type="password" id="adminSecretInput" required placeholder="••••••••••••" />
-        </div>
-        <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">Admin panelga kirish</button>
-      </form>
-    </div>
-  `;
-  $("adminLoginForm").addEventListener("submit", async e => {
-    e.preventDefault();
-    const secret = $("adminSecretInput").value.trim();
-    if (!secret) return;
-    try {
-      const res = await fetch("/api/admin/stats", {
-        headers: { "Authorization": `Bearer ${secret}` }
-      });
-      if (!res.ok) {
-        showToast("❌ Admin paroli noto'g'ri!");
-        return;
-      }
-      state.adminToken = secret;
-      localStorage.setItem("manzil_admin_token", secret);
-      $("adminLogoutBtn").style.display = "inline-flex";
-      showToast("✅ Admin panelga kirildi!");
-      loadAdminDashboard();
-    } catch {
-      // Server ishlamayotgan bo'lsa demo rejim
-      state.adminToken = secret;
-      localStorage.setItem("manzil_admin_token", secret);
-      $("adminLogoutBtn").style.display = "inline-flex";
-      showToast("⚠️ Offline demo admin rejimi ochildi");
-      loadAdminDashboard();
-    }
-  });
-}
-
-function adminLogout() {
-  state.adminToken = "";
-  localStorage.removeItem("manzil_admin_token");
-  $("adminLogoutBtn").style.display = "none";
-  renderAdminLogin();
-  showToast("Admin sessiyasi yopildi");
-}
-
-async function loadAdminDashboard() {
-  let stats = {
-    destinationsCount: DESTINATIONS.length,
-    approvedGuidesCount: state.guides.length,
-    pendingGuidesCount: 0,
-    paymentsCount: 0,
-    feedbackCount: 0
-  };
+  if (guideId) { body.guideId = guideId; body.travelDate = $("payDate").value; body.days = Number($("payDays").value) || 1; }
+  else { body.amountUsd = amountUsd; }
+  btn.disabled = true; btn.textContent = "Yuborilmoqda…";
+  const fail = msg => { box.innerHTML = `<div style="padding:12px;background:#fdecec;border:1px solid #f2b8b8;border-radius:12px;color:#8a1c1c"></div>`; box.firstChild.textContent = "❌ " + msg; btn.disabled = false; btn.textContent = "Qayta urinish"; };
   try {
-    const res = await fetch("/api/admin/stats", { headers: adminHeaders() });
-    if (res.status === 401 || res.status === 403) {
-      adminLogout();
+    const res = await fetch("/api/payments/create", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return fail(data.error || "To'lovni boshlab bo'lmadi.");
+    if (data.checkoutUrl) { location.href = data.checkoutUrl; return; }
+    if (data.sandbox) {
+      box.innerHTML = `<div style="padding:12px;background:#fff7e0;border:1px solid #f0d48a;border-radius:12px">🧪 SINOV rejimi: buyurtma <b></b> yaratildi. Haqiqiy to'lov emas.<br><button class="btn btn-sm" id="sbxBtn" style="margin-top:8px">Sinov to'lovini tasdiqlash</button></div>`;
+      box.querySelector("b").textContent = data.code;
+      $("sbxBtn").onclick = async () => {
+        const r = await fetch("/api/payments/sandbox-confirm", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paymentId: data.paymentId }) });
+        const d = await r.json().catch(() => ({}));
+        showToast(r.ok ? "Sinov to'lovi tasdiqlandi (hisobotlarga kirmaydi)" : (d.error || "Xato"));
+      };
       return;
     }
-    if (res.ok) {
-      const data = await res.json();
-      stats = { ...stats, ...data };
-    }
-  } catch {}
-
-  $("adminBody").innerHTML = `
-    <div class="admin-stats">
-      <div class="admin-stat-card"><strong>${stats.destinationsCount}</strong><span>Jami manzillar</span></div>
-      <div class="admin-stat-card"><strong>${stats.approvedGuidesCount}</strong><span>Faol gidlar</span></div>
-      <div class="admin-stat-card"><strong style="color:var(--gold)">${stats.pendingGuidesCount}</strong><span>Gid arizalari</span></div>
-      <div class="admin-stat-card"><strong style="color:var(--blue)">${stats.paymentsCount}</strong><span>To'lovlar</span></div>
-      <div class="admin-stat-card"><strong style="color:var(--rose)">${stats.feedbackCount}</strong><span>Murojaatlar</span></div>
-    </div>
-
-    <div class="admin-tabs">
-      <button class="chip ${state.adminTab === 'destinations' ? 'active' : ''}" onclick="switchAdminTab('destinations')">📍 Manzillar (${DESTINATIONS.length})</button>
-      <button class="chip ${state.adminTab === 'guides' ? 'active' : ''}" onclick="switchAdminTab('guides')">🧭 Gid arizalari</button>
-      <button class="chip ${state.adminTab === 'payments' ? 'active' : ''}" onclick="switchAdminTab('payments')">💳 To'lovlar</button>
-      <button class="chip ${state.adminTab === 'feedback' ? 'active' : ''}" onclick="switchAdminTab('feedback')">📩 Shikoyat & Takliflar</button>
-    </div>
-
-    <div id="adminTabContent">Yuklanmoqda...</div>
-  `;
-
-  if (state.adminTab === "stats") state.adminTab = "destinations";
-  renderAdminTabContent();
-}
-
-function switchAdminTab(tab) {
-  state.adminTab = tab;
-  state.editingDestId = null;
-  loadAdminDashboard();
-}
-
-async function renderAdminTabContent() {
-  const box = $("adminTabContent");
-  if (!box) return;
-
-  if (state.adminTab === "destinations") {
-    const editObj = state.editingDestId ? DESTINATIONS.find(d => d.id === state.editingDestId) : null;
-    box.innerHTML = `
-      <form id="adminDestForm" style="background:var(--surface-soft);padding:14px;border-radius:14px;margin-bottom:14px;border:1px solid var(--line)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <strong>${editObj ? `✏️ Tahrirlash: ${editObj.name}` : "➕ Yangi manzil qo'shish"}</strong>
-          ${editObj ? `<button type="button" class="btn btn-sm" onclick="state.editingDestId=null;renderAdminTabContent()">Bekor qilish</button>` : ""}
-        </div>
-        <div class="grid-2" style="grid-template-columns:repeat(4,1fr)">
-          <div class="field"><label>Manzil nomi</label><input id="adName" required value="${editObj ? editObj.name : ""}" placeholder="Masalan: Langar" /></div>
-          <div class="field"><label>Davlat</label><input id="adCountry" required value="${editObj ? editObj.country : "O'zbekiston"}" /></div>
-          <div class="field"><label>Mintaqa</label>
-            <select id="adRegion">
-              ${["O'zbekiston","Markaziy Osiyo","Yaqin Sharq","Yevropa","Osiyo","Amerika","Afrika va Okeaniya"].map(r => `<option value="${r}" ${editObj?.region===r?"selected":""}>${r}</option>`).join("")}
-            </select>
-          </div>
-          <div class="field"><label>Yo'nalish</label>
-            <select id="adScope">
-              <option value="uz" ${editObj?.scope==="uz"?"selected":""}>🇺🇿 O'zbekiston</option>
-              <option value="world" ${editObj?.scope==="world"?"selected":""}>🌍 Xorij</option>
-            </select>
-          </div>
-          <div class="field"><label>Latitude</label><input id="adLat" type="number" step="any" required value="${editObj ? editObj.lat : 41.3}" /></div>
-          <div class="field"><label>Longitude</label><input id="adLng" type="number" step="any" required value="${editObj ? editObj.lng : 69.2}" /></div>
-          <div class="field"><label>Aviachipta ($)</label><input id="adFlight" type="number" required value="${editObj ? editObj.flightBase : 20}" /></div>
-          <div class="field"><label>Mehmonxona/tun ($)</label><input id="adHotel" type="number" required value="${editObj ? editObj.hotelNight : 40}" /></div>
-          <div class="field"><label>Ovqat/kun ($)</label><input id="adFood" type="number" required value="${editObj ? editObj.foodDay : 18}" /></div>
-          <div class="field"><label>Transport/kun ($)</label><input id="adTrans" type="number" required value="${editObj ? editObj.transportDay : 12}" /></div>
-          <div class="field"><label>Chipta/kun ($)</label><input id="adAct" type="number" required value="${editObj ? editObj.activitiesDay : 10}" /></div>
-          <div class="field"><label>5 kunlik Tur ($)</label><input id="adTour" type="number" required value="${editObj ? editObj.tourBase5d : 240}" /></div>
-        </div>
-        <div class="grid-2">
-          <div class="field"><label>Qulay oylar (vergul bilan 1-12)</label><input id="adMonths" required value="${editObj ? editObj.bestMonths.join(",") : "4,5,9,10"}" /></div>
-          <div class="field"><label>Qisqa tavsif</label><input id="adDesc" required value="${editObj ? editObj.desc : ""}" placeholder="Asosiy diqqatga sazovor joylar..." /></div>
-        </div>
-        <button class="btn btn-primary btn-sm" type="submit">${editObj ? "💾 O'zgarishlarni saqlash" : "➕ Bazaga qo'shish"}</button>
-      </form>
-
-      <div class="admin-list">
-        ${DESTINATIONS.slice().reverse().map(d => `
-          <div class="admin-row">
-            <div>
-              <strong>#${d.id} ${d.name}</strong> <span class="badge">${d.country}</span>
-              <div style="font-size:12px;color:var(--muted)">DIY bazaviy: $${d.flightBase + d.hotelNight*5} • Tur (5k): $${d.tourBase5d} • Oylar: ${d.bestMonths.join(",")}</div>
-            </div>
-            <div style="display:flex;gap:6px">
-              <button class="btn btn-sm" onclick="state.editingDestId=${d.id};renderAdminTabContent()">✏️ Tahrir</button>
-              <button class="btn btn-sm btn-danger" onclick="adminDeleteDestination(${d.id})">🗑️ O'chirish</button>
-            </div>
-          </div>
-        `).join("")}
-      </div>
-    `;
-
-    $("adminDestForm").addEventListener("submit", async e => {
-      e.preventDefault();
-      const payload = {
-        name: $("adName").value.trim(),
-        country: $("adCountry").value.trim(),
-        region: $("adRegion").value,
-        scope: $("adScope").value,
-        lat: Number($("adLat").value),
-        lng: Number($("adLng").value),
-        flightBase: Number($("adFlight").value),
-        hotelNight: Number($("adHotel").value),
-        foodDay: Number($("adFood").value),
-        transportDay: Number($("adTrans").value),
-        activitiesDay: Number($("adAct").value),
-        tourBase5d: Number($("adTour").value),
-        bestMonths: $("adMonths").value.split(",").map(x => Number(x.trim())).filter(x => x >= 1 && x <= 12),
-        tags: [$("adScope").value === "uz" ? "visa-free" : "city", "diy-win"],
-        desc: $("adDesc").value.trim()
-      };
-
-      const isEdit = Boolean(state.editingDestId);
-      const url = isEdit ? `/api/admin/destinations/${state.editingDestId}` : "/api/admin/destinations";
-      const method = isEdit ? "PUT" : "POST";
-
-      try {
-        const res = await fetch(url, { method, headers: adminHeaders(), body: JSON.stringify(payload) });
-        if (res.ok) {
-          const data = await res.json();
-          if (isEdit) {
-            const idx = DESTINATIONS.findIndex(x => x.id === state.editingDestId);
-            if (idx >= 0) DESTINATIONS[idx] = { ...DESTINATIONS[idx], ...payload };
-          } else {
-            DESTINATIONS.push(data.destination || { id: Date.now(), ...payload });
-          }
-        } else throw new Error();
-      } catch {
-        if (isEdit) {
-          const idx = DESTINATIONS.findIndex(x => x.id === state.editingDestId);
-          if (idx >= 0) DESTINATIONS[idx] = { ...DESTINATIONS[idx], ...payload };
-        } else {
-          DESTINATIONS.push({ id: Date.now(), ...payload });
-        }
-      }
-      state.editingDestId = null;
-      renderCards();
-      loadAdminDashboard();
-      showToast(isEdit ? "✅ Manzil yangilandi!" : "✅ Yangi manzil qo'shildi!");
-    });
-  }
-
-  if (state.adminTab === "guides") {
-    let allGuides = [...state.guides];
-    try {
-      const res = await fetch("/api/admin/guides", { headers: adminHeaders() });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.guides)) allGuides = data.guides;
-      }
-    } catch {}
-
-    box.innerHTML = `<div class="admin-list">${
-      allGuides.length ? allGuides.map(g => `
-        <div class="admin-row">
-          <div>
-            <strong>${g.name}</strong> — ${g.city} ($${g.price}/kun)
-            <span class="badge ${g.status === 'pending' ? 'badge-gold' : ''}">${g.status || 'approved'}</span>
-            <div style="font-size:12px;color:var(--muted)">Tillar: ${g.langs} • Aloqa: ${g.contact} • ${g.bio}</div>
-          </div>
-          <div style="display:flex;gap:6px">
-            ${g.status === "pending" ? `<button class="btn btn-primary btn-sm" onclick="adminApproveGuide(${g.id})">✅ Tasdiqlash</button>` : ""}
-            <button class="btn btn-sm btn-danger" onclick="adminDeleteGuide(${g.id})">🗑️ O'chirish</button>
-          </div>
-        </div>
-      `).join("") : "<p>Gidlar ro'yxati bo'sh.</p>"
-    }</div>`;
-  }
-
-  if (state.adminTab === "payments") {
-    let payments = [];
-    try {
-      const res = await fetch("/api/admin/payments", { headers: adminHeaders() });
-      if (res.ok) payments = (await res.json()).payments || [];
-    } catch {}
-
-    box.innerHTML = `<div class="admin-list">${
-      payments.length ? payments.map(p => `
-        <div class="admin-row">
-          <div>
-            <strong>${p.id}</strong> — ${p.title}
-            <span class="badge ${p.status === 'paid' ? '' : 'badge-gold'}">${p.status}</span>
-            <div style="font-size:12px;color:var(--muted)">Summa: $${p.amountUsd} • Provayder: ${p.provider} • Mijoz: ${p.contact}</div>
-          </div>
-          <div style="display:flex;gap:6px">
-            ${p.status !== "paid" ? `<button class="btn btn-primary btn-sm" onclick="adminMarkPaid('${p.id}')">✅ To'landi deb belgilash</button>` : ""}
-          </div>
-        </div>
-      `).join("") : "<p style='color:var(--muted)'>Hozircha to'lov tranzaksiyalari yo'q.</p>"
-    }</div>`;
-  }
-
-  if (state.adminTab === "feedback") {
-    let items = [];
-    try {
-      const res = await fetch("/api/admin/feedback", { headers: adminHeaders() });
-      if (res.ok) items = (await res.json()).feedback || [];
-    } catch {}
-
-    box.innerHTML = `<div class="admin-list">${
-      items.length ? items.map(f => `
-        <div class="admin-row">
-          <div>
-            <span class="badge badge-blue">${f.type}</span> <strong>${f.name}</strong> (${f.contact})
-            <div style="font-size:13px;margin-top:4px">${f.message}</div>
-          </div>
-          <small style="color:var(--muted)">${f.createdAt || ""}</small>
-        </div>
-      `).join("") : "<p style='color:var(--muted)'>Hozircha shikoyat yoki takliflar kelib tushmagan.</p>"
-    }</div>`;
-  }
-}
-
-async function adminDeleteDestination(id) {
-  if (!confirm("Rostdan ham ushbu manzilni o'chirmoqchimisiz?")) return;
-  try {
-    await fetch(`/api/admin/destinations/${id}`, { method: "DELETE", headers: adminHeaders() });
-  } catch {}
-  DESTINATIONS = DESTINATIONS.filter(d => d.id !== id);
-  renderCards();
-  loadAdminDashboard();
-  showToast("🗑️ Manzil o'chirildi");
-}
-
-async function adminApproveGuide(id) {
-  try {
-    const res = await fetch(`/api/admin/guides/${id}/approve`, { method: "POST", headers: adminHeaders() });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.guide) state.guides.unshift(data.guide);
-    }
-  } catch {}
-  renderGuides();
-  loadAdminDashboard();
-  showToast("✅ Gid tasdiqlandi va katalogga chiqarildi!");
-}
-
-async function adminDeleteGuide(id) {
-  try {
-    await fetch(`/api/admin/guides/${id}`, { method: "DELETE", headers: adminHeaders() });
-  } catch {}
-  state.guides = state.guides.filter(g => g.id !== id);
-  renderGuides();
-  loadAdminDashboard();
-  showToast("🗑️ Gid o'chirildi");
-}
-
-async function adminMarkPaid(id) {
-  try {
-    await fetch(`/api/admin/payments/${id}/status`, {
-      method: "POST",
-      headers: adminHeaders(),
-      body: JSON.stringify({ status: "paid" })
-    });
-  } catch {}
-  loadAdminDashboard();
-  showToast("✅ To'lov holati 'paid' ga o'zgartirildi");
+    box.innerHTML = `<div style="padding:12px;background:#e6f4f0;border-radius:12px;border:1px solid #b6ded2">Buyurtma <b></b> yaratildi, to'lov tasdig'i kutilmoqda.</div>`;
+    box.querySelector("b").textContent = data.code;
+  } catch { fail("Serverga ulanib bo'lmadi. Hech qanday to'lov amalga oshirilmadi."); }
 }
 
 // INIT & EVENTS
 async function initBackendData() {
   try {
     const h = await fetch("/api/health").then(r => r.json());
-    $("aiProviderBadge").textContent = `AI holati: OpenAI (${h.openai ? "✅" : "⚠️"}), Grok (${h.grok ? "✅" : "⚠️"})`;
+    $("aiProviderBadge").textContent = "Server: ulangan ✅";
   } catch {
     $("aiProviderBadge").textContent = "AI mahalliy hisoblash rejimida (server.js ulansa OpenAI/Grok ishlaydi)";
   }
@@ -1604,15 +1267,7 @@ async function initBackendData() {
     }
   } catch {}
 
-  if (state.token) {
-    try {
-      const me = await fetch("/api/auth/me", { headers: { "Authorization": `Bearer ${state.token}` } }).then(r => r.json());
-      if (me.user) {
-        state.user = me.user;
-        updateAuthButton();
-      }
-    } catch {}
-  }
+  if (await loadMe()) { updateAuthButton(); renderCards(); renderRouteList(); }
 }
 
 ["originCity","tripDays","travelersCount","travelMonth","comfortLevel","scopeFilter","regionFilter","sortSelect"].forEach(id => {
@@ -1649,14 +1304,7 @@ $("tagChips").addEventListener("click", e => {
   renderCards();
 });
 $("loadMoreBtn").addEventListener("click", () => { state.visibleCount += 24; renderCards(); });
-$("adminOpenBtn").addEventListener("click", openAdminModal);
 
-document.addEventListener("keydown", e => {
-  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "a") {
-    e.preventDefault();
-    openAdminModal();
-  }
-});
 
 document.querySelectorAll(".modal-backdrop").forEach(bg => {
   bg.addEventListener("click", e => { if (e.target === bg) bg.classList.remove("open"); });

@@ -1,1778 +1,630 @@
+'use strict';
 /**
- * Manzil — Backend Server (Zero npm dependencies, Node.js 18+)
- * Phase 1: xavfsizlik va poydevor (security & foundation)
- *
- * Nima o'zgardi (v2.2.0):
- *  - ADMIN_KEY / JWT_SECRET endi kodda yozilmagan. Productionda .env da bo'lmasa server ishga tushmaydi.
- *  - Admin kaliti faqat header (X-Admin-Key / Bearer) yoki admin-token orqali; URL (?key=) orqali emas.
- *  - To'lov faqat provayder webhooki (Stripe imzosi tekshiriladi) yoki admin orqali "paid" bo'ladi.
- *    /api/payments/confirm endi hech kimga ochiq emas (faqat sandbox/dev rejimida).
- *  - Sandbox to'lovlar daromadga qo'shilmaydi va productionda o'chirilgan.
- *  - Audit log (data/audit.log, append-only): kim, nima, qachon, avvalgi va yangi qiymat.
- *  - Rate limiting (login, register, admin, AI, feedback, ariza, to'lov).
- *  - CORS faqat ruxsat etilgan originlar uchun, xavfsizlik headerlari.
- *  - Telegram webhook maxfiy token bilan himoyalangan; TELEGRAM_CHAT_ID bo'sh bo'lsa hech kim admin emas.
- *  - Parol kamida 8 belgi, login vaqt-xavfsiz, JSON yozish atomik.
- *  - Manzillarga priceStatus: verified | estimated | unavailable.
+ * MANZIL v3 — SQLite bazali, noldan-bog'liqliksiz (zero-dependency) Node.js server.
+ * Talab: Node.js >= 22.13 (node:sqlite).
+ * Ishga tushirish:  node server.js     (DB_PATH=:memory: bo'lsa baza xotirada)
  */
-
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { URL } = require('url');
 
-// 1. Oddiy .env yuklovchi (npm dotenv kerak emas)
-function loadEnvFile() {
-  const envPath = path.join(__dirname, '.env');
-  if (!fs.existsSync(envPath)) return;
-  const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith('#')) continue;
-    const eqIdx = line.indexOf('=');
-    if (eqIdx === -1) continue;
-    const key = line.slice(0, eqIdx).trim();
-    let val = line.slice(eqIdx + 1).trim();
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-      val = val.slice(1, -1);
+// ---------- .env (ixtiyoriy) ----------
+(function loadEnv() {
+  try {
+    for (const line of fs.readFileSync(path.join(__dirname, '.env'), 'utf8').split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+      if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
     }
-    if (!process.env[key]) {
-      process.env[key] = val;
-    }
-  }
-}
-loadEnvFile();
+  } catch (_) {}
+})();
 
-// 2. Konfiguratsiya
-const PORT = Number(process.env.PORT || 3000);
+const db = require('./lib/db');
+const sec = require('./lib/security');
+const core = require('./lib/core');
+const { HttpError, str } = sec;
+
+const VERSION = '3.0.0';
+const PORT = Number(process.env.PORT) || 3000;
+const IS_PROD = process.env.NODE_ENV === 'production';
+const DEMO_PAYMENTS = process.env.DEMO_PAYMENTS === 'true' && !IS_PROD;
 const PUBLIC_URL = (process.env.PUBLIC_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
-const IS_PROD = process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
-
-// Eski, ommaviy bo'lib qolgan qiymatlar — hech qachon qabul qilinmaydi
-const KNOWN_WEAK_SECRETS = [
-  'manzil-admin-2026',
-  'manzil-secret-key-change-in-production-2026',
-  'manzil-super-secret-jwt-key-2026'
-];
-
-function requireSecret(name, minLen) {
-  const v = process.env[name] || '';
-  if (v.length >= minLen && !KNOWN_WEAK_SECRETS.includes(v)) return v;
-  if (IS_PROD) {
-    console.error(`\n[FATAL] ${name} sozlanmagan yoki juda zaif (kamida ${minLen} belgi, eski standart qiymat bo'lmasligi kerak).`);
-    console.error(`        Render > Environment bo'limida ${name} ni kuchli tasodifiy qiymatga o'rnating.\n`);
-    process.exit(1);
-  }
-  const generated = crypto.randomBytes(24).toString('hex');
-  console.warn(`[WARN] ${name} .env da yo'q — vaqtinchalik tasodifiy qiymat ishlatilmoqda (har qayta ishga tushirishda o'zgaradi).`);
-  if (name === 'ADMIN_KEY') console.warn(`[WARN] Bu ishga tushirish uchun ADMIN_KEY = ${generated}`);
-  return generated;
-}
-
-const ADMIN_KEY = requireSecret('ADMIN_KEY', 16);
-const JWT_SECRET = requireSecret('JWT_SECRET', 32);
-const COMMISSION_RATE = Math.min(0.5, Math.max(0, Number(process.env.COMMISSION_RATE || 0.12)));
-
-// CORS: faqat ruxsat etilgan originlar (vergul bilan ajrating). Standart: PUBLIC_URL
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || PUBLIC_URL)
-  .split(',').map(s => s.trim().replace(/\/$/, '')).filter(Boolean);
-
-// Telegram
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
-// Webhook so'rovlari haqiqatan Telegramdan kelganini tekshirish uchun maxfiy token
-const TG_WEBHOOK_SECRET = crypto.createHash('sha256')
-  .update('tg-webhook:' + TELEGRAM_BOT_TOKEN + ':' + JWT_SECRET).digest('hex').slice(0, 48);
-
-// Real AI (OpenAI & Grok / xAI)
-const AI_PROVIDER = (process.env.AI_PROVIDER || 'auto').toLowerCase();
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const GROK_API_KEY = process.env.GROK_API_KEY || process.env.XAI_API_KEY || '';
-const GROK_MODEL = process.env.GROK_MODEL || 'grok-3-mini';
-const AI_DAILY_LIMIT = Math.max(0, Number(process.env.AI_DAILY_LIMIT || 500)); // kuniga umumiy pullik so'rovlar
-
-// To'lov provayderlari
-const CLICK_SERVICE_ID = process.env.CLICK_SERVICE_ID || '';
-const CLICK_MERCHANT_ID = process.env.CLICK_MERCHANT_ID || '';
-const PAYME_MERCHANT_ID = process.env.PAYME_MERCHANT_ID || '';
+const ALLOWED_ORIGINS = new Set([PUBLIC_URL, ...(process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)]);
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
-// Sandbox (demo) to'lov: developmentda yoqilgan, productionda faqat ALLOW_DEMO_PAYMENTS=true bo'lsa
-const DEMO_PAYMENTS = !IS_PROD || process.env.ALLOW_DEMO_PAYMENTS === 'true';
-
+const CLICK_SERVICE_ID = process.env.CLICK_SERVICE_ID || '', CLICK_MERCHANT_ID = process.env.CLICK_MERCHANT_ID || '';
+const PAYME_MERCHANT_ID = process.env.PAYME_MERCHANT_ID || '';
+const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '', TG_ADMIN_CHAT = process.env.TELEGRAM_ADMIN_CHAT_ID || '';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '', OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const AI_DAILY_LIMIT = Number(process.env.AI_DAILY_LIMIT) || 500;
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const DATA_DIR = path.join(__dirname, 'data');
 
-const FILES = {
-  destinations: path.join(DATA_DIR, 'destinations.json'),
-  guides: path.join(DATA_DIR, 'guides.json'),
-  feedback: path.join(DATA_DIR, 'feedback.json'),
-  users: path.join(DATA_DIR, 'users.json'),
-  payments: path.join(DATA_DIR, 'payments.json'),
-  chats: path.join(DATA_DIR, 'chats.json'),
-  audit: path.join(DATA_DIR, 'audit.log')
-};
-
-const SEED_GUIDES = [
-  { id: 'guide_seed_1', name: 'Azizbek Karimov', city: 'Samarqand', country: "O'zbekiston", langs: "O'zbek, Rus, Ingliz", spec: 'Tarixiy obidalar va Registon sirlari', rate: 45, exp: 7, tg: 'azizbek_samarkand_guide', group: '28-noyabr · Samarqand + Shahrisabz (3 joy qoldi)', approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_2', name: 'Nilufar Raximova', city: 'Buxoro', country: "O'zbekiston", langs: "O'zbek, Ingliz, Fransuz", spec: "Eski shahar me'morchiligi va gastronomiya", rate: 40, exp: 5, tg: 'nilufar_bukhara', group: '', approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_3', name: 'Temur Jumaniyozov', city: "Mo'ynoq va Orolbo'yi", country: "O'zbekiston", langs: "O'zbek, Qoraqalpoq, Rus", spec: "4x4 Ustyurt kanyonlari va Orolbo'yi ekspeditsiyasi", rate: 95, exp: 8, tg: 'aral_expedition_uz', group: "5-dekabr · Nukus → Ustyurt → Mo'ynoq (2 joy qoldi)", approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_4', name: 'Emre Yilmaz', city: 'Istanbul', country: 'Turkiya', langs: "O'zbek, Turk, Rus", spec: 'Istanbul sirlari, Bosfor va xarid turlari', rate: 75, exp: 6, tg: 'emre_istanbul_uz', group: 'Har shanba · Sultonahmet va Osiyo qismi piyoda turi', approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_5', name: 'Giorgi Beridze', city: 'Tbilisi va Qozbegi', country: 'Gruziya', langs: 'Rus, Ingliz, Gruzin', spec: "Qozbegi tog'lari, Kaxetiya va oilaviy turlar", rate: 70, exp: 6, tg: 'giorgi_georgia_tour', group: '12-dekabr · Tbilisi → Ananuri → Qozbegi', approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_6', name: 'Sardor Toshmatov', city: 'Dubay', country: 'BAA', langs: "O'zbek, Rus, Ingliz", spec: "VIP transfer, Cho'l safari va Abu-Dabi turi", rate: 90, exp: 5, tg: 'dubai_uz_guide', group: '', approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_7', name: 'Madina Alimova', city: 'Parij', country: 'Fransiya', langs: "O'zbek, Fransuz, Ingliz", spec: 'Luvr, Monmartr va fotosessiya turlari', rate: 110, exp: 5, tg: 'madina_paris_guide', group: '', approved: true, commissionRate: COMMISSION_RATE },
-  { id: 'guide_seed_8', name: 'Bekzod Xolmatov', city: 'Seul', country: 'Janubiy Koreya', langs: "O'zbek, Koreys, Rus", spec: 'Seul saroylari, K-pop va tibbiy/xarid turlari', rate: 85, exp: 4, tg: 'bekzod_seoul', group: '', approved: true, commissionRate: COMMISSION_RATE }
-];
-
-// 3. JSON Ma'lumotlar bazasi yordamchilari
-function ensureDataStore() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(FILES.destinations)) fs.writeFileSync(FILES.destinations, '[]', 'utf8');
-  if (!fs.existsSync(FILES.guides)) fs.writeFileSync(FILES.guides, JSON.stringify(SEED_GUIDES, null, 2), 'utf8');
-  if (!fs.existsSync(FILES.feedback)) fs.writeFileSync(FILES.feedback, '[]', 'utf8');
-  if (!fs.existsSync(FILES.users)) fs.writeFileSync(FILES.users, '[]', 'utf8');
-  if (!fs.existsSync(FILES.payments)) fs.writeFileSync(FILES.payments, '[]', 'utf8');
-  if (!fs.existsSync(FILES.chats)) fs.writeFileSync(FILES.chats, '[]', 'utf8');
-  if (!fs.existsSync(FILES.audit)) fs.writeFileSync(FILES.audit, '', 'utf8');
-}
-ensureDataStore();
-
-function readJson(filePath, fallback = []) {
-  try {
-    if (!fs.existsSync(filePath)) return fallback;
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch (err) {
-    return fallback;
+// ============================================================ Bootstrap
+db.importLegacyJson();
+db.seedSampleGuides();
+async function bootstrapAdmin() {
+  if (db.get('SELECT COUNT(*) c FROM staff').c > 0) return;
+  const email = str(process.env.ADMIN_EMAIL || 'admin@manzil.local', 120).toLowerCase();
+  let pw = process.env.ADMIN_PASSWORD, generated = false;
+  if (!pw || sec.checkPasswordPolicy(pw, { min: 12 })) {
+    if (pw) console.warn('[bootstrap] ADMIN_PASSWORD siyosatga mos emas (kamida 12 belgi) — tasodifiy parol yaratildi.');
+    pw = crypto.randomBytes(12).toString('base64url'); generated = true;
   }
+  const id = db.uid('st_');
+  db.run('INSERT INTO staff(id,name,email,role,password_hash,must_change_pw,created_at) VALUES(?,?,?,?,?,?,?)', id, 'Bosh administrator', email, 'super_admin', await sec.hashPassword(pw), generated ? 1 : 0, db.now());
+  sec.audit(core.SYSTEM, 'staff.bootstrap', 'staff', id, null, { email, role: 'super_admin' });
+  if (generated) {
+    console.log('\n==================================================================');
+    console.log(' BIRINCHI ADMIN YARATILDI (bu parol faqat BIR MARTA ko\'rsatiladi)');
+    console.log('   Email : ' + email);
+    console.log('   Parol : ' + pw);
+    console.log(' Kirgach parolni darhol almashtiring va 2FA ni yoqing.');
+    console.log('==================================================================\n');
+  } else console.log('[bootstrap] Super admin ADMIN_EMAIL/ADMIN_PASSWORD dan yaratildi: ' + email);
 }
 
-// Atomik yozish: avval vaqtinchalik fayl, keyin rename — server o'rtada to'xtasa ham fayl buzilmaydi
-function writeJson(filePath, data) {
-  const tmp = `${filePath}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
-  fs.renameSync(tmp, filePath);
+// ============================================================ HTTP yordamchilar
+function securityHeaders(res, isApi) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  if (IS_PROD) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  if (isApi) { res.setHeader('Cache-Control', 'no-store'); res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'"); }
+  else res.setHeader('Content-Security-Policy', "default-src 'self' https:; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");
 }
-
-// 3.1 Audit log (append-only, hech qachon qisqartirilmaydi)
-function stripSecrets(obj) {
-  if (!obj || typeof obj !== 'object') return obj;
-  const copy = JSON.parse(JSON.stringify(obj));
-  delete copy.passwordHash;
-  return copy;
-}
-
-function clientIp(req) {
-  // Render kabi proksi orqasida birinchi qiymat mijoz IP si. (Proksisiz holatda soxtalashtirilishi mumkin.)
-  const xff = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  return xff || (req.socket && req.socket.remoteAddress) || 'unknown';
-}
-
-function audit(req, action, entity, entityId, before, after, actor) {
-  try {
-    const entry = {
-      id: 'aud_' + crypto.randomBytes(5).toString('hex'),
-      at: new Date().toISOString(),
-      actor: actor || 'admin',
-      ip: req ? clientIp(req) : null,
-      action,
-      entity,
-      entityId: entityId == null ? '' : String(entityId),
-      before: stripSecrets(before) ?? null,
-      after: stripSecrets(after) ?? null
-    };
-    fs.appendFileSync(FILES.audit, JSON.stringify(entry) + '\n', 'utf8');
-  } catch (e) {
-    console.error('[audit] yozib bo‘lmadi:', e.message);
-  }
-}
-
-function readAudit(limit = 200, entity = '') {
-  try {
-    const lines = fs.readFileSync(FILES.audit, 'utf8').split('\n').filter(Boolean);
-    const out = [];
-    for (let i = lines.length - 1; i >= 0 && out.length < limit; i--) {
-      try {
-        const e = JSON.parse(lines[i]);
-        if (!entity || e.entity === entity) out.push(e);
-      } catch (_) {}
-    }
-    return out;
-  } catch (e) {
-    return [];
-  }
-}
-
-// 3.2 Rate limiting (xotirada; bitta server uchun yetarli)
-const rateBuckets = new Map();
-function rateLimit(req, name, max, windowMs, extraKey = '') {
-  const key = `${name}:${clientIp(req)}:${extraKey}`;
-  const now = Date.now();
-  let b = rateBuckets.get(key);
-  if (!b || b.reset < now) b = { count: 0, reset: now + windowMs };
-  b.count++;
-  rateBuckets.set(key, b);
-  return b.count <= max ? 0 : Math.max(1, Math.ceil((b.reset - now) / 1000));
-}
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, b] of rateBuckets) if (b.reset < now) rateBuckets.delete(k);
-}, 60 * 1000).unref();
-
-// Frontend va Backend gid obyektini birxillashtirish
-function normalizeGuideForClient(g) {
-  const status = g.rejected ? 'rejected' : (g.approved === false ? 'pending' : 'approved');
-  return {
-    ...g,
-    price: Number(g.price ?? g.rate ?? 50),
-    rate: Number(g.rate ?? g.price ?? 50),
-    exp: Number(g.exp ?? 3),
-    contact: g.contact || (g.tg ? '@' + String(g.tg).replace(/^@/, '') : ''),
-    tg: String(g.tg || g.contact || '').replace(/^@/, ''),
-    bio: g.bio || g.spec || g.about || '',
-    spec: g.spec || g.bio || '',
-    status
-  };
-}
-
-// Ma'lumot ishonchliligi: verified | estimated | unavailable
-const PRICE_STATUSES = ['verified', 'estimated', 'unavailable'];
-function normalizeDestinationForClient(d) {
-  return { ...d, priceStatus: PRICE_STATUSES.includes(d.priceStatus) ? d.priceStatus : 'estimated' };
-}
-
-// Admin tahrirlashi mumkin bo'lgan maydonlar (mass-assignment'dan himoya)
-function pickDestinationFields(body) {
-  const out = {};
-  const str = (k, max = 2000) => { if (body[k] !== undefined) out[k] = String(body[k]).trim().slice(0, max); };
-  const num = (k) => { if (body[k] !== undefined && Number.isFinite(Number(body[k])) && Number(body[k]) >= 0) out[k] = Number(body[k]); };
-  ['name', 'country', 'region', 'desc', 'image', 'bestSeason', 'entranceFee', 'openingHours', 'safetyNotes', 'transportInfo'].forEach(k => str(k));
-  ['flightBase', 'hotelNight', 'foodDay', 'transportDay', 'activitiesDay', 'tourBase5d'].forEach(num);
-  if (body.lat !== undefined && Math.abs(Number(body.lat)) <= 90) out.lat = Number(body.lat);
-  if (body.lng !== undefined && Math.abs(Number(body.lng)) <= 180) out.lng = Number(body.lng);
-  if (body.scope !== undefined) out.scope = body.scope === 'world' ? 'world' : 'uz';
-  if (Array.isArray(body.bestMonths)) out.bestMonths = body.bestMonths.map(Number).filter(m => m >= 1 && m <= 12);
-  if (Array.isArray(body.tags)) out.tags = body.tags.map(t => String(t).slice(0, 40)).slice(0, 20);
-  if (body.priceStatus !== undefined && PRICE_STATUSES.includes(body.priceStatus)) {
-    out.priceStatus = body.priceStatus;
-    if (body.priceStatus === 'verified') out.verifiedAt = new Date().toISOString();
-  }
-  return out;
-}
-
-// 4. Telegram xabarnoma yuboruvchi
-async function sendTelegram(text) {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    return { sent: false, reason: 'TELEGRAM_BOT_TOKEN yoki TELEGRAM_CHAT_ID sozlanmagan' };
-  }
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
-        text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true
-      })
-    });
-    const data = await res.json();
-    return { sent: Boolean(data.ok), response: data };
-  } catch (err) {
-    return { sent: false, reason: err.message };
-  }
-}
-
-function escHtml(str = '') {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-// 5. Parol xeshlash va Token (zero-dependency crypto)
-function safeEqual(a, b) {
-  const ha = crypto.createHash('sha256').update(String(a)).digest();
-  const hb = crypto.createHash('sha256').update(String(b)).digest();
-  return crypto.timingSafeEqual(ha, hb);
-}
-
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
-  return `${salt}:${hash}`;
-}
-
-function verifyPassword(password, stored) {
-  const [salt, key] = String(stored || '').split(':');
-  if (!salt || !key) return false;
-  const hashBuffer = crypto.scryptSync(String(password), salt, 64);
-  const keyBuffer = Buffer.from(key, 'hex');
-  if (hashBuffer.length !== keyBuffer.length) return false;
-  return crypto.timingSafeEqual(hashBuffer, keyBuffer);
-}
-const DUMMY_HASH = hashPassword('dummy-password-for-timing');
-
-const USER_TOKEN_TTL = 60 * 60 * 24 * 7;   // 7 kun
-const ADMIN_TOKEN_TTL = 60 * 60 * 8;       // 8 soat
-
-function signToken(payloadObj, ttlSec = USER_TOKEN_TTL) {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const now = Math.floor(Date.now() / 1000);
-  const body = Buffer.from(JSON.stringify({ ...payloadObj, iat: now, exp: now + ttlSec })).toString('base64url');
-  const sig = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
-  return `${header}.${body}.${sig}`;
-}
-
-function verifyToken(token) {
-  if (!token) return null;
-  const parts = String(token).split('.');
-  if (parts.length !== 3) return null;
-  const [header, body, sig] = parts;
-  const expected = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
-  if (!safeEqual(sig, expected)) return null;
-  try {
-    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
-    if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
-    return payload;
-  } catch (e) {
-    return null;
-  }
-}
-
-function bearerOf(req) {
-  const authHeader = req.headers['authorization'] || '';
-  return authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-}
-
-function getAuthUser(req) {
-  const payload = verifyToken(bearerOf(req));
-  if (!payload || !payload.sub) return null;
-  const users = readJson(FILES.users, []);
-  return users.find(u => u.id === payload.sub) || null;
-}
-
-/**
- * Admin tekshiruvi. Qabul qilinadi:
- *  - X-Admin-Key header yoki Bearer <ADMIN_KEY>
- *  - Bearer <admin JWT> (/api/admin/sso dan, 8 soat amal qiladi)
- *  - POST body'dagi adminKey (eski frontend bilan moslik uchun)
- * URL (?key=) endi qabul qilinmaydi — u loglarda va brauzer tarixida qoladi.
- * Noto'g'ri urinishlar IP bo'yicha cheklanadi (15 daqiqada 10 ta).
- */
-function isAdmin(req, urlObj, bodyObj = {}) {
-  const key = req.headers['x-admin-key'] || bearerOf(req) || (bodyObj && bodyObj.adminKey) || '';
-  if (!key) return false;
-  if (rateBuckets.get(`adminfail:${clientIp(req)}:`)?.count >= 10 && rateBuckets.get(`adminfail:${clientIp(req)}:`).reset > Date.now()) {
-    return false;
-  }
-  let ok = safeEqual(key, ADMIN_KEY);
-  if (!ok) {
-    const payload = verifyToken(key);
-    ok = Boolean(payload && payload.role === 'admin' && payload.sub === 'admin_master');
-  }
-  if (!ok) rateLimit(req, 'adminfail', 10, 15 * 60 * 1000);
-  return ok;
-}
-
-function adminActor(req) {
-  const t = verifyToken(req.headers['x-admin-key'] || bearerOf(req));
-  return t && t.role === 'admin' ? 'admin-sso' : 'admin-key';
-}
-
-// 6. Real AI (OpenAI / Grok) + Fallback
-const aiDaily = { day: '', count: 0 };
-function aiQuotaAvailable() {
-  const day = new Date().toISOString().slice(0, 10);
-  if (aiDaily.day !== day) { aiDaily.day = day; aiDaily.count = 0; }
-  if (AI_DAILY_LIMIT && aiDaily.count >= AI_DAILY_LIMIT) return false;
-  aiDaily.count++;
-  return true;
-}
-
-function buildLocalAiFallback(message, context = {}) {
-  const t = String(message || '').toLowerCase();
-  const days = context.days || 5;
-  const rate = context.rate || 12850;
-  if (/salom|assalom|hello|hi/.test(t)) {
-    return 'Assalomu alaykum! Men Manzil AI yordamchisiman. Sizga 105+ sayohat manzili, O‘zbekistonliklar uchun viza tartibi, byudjet hisob-kitobi, mahalliy gid topish yoki tur-paket band qilishda yordam beraman. Qayerga sayohat qilishni rejalashtiryapsiz?';
-  }
-  if (/viza|vizasiz/.test(t)) {
-    return 'O‘zbekiston fuqarolari uchun vizasiz davlatlar: Turkiya (90 kun), Gruziya (1 yil), BAA (30 kun), Qozog‘iston (30 kun), Qirg‘iziston (60 kun), Tojikiston (30 kun), Tailand (60 kun), Maldiv (30 kun), Indoneziya (30 kun VOA), Ummon (14 kun) va Xitoy (30 kun). Qoidalar o‘zgarib turadi — safardan oldin rasmiy manbada tekshiring. Asosiy ekranda «🛂 Vizasiz» tugmasini bosing.';
-  }
-  if (/byudjet|narx|qancha|pul|so‘m|som/.test(t)) {
-    return `Hozirgi tanlangan ${days} kunlik safar va 1$ = ${Number(rate).toLocaleString('ru-RU')} so‘m kursi bo‘yicha mustaqil (DIY) sayohat odatda arzonroq tushadi. Diqqat: kartochkalardagi narxlar taxminiy (estimated) — aniq narxni band qilishdan oldin tekshiring.`;
-  }
-  if (/gid|qo‘shil|qoshil|operator|komissiya/.test(t)) {
-    return '«🧭 Gidlar» bo‘limidan hududiy gidlarni topishingiz, aloqaga chiqishingiz yoki onlayn band qilishingiz mumkin. Gid sifatida qo‘shilish bepul — platforma har bir sotilgan paketdan 12% komissiya oladi, 88% gidga qoladi.';
-  }
-  if (/to‘lov|tolov|click|payme|karta|stripe/.test(t)) {
-    return 'Platformada Click, Payme va xalqaro Visa/Mastercard (Stripe) orqali to‘lov qilish rejalashtirilgan. To‘lov faqat provayder tasdiqlagandan so‘ng «to‘langan» bo‘ladi.';
-  }
-  return `Savolingiz bo‘yicha tavsiya: ${days} kunlik sayohatingiz uchun manzillarni marshrutga qo‘shing, byudjetni DIY yoki Tur-paket rejimida solishtiring va kerak bo‘lsa hududiy gidni tanlang. Aniq shahar nomini yozsangiz, viza va xarajatlar bo‘yicha batafsil ma’lumot beraman!`;
-}
-
-async function generateAiReply(message, history = [], context = {}, requestedProvider = 'auto') {
-  const pref = (requestedProvider || AI_PROVIDER || 'auto').toLowerCase();
-  let chosen = 'fallback';
-
-  if (pref === 'openai' && OPENAI_API_KEY) chosen = 'openai';
-  else if (pref === 'grok' && GROK_API_KEY) chosen = 'grok';
-  else if (pref === 'auto') {
-    if (AI_PROVIDER === 'grok' && GROK_API_KEY) chosen = 'grok';
-    else if (OPENAI_API_KEY) chosen = 'openai';
-    else if (GROK_API_KEY) chosen = 'grok';
-  }
-
-  if (chosen !== 'fallback' && !aiQuotaAvailable()) chosen = 'fallback';
-
-  if (chosen === 'fallback') {
-    return {
-      reply: buildLocalAiFallback(message, context),
-      providerUsed: 'local-fallback',
-      model: 'manzil-rules-v2'
-    };
-  }
-
-  const isGrok = chosen === 'grok';
-  const endpoint = isGrok
-    ? 'https://api.x.ai/v1/chat/completions'
-    : 'https://api.openai.com/v1/chat/completions';
-  const apiKey = isGrok ? GROK_API_KEY : OPENAI_API_KEY;
-  const model = isGrok ? GROK_MODEL : OPENAI_MODEL;
-
-  context = context && typeof context === 'object' ? context : {};
-  const planSummary = Array.isArray(context.plan) && context.plan.length
-    ? context.plan.slice(0, 20).map(p => `${String(p.name || '').slice(0, 60)} (${Number(p.days) || 0} kun)`).join(', ')
-    : 'Hali tanlanmagan';
-
-  const systemPrompt = [
-    "Siz Manzil sayohat ekotizimining (105+ mahalliy va xalqaro manzillar, gidlar katalogi, aviachipta qidiruvi va tur-paketlar platformasi) rasmiy AI sayohat maslahatchisisiz.",
-    "Foydalanuvchilarga o'zbek tilida (agar boshqa tilda yozsa, o'sha tilda) aniq, samimiy, lo'nda va amaliy javob bering.",
-    "O'zbekiston fuqarolari uchun viza tartiblari, byudjet rejalashtirish, mustaqil (DIY) va tur-paket farqlari, mahalliy gidlar (12% platforma komissiyasi) haqida ma'lumot bering.",
-    "Muhim: narxlar, viza qoidalari va ish vaqtlari o'zgarishi mumkin. Tasdiqlanmagan narxni aniq narx sifatida bermang — 'taxminan' deb belgilang va rasmiy manbada tekshirishni tavsiya qiling.",
-    `Foydalanuvchi joriy konteksti: Uchish shahri = ${String(context.origin || 'TAS').slice(0, 10)}, Safar kunlari = ${Number(context.days) || 5} kun, Sayohatchilar = ${Number(context.travelers) || 2} kishi, Oy = ${String(context.month || 'Istalgan oy').slice(0, 20)}, Joriy reja: ${planSummary}.`
-  ].join('\n');
-
-  const cleanHistory = Array.isArray(history)
-    ? history.slice(-8).map(m => ({
-        role: m && m.role === 'user' ? 'user' : 'assistant',
-        content: String((m && m.content) || '').slice(0, 1200)
-      }))
-    : [];
-
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20000);
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.65,
-        max_tokens: 600,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...cleanHistory,
-          { role: 'user', content: String(message).slice(0, 2000) }
-        ]
-      }),
-      signal: controller.signal
-    });
-    clearTimeout(timer);
-
-    const data = await response.json();
-    const replyText = data?.choices?.[0]?.message?.content?.trim();
-    if (!response.ok || !replyText) {
-      throw new Error(data?.error?.message || `HTTP ${response.status}`);
-    }
-    return { reply: replyText, providerUsed: chosen, model };
-  } catch (err) {
-    return {
-      reply: buildLocalAiFallback(message, context),
-      providerUsed: 'local-fallback',
-      model: 'manzil-rules-v2',
-      warning: `${chosen.toUpperCase()} API xatosi`
-    };
-  }
-}
-
-// 7. HTTP Yordamchilar
-const CORS_METHODS = 'GET,POST,PUT,DELETE,OPTIONS';
-const CORS_HEADERS = 'Content-Type, Authorization, X-Admin-Key';
-
-function corsFor(req) {
-  const h = { 'Vary': 'Origin', 'Access-Control-Allow-Methods': CORS_METHODS, 'Access-Control-Allow-Headers': CORS_HEADERS };
-  const origin = req.headers.origin;
-  if (origin && ALLOWED_ORIGINS.includes(origin)) h['Access-Control-Allow-Origin'] = origin;
-  return h;
-}
-
-function sendJson(res, statusCode, payload) {
-  const body = JSON.stringify(payload);
-  res.writeHead(statusCode, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Cache-Control': 'no-store',
-    ...(res._cors || {})
-  });
+function sendJson(res, status, obj) {
+  const body = JSON.stringify(obj);
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body) });
   res.end(body);
 }
-
-function parseBody(req, maxBytes = 1024 * 1024) {
+function readRaw(req, max = 1024 * 1024) {
   return new Promise((resolve, reject) => {
-    let raw = '';
-    req.on('data', chunk => {
-      raw += chunk;
-      if (raw.length > maxBytes) {
-        req.destroy();
-        reject(new Error('Payload juda katta'));
-      }
-    });
-    req.on('end', () => {
-      req.rawBody = raw; // webhook imzosini tekshirish uchun
-      if (!raw) return resolve({});
-      try {
-        const parsed = JSON.parse(raw);
-        resolve(parsed && typeof parsed === 'object' ? parsed : {});
-      } catch (e) {
-        reject(new Error("Noto'g'ri JSON format"));
-      }
-    });
+    const chunks = []; let size = 0;
+    req.on('data', c => { size += c.length; if (size > max) { reject(new HttpError(413, 'So\'rov hajmi katta.')); req.destroy(); } else chunks.push(c); });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
   });
 }
-
-function tooMany(res, retryAfter) {
-  res.setHeader('Retry-After', String(retryAfter));
-  return sendJson(res, 429, { ok: false, error: `Juda ko‘p urinish. ${retryAfter} soniyadan keyin qayta urinib ko‘ring.` });
+async function readJson(req) {
+  const ct = String(req.headers['content-type'] || '');
+  const raw = await readRaw(req);
+  if (!raw) return {};
+  if (!ct.includes('application/json')) throw new HttpError(415, 'Content-Type: application/json kerak.');
+  try { const o = JSON.parse(raw); return o && typeof o === 'object' ? o : {}; } catch (_) { throw new HttpError(400, 'JSON noto\'g\'ri.'); }
+}
+function originOk(req) {
+  const o = req.headers.origin;
+  if (!o) return true; // brauzersiz mijozlar (curl, webhooklar)
+  return ALLOWED_ORIGINS.has(o) || o === `http://${req.headers.host}` || o === `https://${req.headers.host}`;
 }
 
-const MIME_TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'application/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.ico': 'image/x-icon',
-  '.webmanifest': 'application/manifest+json'
-};
+// ============================================================ Marshrutlar
+const routes = [];
+function route(method, pattern, opts, fn) {
+  const keys = [];
+  const re = new RegExp('^' + pattern.replace(/:([a-zA-Z]+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '/?$');
+  routes.push({ method, re, keys, opts: opts || {}, fn });
+}
+const rl = (req, name, max, win, extra) => { const s = sec.rateLimit(req, name, max, win, extra); if (s) throw new HttpError(429, `Juda ko'p urinish. ${s} soniyadan keyin qayta urining.`, { retryAfter: s }); };
 
-function serveStatic(req, res, pathname) {
-  let reqPath = pathname === '/' ? '/index.html' : (pathname === '/admin' || pathname === '/admin/' ? '/admin.html' : pathname);
-  try { reqPath = decodeURIComponent(reqPath); } catch (e) { res.writeHead(400); return res.end('Bad request'); }
-  if (reqPath.includes('\0')) { res.writeHead(400); return res.end('Bad request'); }
-  const safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, '');
-  let filePath = path.join(PUBLIC_DIR, safePath);
-
-  if (!filePath.startsWith(PUBLIC_DIR)) {
-    res.writeHead(403);
-    return res.end('Forbidden');
-  }
-  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    // Agar admin.html alohida fayl bo'lmasa index.html ni ochadi
-    filePath = path.join(PUBLIC_DIR, 'index.html');
-    if (!fs.existsSync(filePath)) {
-      filePath = path.join(__dirname, 'index.html');
-    }
-  }
-  if (!fs.existsSync(filePath)) {
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-    return res.end('index.html topilmadi');
-  }
-
-  const ext = path.extname(filePath).toLowerCase();
-  const headers = { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' };
-  if (path.basename(filePath) === 'admin.html') {
-    headers['X-Robots-Tag'] = 'noindex, nofollow';
-    headers['Cache-Control'] = 'no-store';
-  }
-  res.writeHead(200, headers);
-  fs.createReadStream(filePath).pipe(res);
+function currentUser(req) {
+  const s = sec.getSession(req, 'user'); if (!s) return null;
+  const u = db.get('SELECT * FROM users WHERE id=?', s.actor_id);
+  return u && u.status === 'active' ? u : null;
+}
+function currentStaff(req) {
+  const s = sec.getSession(req, 'staff'); if (!s) return null;
+  const st = db.get('SELECT * FROM staff WHERE id=?', s.actor_id);
+  return st && st.active ? st : null;
+}
+const userView = u => ({ id: u.id, name: u.name, email: u.email, phone: u.phone, role: u.role, createdAt: u.created_at });
+const staffView = s => ({ id: s.id, name: s.name, email: s.email, role: s.role, roleLabel: sec.ROLE_LABELS[s.role], active: !!s.active, totpEnabled: !!s.totp_enabled, mustChangePw: !!s.must_change_pw, lastLogin: s.last_login, createdAt: s.created_at });
+const LOCK_AFTER = 5, LOCK_MS = 15 * 60 * 1000;
+function lockedMsg(row) { return row.locked_until > Date.now() ? `Hisob vaqtincha bloklangan. ${Math.ceil((row.locked_until - Date.now()) / 60000)} daqiqadan keyin urining.` : null; }
+function failLogin(table, row) {
+  const n = row.failed_logins + 1;
+  if (n >= LOCK_AFTER) db.run(`UPDATE ${table} SET failed_logins=0, locked_until=? WHERE id=?`, Date.now() + LOCK_MS, row.id);
+  else db.run(`UPDATE ${table} SET failed_logins=? WHERE id=?`, n, row.id);
 }
 
-// 7.1 To'lov yordamchilari
-const PAYMENT_STATUSES = ['pending', 'paid', 'failed', 'cancelled', 'refunded'];
-// Daromad hisobiga faqat haqiqiy (sandbox bo'lmagan) to'langan buyurtmalar kiradi
-const isRealPaid = p => (p.status === 'paid' || p.status === 'completed') && !p.sandbox;
+// ---------- Ommaviy: sog'liq, katalog ----------
+route('GET', '/api/health', {}, () => ({ ok: true, version: VERSION, db: db.IN_MEMORY ? 'memory' : 'file', time: db.now(), payments: { stripe: !!STRIPE_SECRET_KEY, click: !!(CLICK_SERVICE_ID && CLICK_MERCHANT_ID), payme: !!PAYME_MERCHANT_ID, demo: DEMO_PAYMENTS } }));
+const guideView = g => ({ id: g.id, name: g.name, city: g.city, country: g.country, langs: g.langs, spec: g.spec, bio: g.bio, about: g.about, rate: g.rate, price: g.rate, exp: g.exp, tg: g.tg, group: g.grp, verified: !!g.verified, status: g.status, sample: !!g.is_sample,
+  rating: (db.get('SELECT AVG(rating) a, COUNT(*) n FROM reviews WHERE guide_id=?', g.id) || {}).a || null });
+route('GET', '/api/guides', {}, () => ({ ok: true, guides: db.all("SELECT * FROM guides WHERE status='approved' ORDER BY is_sample, name").map(guideView) }));
+route('POST', '/api/guides/apply', {}, ({ req, body }) => {
+  rl(req, 'guide-apply', 5, 3600 * 1000);
+  const g = { name: str(body.name, 80), city: str(body.city, 80), tg: str(body.tg, 64).replace(/^@/, ''), langs: str(body.langs, 120), spec: str(body.spec, 200), about: str(body.about, 1000) };
+  const rate = Number(body.rate);
+  if (g.name.length < 2 || g.city.length < 2 || !g.tg || !(rate >= 5 && rate <= 2000)) throw new HttpError(400, 'Ism, shahar, Telegram va kunlik narx (5–2000$) majburiy.');
+  const id = db.uid('guide_');
+  db.run("INSERT INTO guides(id,name,city,country,langs,spec,bio,about,rate,exp,tg,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)", id, g.name, g.city, str(body.country, 60), g.langs, g.spec, g.spec, g.about, rate, Math.max(0, Math.min(60, parseInt(body.exp, 10) || 0)), g.tg, db.now(), db.now());
+  sec.audit({ type: 'guest', id: 'guest', label: g.tg }, 'guide.apply', 'guide', id, null, { name: g.name, city: g.city }, req);
+  notifyTg(`🧭 Yangi gid arizasi: ${g.name} (${g.city}) @${g.tg}`);
+  return { ok: true, id, status: 'pending' };
+});
+route('GET', '/api/destinations', {}, () => ({ ok: true, destinations: db.all('SELECT * FROM destinations WHERE archived=0 ORDER BY created_at').map(d => ({ ...JSON.parse(d.data), id: d.id, priceStatus: d.price_status })) }));
+route('POST', '/api/feedback', {}, ({ req, body, user }) => {
+  rl(req, 'feedback', 5, 3600 * 1000);
+  const msg = str(body.message || body.msg, 2000);
+  if (msg.length < 3) throw new HttpError(400, 'Xabar matnini yozing.');
+  const id = db.uid('fb_');
+  db.run('INSERT INTO feedback(id,name,contact,type,message,created_at) VALUES(?,?,?,?,?,?)', id, str(body.name || (user && user.name), 80), str(body.contact || (user && user.email), 120), str(body.type, 30) || 'general', msg, db.now());
+  notifyTg(`💬 Yangi fikr-mulohaza: ${msg.slice(0, 200)}`);
+  return { ok: true, id };
+});
 
-async function markPaid(order, payments, via, req, actor) {
-  const before = { status: order.status };
-  if (order.status === 'paid') return false;
-  order.status = 'paid';
-  order.paidAt = new Date().toISOString();
-  order.paidVia = via;
-  order.receiptId = 'RCP-' + crypto.randomBytes(3).toString('hex').toUpperCase();
-  writeJson(FILES.payments, payments);
-  audit(req, 'payment.paid', 'payment', order.orderId, before, { status: 'paid', via, receiptId: order.receiptId }, actor);
-
-  const label = order.sandbox ? '🧪 <b>SANDBOX to‘lov (haqiqiy pul emas)</b>' : '💳 <b>Yangi to‘lov tasdiqlandi! (Manzil Pay)</b>';
-  const tgMsg = [
-    label,
-    `🧾 Chek: <code>${escHtml(order.receiptId)}</code> | Buyurtma: <code>${escHtml(order.orderId)}</code>`,
-    `📦 Xizmat: <b>${escHtml(order.title)}</b>`,
-    `👤 Mijoz: ${escHtml(order.customerName)} (${escHtml(order.customerContact || '-')})`,
-    `💰 Jami: <b>$${order.amountUsd}</b> (~${order.amountUzs.toLocaleString('ru-RU')} so‘m)`,
-    `📊 Platforma komissiyasi (${Math.round(order.commissionRate * 100)}%): <b>$${order.commissionUsd}</b>`,
-    `🏦 Usul: ${escHtml(order.provider.toUpperCase())} (${escHtml(via)})`
-  ].join('\n');
-  await sendTelegram(tgMsg);
-  return true;
+// ---------- AI ----------
+const aiDaily = { day: '', n: 0 };
+function localAi(message) {
+  const t = message.toLowerCase();
+  if (/viza/.test(t)) return 'O\'zbekiston fuqarolari uchun vizasiz tartib davlatga qarab farq qiladi va tez-tez o\'zgaradi (masalan Turkiya, Gruziya, BAA, Qozog\'iston, Qirg\'iziston). Safardan oldin davlatning rasmiy manbasida tekshiring.';
+  if (/to.?lov|click|payme|karta/.test(t)) return 'To\'lov faqat to\'lov provayderi serverga tasdiqlagandan keyin "to\'langan" bo\'ladi. Qaytarish siyosati buyurtma sahifasida ko\'rsatiladi.';
+  if (/gid|operator/.test(t)) return 'Gidlar bo\'limidan tasdiqlangan gidni tanlab, sana belgilab band qilishingiz mumkin. Narx server tomonida hisoblanadi.';
+  return 'Qayerga va necha kunga sayohat rejalashtiryapsiz? Manzil, kunlar va sayohatchilar sonini yozing — taxminiy byudjetni hisoblab beraman (narxlar "taxminiy" deb belgilanadi).';
 }
+route('POST', '/api/ai/chat', {}, async ({ req, body }) => {
+  rl(req, 'ai', 20, 60000);
+  const message = str(body.message, 2000);
+  if (!message) throw new HttpError(400, 'Xabar bo\'sh.');
+  const day = new Date().toISOString().slice(0, 10);
+  if (aiDaily.day !== day) { aiDaily.day = day; aiDaily.n = 0; }
+  let reply = null, provider = 'local-fallback', model = 'rules';
+  if (OPENAI_API_KEY && aiDaily.n < AI_DAILY_LIMIT) {
+    aiDaily.n++;
+    try {
+      const hist = (Array.isArray(body.history) ? body.history : []).slice(-8).map(m => ({ role: m && m.role === 'user' ? 'user' : 'assistant', content: str(m && m.content, 1200) }));
+      const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 20000);
+      const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + OPENAI_API_KEY },
+        body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.6, max_tokens: 600, messages: [{ role: 'system', content: 'Siz Manzil sayohat platformasining AI maslahatchisisiz. O\'zbek tilida qisqa va amaliy javob bering. Tasdiqlanmagan narxni aniq narx sifatida bermang — "taxminan" deb belgilang.' }, ...hist, { role: 'user', content: message }] }) });
+      clearTimeout(tm);
+      const d = await r.json(); const t = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+      if (r.ok && t) { reply = t.trim(); provider = 'openai'; model = OPENAI_MODEL; }
+    } catch (_) {}
+  }
+  if (!reply) reply = localAi(message);
+  db.run('INSERT INTO ai_log(at,provider,model,ip,user_msg,reply) VALUES(?,?,?,?,?,?)', db.now(), provider, model, sec.clientIp(req), message.slice(0, 500), reply.slice(0, 1000));
+  return { ok: true, reply, providerUsed: provider, model };
+});
 
-// Stripe imzosini tekshirish: Stripe-Signature: t=...,v1=...
-function verifyStripeSignature(rawBody, header, secret) {
+// ---------- Mijoz auth ----------
+route('POST', '/api/auth/register', {}, async ({ req, res, body }) => {
+  rl(req, 'register', 5, 3600 * 1000);
+  const email = str(body.email || body.emailOrPhone, 120).toLowerCase(), name = str(body.name, 80);
+  if (name.length < 2) throw new HttpError(400, 'Ismingizni kiriting.');
+  if (!sec.isEmail(email)) throw new HttpError(400, 'Email manzili noto\'g\'ri.');
+  const pe = sec.checkPasswordPolicy(body.password, { email }); if (pe) throw new HttpError(400, pe);
+  if (db.get('SELECT 1 x FROM users WHERE email=?', email)) { await sec.dummyVerify('x'); throw new HttpError(409, 'Bu email bilan hisob mavjud. Kirishga urining.'); }
+  const id = db.uid('usr_'), ph = await sec.hashPassword(body.password);
+  db.tx(() => {
+    db.run('INSERT INTO users(id,name,email,phone,password_hash,created_at,pw_changed_at) VALUES(?,?,?,?,?,?,?)', id, name, email, str(body.phone, 30) || null, ph, db.now(), db.now());
+    db.run('INSERT INTO user_data(user_id,favorites,route,updated_at) VALUES(?,?,?,?)', id, JSON.stringify((Array.isArray(body.favorites) ? body.favorites : []).slice(0, 200)), JSON.stringify((Array.isArray(body.route) ? body.route : []).slice(0, 100)), db.now());
+    sec.audit({ type: 'user', id, label: email }, 'user.register', 'user', id, null, { email }, req);
+  });
+  sec.createSession(req, res, 'user', id);
+  return { ok: true, user: userView(db.get('SELECT * FROM users WHERE id=?', id)) };
+});
+route('POST', '/api/auth/login', {}, async ({ req, res, body }) => {
+  const email = str(body.email || body.emailOrPhone, 120).toLowerCase();
+  rl(req, 'login', 10, 15 * 60 * 1000); rl(req, 'login-acct', 8, 15 * 60 * 1000, email);
+  const u = db.get('SELECT * FROM users WHERE email=?', email);
+  if (!u) { await sec.dummyVerify(body.password); throw new HttpError(401, 'Email yoki parol noto\'g\'ri.'); }
+  const lk = lockedMsg(u); if (lk) throw new HttpError(423, lk);
+  const v = await sec.verifyPassword(body.password, u.password_hash);
+  if (!v.ok) { failLogin('users', u); sec.audit({ type: 'user', id: u.id, label: email }, 'user.login_failed', 'user', u.id, null, null, req); throw new HttpError(401, 'Email yoki parol noto\'g\'ri.'); }
+  if (u.status !== 'active') throw new HttpError(403, 'Hisob faol emas. Qo\'llab-quvvatlashga murojaat qiling.');
+  if (v.needsRehash) db.run('UPDATE users SET password_hash=? WHERE id=?', await sec.hashPassword(body.password), u.id);
+  db.run('UPDATE users SET failed_logins=0, locked_until=0, last_login=? WHERE id=?', db.now(), u.id);
+  sec.createSession(req, res, 'user', u.id);
+  return { ok: true, user: userView(u) };
+});
+route('POST', '/api/auth/logout', {}, ({ req, res }) => { sec.destroySession(req, res, 'user'); return { ok: true }; });
+const dataOf = id => { const d = db.get('SELECT * FROM user_data WHERE user_id=?', id) || {}; const j = (s, f) => { try { return JSON.parse(s); } catch (_) { return f; } }; return { favorites: j(d.favorites, []), route: j(d.route, []), plan: j(d.plan, []), checklist: j(d.checklist, []) }; };
+route('GET', '/api/auth/me', { auth: 'user' }, ({ user }) => ({ ok: true, user: userView(user), data: dataOf(user.id) }));
+route('POST', '/api/auth/sync', { auth: 'user' }, ({ user, body }) => {
+  const arr = (v, n) => JSON.stringify((Array.isArray(v) ? v : []).slice(0, n));
+  db.run(`INSERT INTO user_data(user_id,favorites,route,plan,checklist,updated_at) VALUES(?,?,?,?,?,?)
+          ON CONFLICT(user_id) DO UPDATE SET favorites=excluded.favorites, route=excluded.route, plan=excluded.plan, checklist=excluded.checklist, updated_at=excluded.updated_at`,
+    user.id, arr(body.favorites, 200), arr(body.route, 100), arr(body.plan, 100), arr(body.checklist, 100), db.now());
+  return { ok: true, data: dataOf(user.id) };
+});
+route('POST', '/api/auth/password', { auth: 'user' }, async ({ req, user, body }) => {
+  rl(req, 'pw-change', 5, 3600 * 1000, user.id);
+  if (!(await sec.verifyPassword(body.current, user.password_hash)).ok) throw new HttpError(403, 'Joriy parol noto\'g\'ri.');
+  const pe = sec.checkPasswordPolicy(body.password, { email: user.email }); if (pe) throw new HttpError(400, pe);
+  db.run('UPDATE users SET password_hash=?, pw_changed_at=? WHERE id=?', await sec.hashPassword(body.password), db.now(), user.id);
+  sec.revokeAllSessions('user', user.id);
+  sec.audit({ type: 'user', id: user.id, label: user.email }, 'user.password_change', 'user', user.id, null, null, req);
+  return { ok: true, relogin: true };
+});
+
+// ---------- Buyurtma va to'lov ----------
+async function makeCheckout(o, body) {
+  const base = { sandbox: false, url: null, txnId: null };
+  const ret = `${PUBLIC_URL}/?order=${o.code}`;
+  if (o.provider === 'click' && CLICK_SERVICE_ID && CLICK_MERCHANT_ID)
+    return { ...base, url: `https://my.click.uz/services/pay?service_id=${encodeURIComponent(CLICK_SERVICE_ID)}&merchant_id=${encodeURIComponent(CLICK_MERCHANT_ID)}&amount=${(o.amountUzs).toFixed(2)}&transaction_param=${encodeURIComponent(o.paymentId)}&return_url=${encodeURIComponent(ret)}` };
+  if (o.provider === 'payme' && PAYME_MERCHANT_ID)
+    return { ...base, url: 'https://checkout.paycom.uz/' + Buffer.from(`m=${PAYME_MERCHANT_ID};ac.order_id=${o.paymentId};a=${o.amountUzs * 100}`).toString('base64') };
+  if ((o.provider === 'card' || o.provider === 'stripe') && STRIPE_SECRET_KEY) {
+    const p = new URLSearchParams();
+    p.append('mode', 'payment'); p.append('success_url', ret + '&status=success'); p.append('cancel_url', ret + '&status=cancel');
+    p.append('line_items[0][price_data][currency]', 'usd'); p.append('line_items[0][price_data][product_data][name]', o.title.slice(0, 120));
+    p.append('line_items[0][price_data][unit_amount]', String(o.amountC)); p.append('line_items[0][quantity]', '1');
+    p.append('metadata[paymentId]', o.paymentId); p.append('client_reference_id', o.code);
+    const r = await fetch('https://api.stripe.com/v1/checkout/sessions', { method: 'POST', headers: { Authorization: 'Bearer ' + STRIPE_SECRET_KEY, 'Content-Type': 'application/x-www-form-urlencoded' }, body: p.toString() });
+    const d = await r.json();
+    if (r.ok && d.url) return { ...base, url: d.url, txnId: null };
+    throw new HttpError(502, 'Karta to\'lovi sessiyasini yaratib bo\'lmadi. Keyinroq urining.');
+  }
+  if (DEMO_PAYMENTS) return { ...base, sandbox: true };
+  throw new HttpError(503, 'Bu to\'lov usuli hozircha ulanmagan. Boshqa usulni tanlang yoki operator bilan bog\'laning.', { code: 'PAYMENT_PROVIDER_UNAVAILABLE' });
+}
+route('POST', '/api/payments/create', {}, async ({ req, body, user }) => {
+  rl(req, 'pay-create', 20, 3600 * 1000);
+  const o = core.prepareOrder(user, body);
+  const checkout = await makeCheckout(o, body);
+  const r = core.insertOrder(o, checkout);
+  return { ok: true, code: r.booking.code, bookingId: r.booking.id, paymentId: r.payment.id, status: r.payment.status, checkoutUrl: checkout.url, sandbox: !!checkout.sandbox,
+    amountUsd: core.usd(r.booking.amount_c), amountUzs: r.booking.amount_uzs, priceStatus: o.priceSource === 'server' ? 'verified' : 'estimated' };
+});
+route('GET', '/api/payments/status/:code', {}, ({ req, params }) => {
+  rl(req, 'pay-status', 60, 60000);
+  const b = db.get('SELECT b.code,b.status,(SELECT status FROM payments WHERE booking_id=b.id ORDER BY created_at DESC LIMIT 1) pay_status FROM bookings b WHERE code=?', str(params.code, 20));
+  if (!b) throw new HttpError(404, 'Buyurtma topilmadi.');
+  return { ok: true, code: b.code, bookingStatus: b.status, paymentStatus: b.pay_status };
+});
+// Faqat DEMO_PAYMENTS=true (production emas) va faqat sandbox to'lov uchun
+route('POST', '/api/payments/sandbox-confirm', {}, ({ req, body }) => {
+  rl(req, 'sbx', 30, 3600 * 1000);
+  if (!DEMO_PAYMENTS) throw new HttpError(404, 'Topilmadi.');
+  const p = db.get('SELECT * FROM payments WHERE id=?', str(body.paymentId, 40));
+  if (!p || !p.is_sandbox) throw new HttpError(404, 'Sandbox to\'lov topilmadi.');
+  core.markPaid(p.id, 'sandbox', core.SYSTEM);
+  return { ok: true, sandbox: true, note: 'Bu sinov to\'lovi — hisobotlarga kirmaydi.' };
+});
+function verifyStripeSig(raw, header, secret) {
   if (!header || !secret) return false;
-  const parts = Object.fromEntries(String(header).split(',').map(kv => kv.split('=').map(s => s.trim())));
-  const t = parts.t;
-  const v1 = String(header).split(',').filter(s => s.trim().startsWith('v1=')).map(s => s.trim().slice(3));
-  if (!t || !v1.length) return false;
-  if (Math.abs(Date.now() / 1000 - Number(t)) > 300) return false; // 5 daqiqadan eski bo'lsa rad
-  const expected = crypto.createHmac('sha256', secret).update(`${t}.${rawBody}`).digest('hex');
-  return v1.some(sig => sig.length === expected.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)));
+  const parts = String(header).split(',').map(s => s.trim());
+  const t = (parts.find(s => s.startsWith('t=')) || '').slice(2); const v1 = parts.filter(s => s.startsWith('v1=')).map(s => s.slice(3));
+  if (!t || !v1.length || Math.abs(Date.now() / 1000 - Number(t)) > 300) return false;
+  const exp = crypto.createHmac('sha256', secret).update(`${t}.${raw}`).digest('hex');
+  return v1.some(s => s.length === exp.length && crypto.timingSafeEqual(Buffer.from(s), Buffer.from(exp)));
 }
+route('POST', '/api/payments/webhook/stripe', { raw: true }, ({ req, rawBody }) => {
+  if (!STRIPE_WEBHOOK_SECRET) throw new HttpError(503, 'Webhook sozlanmagan.');
+  if (!verifyStripeSig(rawBody, req.headers['stripe-signature'], STRIPE_WEBHOOK_SECRET)) throw new HttpError(400, 'Imzo noto\'g\'ri.');
+  const ev = JSON.parse(rawBody);
+  try { db.run('INSERT INTO payment_events(provider,event_id,received_at,payload) VALUES(?,?,?,?)', 'stripe', String(ev.id), db.now(), JSON.stringify({ type: ev.type })); }
+  catch (_) { return { ok: true, duplicate: true }; }
+  const obj = ev.data && ev.data.object || {};
+  const pid = obj.metadata && obj.metadata.paymentId;
+  const p = pid && db.get('SELECT * FROM payments WHERE id=?', pid);
+  if (!p) return { ok: true, ignored: true };
+  if (ev.type === 'checkout.session.completed' && obj.payment_status === 'paid') {
+    if (obj.amount_total !== p.amount_c || String(obj.currency).toLowerCase() !== 'usd') {
+      sec.audit(core.SYSTEM, 'payment.amount_mismatch', 'payment', p.id, { expectedC: p.amount_c }, { gotC: obj.amount_total, currency: obj.currency });
+      notifyTg(`⚠️ Stripe summa mos kelmadi: ${p.id}`);
+      return { ok: true, mismatch: true };
+    }
+    core.markPaid(p.id, 'stripe', core.SYSTEM, { providerTxnId: obj.payment_intent || obj.id });
+    notifyTg(`✅ To'lov keldi: $${core.usd(p.amount_c)} (${p.id})`);
+  } else if (ev.type === 'checkout.session.expired') core.failPayment(p.id, 'expired', 'stripe expired');
+  return { ok: true };
+});
+const notImpl = name => () => { throw new HttpError(501, `${name} merchant API hali ulanmagan (Phase 5). To'lov faqat Stripe orqali tasdiqlanadi.`); };
+route('POST', '/api/payments/webhook/click', {}, notImpl('Click'));
+route('POST', '/api/payments/webhook/payme', {}, notImpl('Payme'));
 
-// 8. Telegram Bot Yordamchilari va Webhook Mantiqi
-const BOT_META = {
-  description:
-    "🧭 Manzil — O'zbekiston va dunyo bo'ylab 105+ sayohat manzillari, tasdiqlangan mahalliy gidlar va AI sayohat yordamchisi.\n\n" +
-    "✅ Tasdiqlangan gidlar bilan bog'lanish va onlayn band qilish\n" +
-    "✅ O'zbekistonliklar uchun vizasiz davlatlar va byudjet hisobi\n" +
-    "✅ Gid sifatida ro'yxatdan o'tish va 24/7 qo'llab-quvvatlash\n\n" +
-    "Boshlash uchun /start tugmasini bosing!",
-  shortDescription:
-    "Manzil rasmiy yordamchi boti — mahalliy gidlar, sayohat rejalari va 24/7 qo'llab-quvvatlash",
-  commands: [
-    { command: 'start', description: 'Botni ishga tushirish va asosiy menyu' },
-    { command: 'guides', description: "Tasdiqlangan mahalliy gidlar ro'yxati" },
-    { command: 'visa', description: "O'zbekistonliklar uchun vizasiz davlatlar" },
-    { command: 'apply', description: "Gid sifatida ro'yxatdan o'tish" },
-    { command: 'support', description: 'Operatorga savol yoki taklif yozish' },
-    { command: 'admin', description: 'Admin statistika va boshqaruv (admin)' }
-  ]
-};
+route('GET', '/api/my/bookings', { auth: 'user' }, ({ user }) => ({ ok: true, bookings: db.all('SELECT id FROM bookings WHERE user_id=? ORDER BY created_at DESC LIMIT 100', user.id).map(r => { const d = core.bookingDetail(r.id); return { ...d.booking, review: d.review, refunds: d.refunds.map(x => ({ amountUsd: x.amountUsd, status: x.status })) }; }) }));
+route('POST', '/api/my/bookings/:id/cancel', { auth: 'user' }, ({ user, params }) => ({ ok: true, ...core.cancelByCustomer(user, params.id) }));
+route('POST', '/api/my/bookings/:id/review', { auth: 'user' }, ({ user, params, body }) => ({ ok: true, id: core.addReview(user, params.id, body) }));
 
-const BOT_USERS_FILE = path.join(DATA_DIR, 'bot_users.json');
-
-function trackBotUser(chatObj) {
-  if (!chatObj || !chatObj.id) return;
-  try {
-    const list = readJson(BOT_USERS_FILE, []);
-    const idStr = String(chatObj.id);
-    const idx = list.findIndex(u => String(u.id) === idStr);
-    const entry = {
-      id: chatObj.id,
-      firstName: chatObj.first_name || '',
-      username: chatObj.username || '',
-      updatedAt: new Date().toISOString()
-    };
-    if (idx === -1) list.push(entry);
-    else list[idx] = { ...list[idx], ...entry };
-    writeJson(BOT_USERS_FILE, list);
-  } catch (e) {}
-}
-
-async function tgApi(method, payload) {
-  const token = process.env.TELEGRAM_BOT_TOKEN || '';
-  if (!token) return { ok: false, skipped: true };
-  try {
-    const r = await fetch('https://api.telegram.org/bot' + token + '/' + method, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    return await r.json();
-  } catch (e) {
-    return { ok: false, error: e.message };
+// ---------- Xodim auth ----------
+route('POST', '/api/staff/login', {}, async ({ req, res, body }) => {
+  const email = str(body.email, 120).toLowerCase();
+  rl(req, 'staff-login', 10, 15 * 60 * 1000); rl(req, 'staff-acct', 6, 15 * 60 * 1000, email);
+  const s = db.get('SELECT * FROM staff WHERE email=?', email);
+  if (!s || !s.active) { await sec.dummyVerify(body.password); throw new HttpError(401, 'Email yoki parol noto\'g\'ri.'); }
+  const lk = lockedMsg(s); if (lk) throw new HttpError(423, lk);
+  const v = await sec.verifyPassword(body.password, s.password_hash);
+  if (!v.ok) { failLogin('staff', s); sec.audit({ type: 'staff', id: s.id, label: s.name }, 'staff.login_failed', 'staff', s.id, null, null, req); throw new HttpError(401, 'Email yoki parol noto\'g\'ri.'); }
+  if (s.totp_enabled) {
+    if (!body.totp) throw new HttpError(401, 'Autentifikator kodi kerak.', { need2fa: true });
+    const step = sec.verifyTotp(s.totp_secret, String(body.totp), s.totp_last);
+    if (!step) { failLogin('staff', s); throw new HttpError(401, 'Autentifikator kodi noto\'g\'ri.', { need2fa: true }); }
+    db.run('UPDATE staff SET totp_last=? WHERE id=?', step, s.id);
   }
+  if (v.needsRehash) db.run('UPDATE staff SET password_hash=? WHERE id=?', await sec.hashPassword(body.password), s.id);
+  db.run('UPDATE staff SET failed_logins=0, locked_until=0, last_login=? WHERE id=?', db.now(), s.id);
+  sec.createSession(req, res, 'staff', s.id);
+  sec.audit({ type: 'staff', id: s.id, label: s.name }, 'staff.login', 'staff', s.id, null, null, req);
+  return { ok: true, staff: staffView(db.get('SELECT * FROM staff WHERE id=?', s.id)) };
+});
+route('POST', '/api/staff/logout', {}, ({ req, res }) => { sec.destroySession(req, res, 'staff'); return { ok: true }; });
+route('GET', '/api/staff/me', { auth: 'staff' }, ({ staff }) => ({ ok: true, staff: staffView(staff), perms: sec.permsOf(staff), roles: sec.ROLE_LABELS }));
+route('POST', '/api/staff/password', { auth: 'staff' }, async ({ req, staff, body }) => {
+  rl(req, 'staff-pw', 5, 3600 * 1000, staff.id);
+  if (!(await sec.verifyPassword(body.current, staff.password_hash)).ok) throw new HttpError(403, 'Joriy parol noto\'g\'ri.');
+  const pe = sec.checkPasswordPolicy(body.password, { min: 12, email: staff.email }); if (pe) throw new HttpError(400, pe);
+  db.run('UPDATE staff SET password_hash=?, must_change_pw=0, pw_changed_at=? WHERE id=?', await sec.hashPassword(body.password), db.now(), staff.id);
+  sec.revokeAllSessions('staff', staff.id);
+  sec.audit(core.staffActor(staff), 'staff.password_change', 'staff', staff.id, null, null, req);
+  return { ok: true, relogin: true };
+});
+route('POST', '/api/staff/2fa/setup', { auth: 'staff' }, ({ staff }) => {
+  if (staff.totp_enabled) throw new HttpError(409, '2FA allaqachon yoqilgan.');
+  const secret = sec.newTotpSecret(); db.run('UPDATE staff SET totp_secret=? WHERE id=?', secret, staff.id);
+  return { ok: true, secret, uri: sec.totpUri(secret, staff.email) };
+});
+route('POST', '/api/staff/2fa/enable', { auth: 'staff' }, ({ req, staff, body }) => {
+  if (!staff.totp_secret || staff.totp_enabled) throw new HttpError(409, 'Avval 2FA sozlashni boshlang.');
+  const step = sec.verifyTotp(staff.totp_secret, String(body.code), 0); if (!step) throw new HttpError(400, 'Kod noto\'g\'ri.');
+  db.run('UPDATE staff SET totp_enabled=1, totp_last=? WHERE id=?', step, staff.id);
+  sec.audit(core.staffActor(staff), 'staff.2fa_enable', 'staff', staff.id, null, null, req);
+  return { ok: true };
+});
+
+// ============================================================ Admin API
+const A = (perm, extra = {}) => ({ auth: 'staff', perm, ...extra });
+const q = (query, k) => str(query.get(k), 60);
+const num = (v, d, min, max) => Math.max(min, Math.min(max, parseInt(v, 10) || d));
+route('GET', '/api/admin/dashboard', A('dashboard'), ({ query }) => ({ ok: true, ...core.dashboard(q(query, 'from'), q(query, 'to'), query.get('sandbox') === '1') }));
+route('GET', '/api/admin/bookings', A('bookings.read'), ({ query, staff }) => ({ ok: true, ...core.listBookings({ status: q(query, 'status'), type: q(query, 'type'), q: q(query, 'q'), from: q(query, 'from'), to: q(query, 'to'), staffId: query.get('mine') === '1' ? staff.id : q(query, 'staffId'), limit: num(query.get('limit'), 50, 1, 200), offset: num(query.get('offset'), 0, 0, 100000) }) }));
+route('GET', '/api/admin/bookings/:id', A('bookings.read'), ({ params }) => { const d = core.bookingDetail(params.id); if (!d) throw new HttpError(404, 'Topilmadi.'); return { ok: true, ...d }; });
+route('POST', '/api/admin/bookings/:id/status', A('bookings.write'), ({ staff, params, body }) => {
+  core.setBookingStatus(params.id, str(body.status, 20), staff, { note: str(body.note, 300), priceVerified: !!body.priceVerified, refund: !!body.refund });
+  return { ok: true, ...core.bookingDetail(params.id) };
+});
+route('POST', '/api/admin/bookings/:id/assign', A('bookings.write'), ({ staff, params, body }) => {
+  const st = db.get('SELECT id,active FROM staff WHERE id=?', str(body.staffId, 40)); if (!st || !st.active) throw new HttpError(404, 'Xodim topilmadi.');
+  if (!db.get('SELECT 1 x FROM bookings WHERE id=?', params.id)) throw new HttpError(404, 'Buyurtma topilmadi.');
+  core.assignStaff(params.id, st.id, core.staffActor(staff)); return { ok: true };
+});
+route('GET', '/api/admin/payments', A('payments.read'), ({ query }) => ({ ok: true, payments: core.listPayments({ status: q(query, 'status'), limit: 200 }) }));
+// Bank o'tkazmasi/naqd kabi qo'lda tasdiqlash — faqat moliya, izoh majburiy, audit'ga yoziladi
+route('POST', '/api/admin/payments/:id/confirm', A('payments.confirm'), ({ staff, params, body }) => {
+  const note = str(body.note, 300); if (note.length < 5) throw new HttpError(400, 'Tasdiqlash asosini (masalan, bank o\'tkazma raqami) yozing.');
+  const p = db.get('SELECT * FROM payments WHERE id=?', params.id);
+  if (p && ['click', 'payme', 'stripe', 'card'].includes(p.provider) && !p.is_sandbox && !body.override) throw new HttpError(409, 'Provayder orqali to\'lanadigan to\'lovni qo\'lda tasdiqlash uchun "override" belgisi kerak.');
+  const r = core.markPaid(params.id, 'manual:' + note, core.staffActor(staff));
+  return { ok: true, changed: r.changed };
+});
+route('GET', '/api/admin/refunds', A('payments.read'), ({ query }) => ({ ok: true, refunds: core.listRefunds(q(query, 'status')) }));
+route('POST', '/api/admin/payments/:id/refund', A('refunds.request'), ({ staff, params, body }) => {
+  const p = db.get('SELECT amount_c, refunded_c FROM payments WHERE id=?', params.id); if (!p) throw new HttpError(404, 'Topilmadi.');
+  const amountC = body.full ? p.amount_c - p.refunded_c : core.toC(body.amountUsd);
+  return { ok: true, refund: core.requestRefund(params.id, amountC, body.reason, staff) };
+});
+route('POST', '/api/admin/refunds/:id/approve', A('refunds.approve'), ({ staff, params }) => ({ ok: true, refund: core.approveRefund(params.id, staff, { selfApprove: db.getSetting('refund_self_approve') === 'true' }) }));
+route('POST', '/api/admin/refunds/:id/reject', A('refunds.approve'), ({ staff, params, body }) => ({ ok: true, refund: core.rejectRefund(params.id, staff, body.note) }));
+route('POST', '/api/admin/refunds/:id/process', A('refunds.approve'), async ({ staff, params, body }) => {
+  const r = db.get('SELECT * FROM refunds WHERE id=?', params.id); if (!r) throw new HttpError(404, 'Topilmadi.');
+  const p = db.get('SELECT * FROM payments WHERE id=?', r.payment_id);
+  if (r.status !== 'approved') throw new HttpError(409, 'Avval so\'rov tasdiqlanishi kerak.');
+  let providerRef = str(body.providerRef, 120), method = 'manual';
+  if (p.provider === 'stripe' || p.provider === 'card') {
+    if (!p.is_sandbox && STRIPE_SECRET_KEY && p.provider_txn_id && p.provider_txn_id.startsWith('pi_')) {
+      const f = new URLSearchParams({ payment_intent: p.provider_txn_id, amount: String(r.amount_c) });
+      const resp = await fetch('https://api.stripe.com/v1/refunds', { method: 'POST', headers: { Authorization: 'Bearer ' + STRIPE_SECRET_KEY, 'Content-Type': 'application/x-www-form-urlencoded', 'Idempotency-Key': 'refund_' + r.id }, body: f.toString() });
+      const d = await resp.json();
+      if (!resp.ok) throw new HttpError(502, 'Stripe qaytarishni rad etdi: ' + str(d && d.error && d.error.message, 150));
+      providerRef = d.id; method = 'stripe_api';
+    } else if (!p.is_sandbox && !providerRef) throw new HttpError(400, 'Pul provayder orqali qaytarilgach, uning ma\'lumot raqamini (providerRef) kiriting.');
+  } else if (!p.is_sandbox && !providerRef) throw new HttpError(400, 'Pul mijozga qaytarilgach, o\'tkazma raqamini (providerRef) kiriting.');
+  return { ok: true, refund: core.processRefund(params.id, core.staffActor(staff), { providerRef, method }) };
+});
+// Hisob-kitob
+route('GET', '/api/admin/accounting', A('accounting.read'), ({ query }) => ({ ok: true, ...core.accounting(q(query, 'from'), q(query, 'to')), payables: core.payables(), expenses: db.all('SELECT * FROM expenses ORDER BY spent_at DESC, created_at DESC LIMIT 100').map(e => ({ id: e.id, category: e.category, description: e.description, amountUsd: core.usd(e.amount_c), spentAt: e.spent_at })), payouts: db.all('SELECT p.*, g.name gname FROM payouts p LEFT JOIN guides g ON g.id=p.party ORDER BY created_at DESC LIMIT 100').map(p => ({ id: p.id, party: p.party, name: p.gname || p.party, amountUsd: core.usd(p.amount_c), method: p.method, reference: p.reference, at: p.created_at })) }));
+route('GET', '/api/admin/ledger', A('accounting.read'), ({ query }) => ({ ok: true, entries: core.listLedger(num(query.get('limit'), 200, 1, 1000)) }));
+route('POST', '/api/admin/payouts', A('payouts.write'), ({ staff, body }) => ({ ok: true, payout: core.createPayout(str(body.party, 60), core.toC(body.amountUsd), body, staff) }));
+route('POST', '/api/admin/expenses', A('accounting.write'), ({ staff, body }) => ({ ok: true, expense: core.addExpense({ category: str(body.category, 30), description: body.description, amountC: core.toC(body.amountUsd), spentAt: str(body.spentAt, 10) }, staff) }));
+route('GET', '/api/admin/export', A('accounting.read', { csv: true }), ({ query, staff }) => {
+  const type = q(query, 'type'); let rows, cols;
+  if (type === 'ledger') { rows = core.listLedger(1000); cols = ['id', 'txnId', 'at', 'account', 'debitUsd', 'creditUsd', 'party', 'refType', 'refId', 'memo']; }
+  else if (type === 'payments') { rows = core.listPayments({ limit: 1000 }); cols = ['id', 'bookingCode', 'customer', 'provider', 'status', 'amountUsd', 'refundedUsd', 'sandbox', 'createdAt', 'paidAt']; }
+  else if (type === 'bookings') { rows = core.listBookings({ limit: 200 }).bookings.map(b => ({ code: b.code, title: b.title, customer: b.customer.name, contact: b.customer.contact, amountUsd: b.amountUsd, commissionUsd: b.commissionUsd, status: b.status, payStatus: b.payStatus, staff: b.staff && b.staff.name, createdAt: b.createdAt })); cols = ['code', 'title', 'customer', 'contact', 'amountUsd', 'commissionUsd', 'status', 'payStatus', 'staff', 'createdAt']; }
+  else throw new HttpError(400, 'type: ledger | payments | bookings');
+  sec.audit(core.staffActor(staff), 'export.csv', 'export', type, null, { rows: rows.length });
+  return { csv: core.toCsv(rows, cols), filename: `manzil-${type}-${db.now().slice(0, 10)}.csv` };
+});
+// Xodimlar
+route('GET', '/api/admin/staff', A('staff.read'), () => ({ ok: true, staff: db.all('SELECT * FROM staff ORDER BY created_at').map(staffView), roles: sec.ROLE_LABELS }));
+route('POST', '/api/admin/staff', A('staff.manage'), async ({ req, staff, body }) => {
+  const email = str(body.email, 120).toLowerCase(), name = str(body.name, 80), role = str(body.role, 30);
+  if (!sec.isEmail(email) || name.length < 2) throw new HttpError(400, 'Ism va email to\'g\'ri bo\'lsin.');
+  if (!sec.ROLE_PERMS[role]) throw new HttpError(400, 'Rol noto\'g\'ri.');
+  if (db.get('SELECT 1 x FROM staff WHERE email=?', email)) throw new HttpError(409, 'Bu email band.');
+  const pw = crypto.randomBytes(12).toString('base64url'), id = db.uid('st_');
+  db.run('INSERT INTO staff(id,name,email,role,password_hash,must_change_pw,created_at,created_by) VALUES(?,?,?,?,?,1,?,?)', id, name, email, role, await sec.hashPassword(pw), db.now(), staff.id);
+  sec.audit(core.staffActor(staff), 'staff.create', 'staff', id, null, { email, role }, req);
+  return { ok: true, staff: staffView(db.get('SELECT * FROM staff WHERE id=?', id)), oneTimePassword: pw };
+});
+route('POST', '/api/admin/staff/:id/update', A('staff.manage'), ({ req, staff, params, body }) => {
+  const t = db.get('SELECT * FROM staff WHERE id=?', params.id); if (!t) throw new HttpError(404, 'Topilmadi.');
+  const role = body.role ? str(body.role, 30) : t.role; if (!sec.ROLE_PERMS[role]) throw new HttpError(400, 'Rol noto\'g\'ri.');
+  const active = body.active === undefined ? t.active : (body.active ? 1 : 0);
+  if (t.id === staff.id && (!active || role !== t.role)) throw new HttpError(409, 'O\'z rolingiz yoki holatingizni o\'zgartira olmaysiz.');
+  if ((t.role === 'super_admin') && (!active || role !== 'super_admin') && db.get("SELECT COUNT(*) c FROM staff WHERE role='super_admin' AND active=1").c <= 1) throw new HttpError(409, 'Oxirgi super adminni o\'chirib bo\'lmaydi.');
+  db.run('UPDATE staff SET role=?, active=? WHERE id=?', role, active, t.id);
+  if (!active || role !== t.role) sec.revokeAllSessions('staff', t.id);
+  sec.audit(core.staffActor(staff), 'staff.update', 'staff', t.id, { role: t.role, active: !!t.active }, { role, active: !!active }, req);
+  return { ok: true };
+});
+route('POST', '/api/admin/staff/:id/reset-password', A('staff.manage'), async ({ req, staff, params }) => {
+  const t = db.get('SELECT * FROM staff WHERE id=?', params.id); if (!t) throw new HttpError(404, 'Topilmadi.');
+  const pw = crypto.randomBytes(12).toString('base64url');
+  db.run('UPDATE staff SET password_hash=?, must_change_pw=1, failed_logins=0, locked_until=0 WHERE id=?', await sec.hashPassword(pw), t.id);
+  sec.revokeAllSessions('staff', t.id);
+  sec.audit(core.staffActor(staff), 'staff.reset_password', 'staff', t.id, null, null, req);
+  return { ok: true, oneTimePassword: pw };
+});
+route('GET', '/api/admin/performance', A(null, { anyPerm: ['staff.performance', 'staff.performance.self'] }), ({ query, staff }) => {
+  const all = sec.can(staff, 'staff.performance');
+  return { ok: true, scope: all ? 'all' : 'self', rows: core.staffPerformance(q(query, 'from'), q(query, 'to'), all ? null : staff.id), slaMinutes: Number(db.getSetting('sla_confirm_minutes')) };
+});
+route('GET', '/api/admin/performance/:id/feedback', A(null, { anyPerm: ['staff.performance', 'staff.performance.self'] }), ({ staff, params }) => {
+  if (!sec.can(staff, 'staff.performance') && params.id !== staff.id) throw new HttpError(403, 'Ruxsat yo\'q.');
+  return { ok: true, feedback: core.staffFeedback(params.id) };
+});
+// Foydalanuvchilar
+route('GET', '/api/admin/users', A('users.read'), ({ query }) => {
+  const s = q(query, 'q').replace(/[%_]/g, ''); const w = s ? 'WHERE name LIKE ? OR email LIKE ?' : '';
+  return { ok: true, users: db.all(`SELECT u.*, (SELECT COUNT(*) FROM bookings b WHERE b.user_id=u.id) bookings FROM users u ${w} ORDER BY created_at DESC LIMIT 200`, ...(s ? [`%${s}%`, `%${s}%`] : [])).map(u => ({ ...userView(u), status: u.status, lastLogin: u.last_login, bookings: u.bookings })) };
+});
+route('POST', '/api/admin/users/:id/status', A('users.write'), ({ req, staff, params, body }) => {
+  const st = str(body.status, 12); if (!['active', 'suspended'].includes(st)) throw new HttpError(400, 'Holat noto\'g\'ri.');
+  const u = db.get('SELECT * FROM users WHERE id=?', params.id); if (!u) throw new HttpError(404, 'Topilmadi.');
+  db.run('UPDATE users SET status=? WHERE id=?', st, u.id); if (st !== 'active') sec.revokeAllSessions('user', u.id);
+  sec.audit(core.staffActor(staff), 'user.status', 'user', u.id, { status: u.status }, { status: st }, req); return { ok: true };
+});
+// Gidlar
+route('GET', '/api/admin/guides', A('guides.read'), () => ({ ok: true, guides: db.all('SELECT * FROM guides ORDER BY status, created_at DESC').map(g => ({ ...guideView(g), commissionRate: g.commission_rate, bookings: db.get("SELECT COUNT(*) n FROM bookings WHERE guide_id=? AND status IN ('confirmed','completed')", g.id).n })) }));
+route('POST', '/api/admin/guides/:id/status', A('guides.write'), ({ req, staff, params, body }) => {
+  const g = db.get('SELECT * FROM guides WHERE id=?', params.id); if (!g) throw new HttpError(404, 'Topilmadi.');
+  const st = str(body.status, 12) || g.status; if (!['pending', 'approved', 'rejected', 'suspended'].includes(st)) throw new HttpError(400, 'Holat noto\'g\'ri.');
+  let cr = g.commission_rate; if (body.commissionRate !== undefined && body.commissionRate !== null && body.commissionRate !== '') { cr = Number(body.commissionRate); if (!(cr >= 0 && cr <= 0.5)) throw new HttpError(400, 'Komissiya 0–0.5 oralig\'ida.'); }
+  db.run('UPDATE guides SET status=?, verified=?, commission_rate=?, updated_at=? WHERE id=?', st, body.verified === undefined ? g.verified : (body.verified ? 1 : 0), cr, db.now(), g.id);
+  sec.audit(core.staffActor(staff), 'guide.update', 'guide', g.id, { status: g.status, verified: !!g.verified, commission: g.commission_rate }, { status: st, verified: body.verified, commission: cr }, req); return { ok: true };
+});
+// Manzillar
+const destBody = b => { const d = {}; for (const k of ['name', 'country', 'region', 'category', 'season', 'description', 'transport', 'accommodation', 'safety', 'hours']) if (b[k] !== undefined) d[k] = str(b[k], 600); for (const k of ['dailyBudgetUsd', 'lat', 'lng', 'entranceFeeUsd']) if (b[k] !== undefined && b[k] !== '') d[k] = Number(b[k]) || 0; if (!d.name) throw new HttpError(400, 'Manzil nomi kerak.'); return d; };
+route('GET', '/api/admin/destinations', A('destinations.write'), () => ({ ok: true, destinations: db.all('SELECT * FROM destinations ORDER BY created_at DESC').map(d => ({ ...JSON.parse(d.data), id: d.id, priceStatus: d.price_status, archived: !!d.archived })) }));
+route('POST', '/api/admin/destinations', A('destinations.write'), ({ req, staff, body }) => {
+  const d = destBody(body), id = db.uid('dst_'), ps = ['verified', 'estimated', 'unavailable'].includes(body.priceStatus) ? body.priceStatus : 'estimated';
+  db.run('INSERT INTO destinations(id,data,price_status,created_at,updated_at) VALUES(?,?,?,?,?)', id, JSON.stringify(d), ps, db.now(), db.now());
+  sec.audit(core.staffActor(staff), 'destination.create', 'destination', id, null, { ...d, priceStatus: ps }, req); return { ok: true, id };
+});
+route('POST', '/api/admin/destinations/:id/update', A('destinations.write'), ({ req, staff, params, body }) => {
+  const o = db.get('SELECT * FROM destinations WHERE id=?', params.id); if (!o) throw new HttpError(404, 'Topilmadi.');
+  const d = destBody({ ...JSON.parse(o.data), ...body }), ps = ['verified', 'estimated', 'unavailable'].includes(body.priceStatus) ? body.priceStatus : o.price_status;
+  const arch = body.archived === undefined ? o.archived : (body.archived ? 1 : 0);
+  db.run('UPDATE destinations SET data=?, price_status=?, archived=?, updated_at=? WHERE id=?', JSON.stringify(d), ps, arch, db.now(), o.id);
+  sec.audit(core.staffActor(staff), 'destination.update', 'destination', o.id, { ...JSON.parse(o.data), priceStatus: o.price_status, archived: !!o.archived }, { ...d, priceStatus: ps, archived: !!arch }, req); return { ok: true };
+});
+// Fikr va sharhlar
+route('GET', '/api/admin/feedback', A('feedback.read'), () => ({ ok: true, feedback: db.all('SELECT f.*, s.name handler FROM feedback f LEFT JOIN staff s ON s.id=f.handled_by ORDER BY created_at DESC LIMIT 200').map(f => ({ id: f.id, name: f.name, contact: f.contact, type: f.type, message: f.message, status: f.status, handler: f.handler, at: f.created_at })),
+  reviews: db.all('SELECT r.*, b.code, b.customer_name, s.name staff_name, g.name guide_name FROM reviews r JOIN bookings b ON b.id=r.booking_id LEFT JOIN staff s ON s.id=r.staff_id LEFT JOIN guides g ON g.id=r.guide_id ORDER BY r.created_at DESC LIMIT 200').map(r => ({ code: r.code, customer: r.customer_name, rating: r.rating, serviceRating: r.service_rating, comment: r.comment, staff: r.staff_name, guide: r.guide_name, at: r.created_at })) }));
+route('POST', '/api/admin/feedback/:id/handle', A('feedback.write'), ({ req, staff, params, body }) => {
+  const st = str(body.status, 12) || 'handled'; if (!['new', 'handled', 'spam'].includes(st)) throw new HttpError(400, 'Holat noto\'g\'ri.');
+  db.run('UPDATE feedback SET status=?, handled_by=? WHERE id=?', st, staff.id, params.id);
+  sec.audit(core.staffActor(staff), 'feedback.handle', 'feedback', params.id, null, { status: st }, req); return { ok: true };
+});
+// Ochiq ma'lumotlar bazasi ko'rinishi (faqat super admin; parol xeshlari yashirin)
+route('GET', '/api/admin/db', A('db.view'), () => ({ ok: true, engine: 'SQLite (node:sqlite)', location: db.IN_MEMORY ? 'xotirada (:memory:)' : db.DB_PATH, note: 'Parollar hech qachon ochiq matnda saqlanmaydi: faqat scrypt xeshi (qaytarib bo\'lmaydi). Bu yerda u yashirilgan.', tables: db.VIEWABLE_TABLES.map(t => ({ name: t, rows: db.get(`SELECT COUNT(*) c FROM ${t}`).c })) }));
+route('GET', '/api/admin/db/:table', A('db.view'), ({ req, staff, params, query }) => {
+  if (!db.VIEWABLE_TABLES.includes(params.table)) throw new HttpError(404, 'Jadval topilmadi.');
+  const limit = num(query.get('limit'), 50, 1, 200), offset = num(query.get('offset'), 0, 0, 1e7);
+  const cols = db.all(`PRAGMA table_info(${params.table})`).map(c => c.name);
+  const order = cols.includes('created_at') ? 'created_at DESC' : cols.includes('seq') ? 'seq DESC' : cols.includes('id') ? 'id DESC' : 'rowid DESC';
+  const rows = db.all(`SELECT * FROM ${params.table} ORDER BY ${order} LIMIT ? OFFSET ?`, limit, offset).map(r => {
+    const o = {}; for (const c of cols) { const v = r[c]; o[c] = db.MASKED_COLUMNS.has(c) ? (v ? `[yashirin: ${String(v).startsWith('scrypt$') ? 'scrypt xesh' : 'maxfiy'}]` : null) : (typeof v === 'string' && v.length > 300 ? v.slice(0, 300) + '…' : v); }
+    return o;
+  });
+  sec.audit(core.staffActor(staff), 'db.view', 'table', params.table, null, { limit, offset }, req);
+  return { ok: true, table: params.table, columns: cols, masked: cols.filter(c => db.MASKED_COLUMNS.has(c)), total: db.get(`SELECT COUNT(*) c FROM ${params.table}`).c, rows };
+});
+// Audit
+route('GET', '/api/admin/audit', A('audit.read'), ({ query }) => {
+  const ent = q(query, 'entity'), lim = num(query.get('limit'), 100, 1, 500);
+  const rows = db.all(`SELECT seq,at,actor_type,actor_label,action,entity,entity_id,payload,hash FROM audit ${ent ? 'WHERE entity=?' : ''} ORDER BY seq DESC LIMIT ?`, ...(ent ? [ent] : []), lim);
+  return { ok: true, entries: rows.map(r => { const p = JSON.parse(r.payload); return { seq: r.seq, at: r.at, actor: r.actor_label, actorType: r.actor_type, action: r.action, entity: r.entity, entityId: r.entity_id, before: p.before, after: p.after, ip: p.ip, hash: r.hash.slice(0, 12) }; }) };
+});
+route('GET', '/api/admin/audit/verify', A('audit.read'), () => ({ ok: true, ...sec.verifyAuditChain() }));
+// Sozlamalar
+const SETTING_KEYS = ['commission_rate', 'usd_uzs_rate', 'sla_confirm_minutes', 'cancel_policy', 'refund_self_approve'];
+route('GET', '/api/admin/settings', A('settings.write'), () => ({ ok: true, settings: Object.fromEntries(SETTING_KEYS.map(k => [k, db.getSetting(k)])), integrations: { stripe: !!STRIPE_SECRET_KEY, stripeWebhook: !!STRIPE_WEBHOOK_SECRET, click: !!(CLICK_SERVICE_ID && CLICK_MERCHANT_ID), payme: !!PAYME_MERCHANT_ID, telegram: !!TG_TOKEN, openai: !!OPENAI_API_KEY, demoPayments: DEMO_PAYMENTS, production: IS_PROD }, ai: { today: aiDaily.n, limit: AI_DAILY_LIMIT, total: db.get('SELECT COUNT(*) c FROM ai_log').c, fallback: db.get("SELECT COUNT(*) c FROM ai_log WHERE provider='local-fallback'").c } }));
+route('POST', '/api/admin/settings', A('settings.write'), ({ req, staff, body }) => {
+  const before = {}, after = {};
+  for (const k of SETTING_KEYS) {
+    if (body[k] === undefined) continue;
+    let v = String(body[k]);
+    if (k === 'commission_rate' && !(Number(v) >= 0 && Number(v) <= 0.5)) throw new HttpError(400, 'Komissiya 0–0.5.');
+    if (k === 'usd_uzs_rate' && !(Number(v) >= 1000 && Number(v) <= 100000)) throw new HttpError(400, 'Kurs noto\'g\'ri.');
+    if (k === 'sla_confirm_minutes' && !(Number(v) >= 1 && Number(v) <= 10080)) throw new HttpError(400, 'SLA noto\'g\'ri.');
+    if (k === 'refund_self_approve' && !['true', 'false'].includes(v)) throw new HttpError(400, 'true/false.');
+    if (k === 'cancel_policy') { try { const p = JSON.parse(v); if (!Array.isArray(p) || !p.every(r => Number.isFinite(r.minDays) && r.pct >= 0 && r.pct <= 100)) throw 0; v = JSON.stringify(p); } catch (_) { throw new HttpError(400, 'Bekor qilish siyosati JSON noto\'g\'ri.'); } }
+    before[k] = db.getSetting(k); after[k] = v; db.setSetting(k, v);
+  }
+  sec.audit(core.staffActor(staff), 'settings.update', 'settings', 'global', before, after, req); return { ok: true };
+});
+
+// ============================================================ Telegram (bildirishnoma; webhook maxfiy URL bilan)
+async function notifyTg(text) {
+  if (!TG_TOKEN || !TG_ADMIN_CHAT) return;
+  try { await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: TG_ADMIN_CHAT, text: String(text).slice(0, 3500) }) }); } catch (_) {}
 }
 
-async function sendTgTo(chatId, text, extra = {}) {
-  return tgApi('sendMessage', {
-    chat_id: chatId,
-    text,
-    parse_mode: 'HTML',
-    disable_web_page_preview: true,
-    ...extra
+// ============================================================ Statik fayllar
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webp': 'image/webp', '.txt': 'text/plain; charset=utf-8' };
+function serveStatic(req, res, pathname) {
+  let p = pathname === '/' ? '/index.html' : (pathname === '/admin' || pathname === '/admin/') ? '/admin.html' : pathname;
+  try { p = decodeURIComponent(p); } catch (_) { res.writeHead(400); return res.end(); }
+  const file = path.normalize(path.join(PUBLIC_DIR, p));
+  if (!file.startsWith(PUBLIC_DIR + path.sep) || p.includes('\0') || path.basename(file).startsWith('.')) { res.writeHead(404); return res.end('Not found'); }
+  fs.readFile(file, (e, buf) => {
+    if (e) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
+    const ext = path.extname(file).toLowerCase();
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600' });
+    res.end(req.method === 'HEAD' ? undefined : buf);
   });
 }
 
-async function sendTelegramAdminAction(text, replyMarkup = null) {
-  const chatId = process.env.TELEGRAM_CHAT_ID || '';
-  if (!chatId) return { ok: false, skipped: true };
-  const extra = replyMarkup ? { reply_markup: replyMarkup } : {};
-  return sendTgTo(chatId, text, extra);
-}
-
-const WEBHOOK_PARAMS = { allowed_updates: ['message', 'callback_query'], secret_token: TG_WEBHOOK_SECRET };
-
-async function syncTelegramWebhook() {
-  const token = process.env.TELEGRAM_BOT_TOKEN || '';
-  const pubUrl = String(process.env.PUBLIC_URL || 'https://manzil-app-1.onrender.com').replace(/\/+$/, '');
-  if (!token || !pubUrl.startsWith('https://')) {
-    return { ok: false, error: 'HTTPS PUBLIC_URL yoki TELEGRAM_BOT_TOKEN topilmadi' };
+// ============================================================ Asosiy handler
+async function handle(req, res) {
+  const url = new URL(req.url, 'http://x');
+  const isApi = url.pathname.startsWith('/api/');
+  securityHeaders(res, isApi);
+  if (!isApi) {
+    if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
+    return serveStatic(req, res, url.pathname);
   }
-  const webhookRes = await tgApi('setWebhook', { url: pubUrl + '/api/telegram/webhook', ...WEBHOOK_PARAMS });
-  const cmdRes = await tgApi('setMyCommands', { commands: BOT_META.commands });
-  const descRes = await tgApi('setMyDescription', { description: BOT_META.description });
-  const shortRes = await tgApi('setMyShortDescription', { short_description: BOT_META.shortDescription });
-  return { ok: Boolean(webhookRes.ok), webhookRes, cmdRes, descRes, shortRes };
-}
-
-async function processTelegramUpdate(body) {
-  const adminChatId = String(process.env.TELEGRAM_CHAT_ID || '');
-  const siteUrl = String(process.env.PUBLIC_URL || 'https://manzil-app-1.onrender.com').replace(/\/+$/, '');
-
-  // A) INLINE TUGMALAR (Tasdiqlash / Rad etish)
-  const cb = body && body.callback_query;
-  if (cb && cb.data) {
-    const fromId = String(cb.from && cb.from.id ? cb.from.id : '');
-    // TELEGRAM_CHAT_ID sozlanmagan bo'lsa HECH KIM admin emas (avval hamma tasdiqlay olardi)
-    if (!adminChatId || fromId !== adminChatId) {
-      await tgApi('answerCallbackQuery', {
-        callback_query_id: cb.id,
-        text: "Faqat admin uchun ruxsat etilgan!",
-        show_alert: true
-      });
-      return;
-    }
-
-    const [action, guideId] = String(cb.data).split(':');
-    const guides = readJson(FILES.guides, SEED_GUIDES);
-    const guide = guides.find(g => String(g.id) === String(guideId));
-    let toastText = 'Ariza topilmadi';
-    let statusTag = '';
-
-    if (guide && (action === 'approve' || action === 'reject')) {
-      const before = { approved: guide.approved, rejected: guide.rejected };
-      if (action === 'approve') {
-        guide.approved = true;
-        guide.rejected = false;
-        guide.approvedAt = new Date().toISOString();
-        toastText = '✅ Gid tasdiqlandi!';
-        statusTag = '\n\n✅ <b>HOLAT: TASDIQLANDI</b>';
-      } else {
-        guide.approved = false;
-        guide.rejected = true;
-        guide.rejectedAt = new Date().toISOString();
-        toastText = '❌ Ariza rad etildi';
-        statusTag = '\n\n❌ <b>HOLAT: RAD ETILDI</b>';
-      }
-      writeJson(FILES.guides, guides);
-      audit(null, 'guide.' + action, 'guide', guide.id, before, { approved: guide.approved, rejected: guide.rejected }, 'telegram:' + fromId);
-    }
-
-    await tgApi('answerCallbackQuery', { callback_query_id: cb.id, text: toastText });
-    if (cb.message && cb.message.chat && statusTag) {
-      const origText = cb.message.text || '';
-      await tgApi('editMessageText', {
-        chat_id: cb.message.chat.id,
-        message_id: cb.message.message_id,
-        text: origText + statusTag,
-        parse_mode: 'HTML'
-      });
-    }
-    return;
-  }
-
-  // B) XABARLAR VA BUYRUQLAR
-  const msg = body && body.message;
-  if (msg && msg.chat) {
-    const chatId = String(msg.chat.id);
-    const text = String(msg.text || '').trim();
-    const isOwner = Boolean(adminChatId) && chatId === adminChatId;
-    trackBotUser(msg.chat);
-
-    const mainKeyboard = {
-      keyboard: [
-        [{ text: '🧭 Gidlar katalogi' }, { text: '🛂 Vizasiz davlatlar' }],
-        [{ text: "💼 Gid bo‘lish" }, { text: '💬 Operatorga yozish' }]
-      ],
-      resize_keyboard: true
-    };
-
-    if (isOwner && msg.reply_to_message && text && !text.startsWith('/')) {
-      const repliedText = msg.reply_to_message.text || msg.reply_to_message.caption || '';
-      const idMatch = repliedText.match(/ID:\s*(\d+)/);
-      if (idMatch && idMatch[1]) {
-        const sent = await sendTgTo(idMatch[1], '💬 <b>Manzil Qo‘llab-quvvatlash javobi:</b>\n\n' + escHtml(text));
-        await sendTgTo(chatId, sent.ok ? '✅ Javobingiz foydalanuvchiga yetkazildi!' : '❌ Xabar yuborilmadi');
-        return;
-      }
-    }
-
-    if (isOwner && text.startsWith('/broadcast ')) {
-      const notice = text.slice('/broadcast '.length).trim();
-      const subs = readJson(BOT_USERS_FILE, []);
-      let sentCount = 0;
-      for (const u of subs) {
-        if (String(u.id) === adminChatId) continue;
-        const r = await sendTgTo(u.id, '📢 <b>Manzil Yangiligi:</b>\n\n' + escHtml(notice));
-        if (r.ok) sentCount++;
-      }
-      audit(null, 'broadcast.send', 'telegram', '', null, { sentCount, preview: notice.slice(0, 200) }, 'telegram:' + chatId);
-      await sendTgTo(chatId, '📣 E’lon <b>' + sentCount + '</b> ta foydalanuvchiga yuborildi.');
-      return;
-    }
-
-    if (isOwner && (text === '/admin' || text === '/stats')) {
-      const guides = readJson(FILES.guides, SEED_GUIDES);
-      const payments = readJson(FILES.payments, []);
-      const subs = readJson(BOT_USERS_FILE, []);
-      const pending = guides.filter(g => g.approved === false && !g.rejected).length;
-      const approved = guides.filter(g => g.approved === true).length;
-      const paid = payments.filter(isRealPaid);
-      const gross = paid.reduce((s, p) => s + Number(p.amountUsd || p.amount || p.totalAmount || 0), 0);
-      const comm = Math.round(gross * COMMISSION_RATE * 100) / 100;
-
-      const statMsg = [
-        '📊 <b>Manzil Jonli Statistika</b>',
-        '',
-        '🟡 Kutilayotgan gid arizalari: <b>' + pending + ' ta</b>',
-        '🟢 Tasdiqlangan gidlar: <b>' + approved + ' ta</b>',
-        '💳 Jami buyurtmalar: <b>' + payments.length + ' ta</b> (Haqiqiy to‘langan: ' + paid.length + ')',
-        '💰 Umumiy aylanma: <b>$' + gross + '</b>',
-        '🏦 Platforma komissiyasi (' + Math.round(COMMISSION_RATE * 100) + '%): <b>$' + comm + '</b>',
-        '👥 Bot foydalanuvchilari: <b>' + subs.length + ' ta</b>',
-        '',
-        '⏳ Kutilayotgan arizalarni ko‘rish: /pending'
-      ].join('\n');
-
-      await sendTgTo(chatId, statMsg, {
-        reply_markup: {
-          inline_keyboard: [[{ text: '🖥 Web-saytni ochish', url: siteUrl }]]
-        }
-      });
-      return;
-    }
-
-    if (isOwner && text === '/pending') {
-      const guides = readJson(FILES.guides, SEED_GUIDES);
-      const pendingList = guides.filter(g => g.approved === false && !g.rejected);
-      if (!pendingList.length) {
-        await sendTgTo(chatId, '✅ Hozircha kutilayotgan yangi gid arizalari yo‘q.');
-        return;
-      }
-      for (const g of pendingList) {
-        const card = [
-          '🟡 <b>Kutilayotgan ariza</b>',
-          '🆔 ID: <code>' + escHtml(g.id) + '</code>',
-          '👤 Ism: <b>' + escHtml(g.name) + '</b>',
-          '📍 Hudud: ' + escHtml(g.city) + ', ' + escHtml(g.country || ''),
-          '💰 Stavka: $' + escHtml(g.rate || g.price) + '/kun',
-          '✈️ Telegram: @' + escHtml(g.tg),
-          '📝 Yo‘nalish: ' + escHtml(g.spec || g.bio)
-        ].join('\n');
-        await sendTgTo(chatId, card, {
-          reply_markup: {
-            inline_keyboard: [[
-              { text: '✅ Tasdiqlash', callback_data: 'approve:' + g.id },
-              { text: '❌ Rad etish', callback_data: 'reject:' + g.id }
-            ]]
-          }
-        });
-      }
-      return;
-    }
-
-    if (text.startsWith('/start')) {
-      const welcome = [
-        'Assalomu alaykum, <b>' + escHtml(msg.chat.first_name || 'Sayohatchi') + '</b>! 👋',
-        '',
-        '<b>Manzil</b> sayohat ekotizimining rasmiy botiga xush kelibsiz.',
-        'Pastdagi tugmalardan birini tanlang yoki sayohat bo‘yicha savolingizni yozing:'
-      ].join('\n');
-      await sendTgTo(chatId, welcome, {
-        reply_markup: { inline_keyboard: [[{ text: '🌐 Manzil Web-ilovasini ochish', url: siteUrl }]] }
-      });
-      await sendTgTo(chatId, '⬇️ Tezkor menyu faollashtirildi:', { reply_markup: mainKeyboard });
-      return;
-    }
-
-    if (text === '/guides' || text === '🧭 Gidlar katalogi') {
-      const guides = readJson(FILES.guides, SEED_GUIDES).filter(g => g.approved !== false && !g.rejected);
-      const lines = guides.slice(0, 8).map((g, i) =>
-        (i + 1) + '. <b>' + escHtml(g.name) + '</b> — ' + escHtml(g.city) + ' ($' + (g.rate || g.price) + '/kun)\n   🗣 ' + escHtml(g.langs) + ' | ✈️ @' + escHtml(g.tg)
-      );
-      await sendTgTo(chatId, '🧭 <b>Tasdiqlangan mahalliy gidlar (' + guides.length + ' ta):</b>\n\n' + lines.join('\n\n'), {
-        reply_markup: { inline_keyboard: [[{ text: '🌐 Barcha gidlar va band qilish', url: siteUrl }]] }
-      });
-      return;
-    }
-
-    if (text === '/visa' || text === '🛂 Vizasiz davlatlar') {
-      const visaText = [
-        '🛂 <b>O‘zbekiston fuqarolari uchun asosiy vizasiz davlatlar:</b>',
-        '🇹🇷 Turkiya (90 kun) | 🇬🇪 Gruziya (1 yil) | 🇦🇪 BAA (30 kun)',
-        '🇨🇳 Xitoy (30 kun) | 🇹🇭 Tailand (60 kun) | 🇲🇻 Maldiv (30 kun)',
-        '🇰🇿 Qozog‘iston (30 kun) | 🇰🇬 Qirg‘iziston (60 kun) | 🇹🇯 Tojikiston (30 kun)',
-        '',
-        '<i>Qoidalar o‘zgarib turadi — safardan oldin rasmiy manbada tekshiring.</i>'
-      ].join('\n');
-      await sendTgTo(chatId, visaText, {
-        reply_markup: { inline_keyboard: [[{ text: '🌐 Saytda byudjet hisoblash', url: siteUrl }]] }
-      });
-      return;
-    }
-
-    if (text === '/apply' || text === "💼 Gid bo‘lish") {
-      await sendTgTo(chatId, '💼 <b>Gid sifatida qo‘shilish bepul!</b>\nHar bir buyurtmadan <b>88% daromad</b> sizga qoladi (12% komissiya).', {
-        reply_markup: { inline_keyboard: [[{ text: '📝 Gidlikka ariza topshirish', url: siteUrl }]] }
-      });
-      return;
-    }
-
-    if (text === '/support' || text === '💬 Operatorga yozish') {
-      await sendTgTo(chatId, '💬 Savolingiz yoki taklifingizni shu yerga yozib yuboring — xabaringiz operatorga yetkaziladi.');
-      return;
-    }
-
-    if (text) {
-      const aiRes = await generateAiReply(text.slice(0, 1000), [], {}, 'auto');
-      await sendTgTo(chatId, '🤖 ' + escHtml(aiRes.reply));
-      if (!isOwner) {
-        const uName = [msg.chat.first_name, msg.chat.last_name].filter(Boolean).join(' ') || 'Foydalanuvchi';
-        const uTag = msg.chat.username ? '@' + msg.chat.username : 'username yo‘q';
-        await sendTelegramAdminAction(
-          '📩 <b>Botga yangi xabar keldi</b>\n🆔 ID: <code>' + chatId + '</code>\n👤 Mijoz: <b>' + escHtml(uName) + '</b> (' + escHtml(uTag) + ')\n💬 Xabar: ' + escHtml(text.slice(0, 1000)) + '\n\n<i>↩️ Javob berish uchun shu xabarga Reply qiling.</i>'
-        );
-      }
-    }
-  }
-}
-
-// 9. Asosiy Server Router
-const KNOWN_DEST_KEYS = ['id', 'createdAt', 'updatedAt', 'name', 'country', 'region', 'desc', 'image', 'bestSeason', 'entranceFee', 'openingHours', 'safetyNotes', 'transportInfo', 'flightBase', 'hotelNight', 'foodDay', 'transportDay', 'activitiesDay', 'tourBase5d', 'lat', 'lng', 'scope', 'bestMonths', 'tags', 'priceStatus', 'verifiedAt'];
-function omitKeys(obj, keys) {
-  const out = {};
-  for (const k of Object.keys(obj || {})) if (!keys.includes(k)) out[k] = obj[k];
-  return out;
-}
-
-const server = http.createServer(async (req, res) => {
-  res._cors = corsFor(req);
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  if (PUBLIC_URL.startsWith('https://')) res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
-
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204, res._cors);
-    return res.end();
-  }
-
-  const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const pathname = urlObj.pathname;
-
+  const origin = req.headers.origin;
+  if (origin && originOk(req)) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Access-Control-Allow-Credentials', 'true'); res.setHeader('Vary', 'Origin'); res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS'); res.setHeader('Access-Control-Allow-Headers', 'Content-Type'); }
+  if (req.method === 'OPTIONS') { res.writeHead(originOk(req) ? 204 : 403); return res.end(); }
   try {
-    // --- HEALTH CHECK (ommaviy qismi minimal; tafsilot faqat adminga) ---
-    if (req.method === 'GET' && pathname === '/api/health') {
-      const base = { ok: true, service: 'manzil-backend', version: '2.2.0', uptimeSec: Math.round(process.uptime()) };
-      if (!isAdmin(req, urlObj)) return sendJson(res, 200, base);
-      const guides = readJson(FILES.guides, []);
-      return sendJson(res, 200, {
-        ...base,
-        env: IS_PROD ? 'production' : 'development',
-        demoPaymentsEnabled: DEMO_PAYMENTS,
-        commissionRate: COMMISSION_RATE,
-        integrations: {
-          telegram: Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID),
-          openai: Boolean(OPENAI_API_KEY),
-          grok: Boolean(GROK_API_KEY),
-          click: Boolean(CLICK_SERVICE_ID && CLICK_MERCHANT_ID),
-          payme: Boolean(PAYME_MERCHANT_ID),
-          stripe: Boolean(STRIPE_SECRET_KEY),
-          stripeWebhook: Boolean(STRIPE_WEBHOOK_SECRET)
-        },
-        counts: {
-          guides: guides.length,
-          approvedGuides: guides.filter(g => g.approved !== false).length,
-          feedback: readJson(FILES.feedback, []).length,
-          users: readJson(FILES.users, []).length,
-          payments: readJson(FILES.payments, []).length
-        }
-      });
+    const isWebhook = url.pathname.startsWith('/api/payments/webhook/');
+    if (req.method !== 'GET' && !isWebhook && !originOk(req)) throw new HttpError(403, 'Origin ruxsat etilmagan.');
+    let match = null;
+    for (const r of routes) { if (r.method !== req.method) continue; const m = r.re.exec(url.pathname); if (m) { match = { r, params: Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(m[i + 1])])) }; break; } }
+    if (!match) throw new HttpError(404, 'Endpoint topilmadi.');
+    const { r, params } = match;
+    rl(req, 'api', 300, 60000);
+    const ctx = { req, res, params, query: url.searchParams, user: null, staff: null };
+    if (r.opts.auth === 'staff') {
+      ctx.staff = currentStaff(req);
+      if (!ctx.staff) throw new HttpError(401, 'Tizimga kiring.');
+      if (ctx.staff.must_change_pw && !['/api/staff/password', '/api/staff/me', '/api/staff/logout'].includes(url.pathname)) throw new HttpError(403, 'Avval parolni almashtiring.', { mustChangePw: true });
+      const ok = r.opts.anyPerm ? r.opts.anyPerm.some(p => sec.can(ctx.staff, p)) : sec.can(ctx.staff, r.opts.perm);
+      if (!ok) { sec.audit(core.staffActor(ctx.staff), 'access.denied', 'route', url.pathname, null, { perm: r.opts.perm || r.opts.anyPerm }, req); throw new HttpError(403, 'Bu amal uchun ruxsatingiz yo\'q.'); }
+    } else {
+      ctx.user = currentUser(req);
+      if (r.opts.auth === 'user' && !ctx.user) throw new HttpError(401, 'Tizimga kiring.');
     }
-
-    // --- DESTINATIONS: PUBLIC LIST & ADMIN CRUD ---
-    if (req.method === 'GET' && pathname === '/api/destinations') {
-      const destinations = readJson(FILES.destinations, []).map(normalizeDestinationForClient);
-      return sendJson(res, 200, { ok: true, destinations });
+    if (r.opts.raw) ctx.rawBody = await readRaw(req); else if (req.method === 'POST') ctx.body = await readJson(req); else ctx.body = {};
+    const out = await r.fn(ctx);
+    if (out && out.csv) {
+      res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${out.filename}"` });
+      return res.end(out.csv);
     }
-
-    if (req.method === 'POST' && pathname === '/api/admin/destinations') {
-      const body = await parseBody(req);
-      if (!isAdmin(req, urlObj, body)) {
-        return sendJson(res, 401, { ok: false, error: 'Admin ruxsati talab qilinadi' });
-      }
-      const list = readJson(FILES.destinations, []);
-      const fields = pickDestinationFields(body);
-      if (!fields.name) return sendJson(res, 400, { ok: false, error: 'Manzil nomi kiritilmagan' });
-      const newDest = {
-        id: Number(body.id) || Date.now(),
-        country: "O'zbekiston",
-        region: "O'zbekiston",
-        scope: 'uz',
-        lat: 41.3,
-        lng: 69.2,
-        flightBase: 0,
-        hotelNight: 40,
-        foodDay: 18,
-        transportDay: 12,
-        activitiesDay: 10,
-        tourBase5d: 240,
-        bestMonths: [4, 5, 9, 10],
-        tags: ['diy-win'],
-        desc: '',
-        priceStatus: 'estimated',
-        ...fields,
-        createdAt: new Date().toISOString()
-      };
-      if (list.some(d => String(d.id) === String(newDest.id))) {
-        return sendJson(res, 409, { ok: false, error: 'Bunday ID li manzil allaqachon mavjud' });
-      }
-      list.push(newDest);
-      writeJson(FILES.destinations, list);
-      audit(req, 'destination.create', 'destination', newDest.id, null, newDest, adminActor(req));
-      return sendJson(res, 201, { ok: true, destination: newDest });
+    sendJson(res, 200, out || { ok: true });
+  } catch (e) {
+    if (e instanceof HttpError) {
+      if (e.extra && e.extra.retryAfter) res.setHeader('Retry-After', e.extra.retryAfter);
+      return sendJson(res, e.status, { ok: false, error: e.message, ...(e.extra || {}) });
     }
-
-    const adminDestMatch = pathname.match(/^\/api\/admin\/destinations\/([^/]+)$/);
-    if (adminDestMatch && (req.method === 'PUT' || req.method === 'DELETE')) {
-      const body = req.method === 'PUT' ? await parseBody(req) : {};
-      if (!isAdmin(req, urlObj, body)) {
-        return sendJson(res, 401, { ok: false, error: 'Admin ruxsati talab qilinadi' });
-      }
-      const destId = decodeURIComponent(adminDestMatch[1]);
-      let list = readJson(FILES.destinations, []);
-      if (req.method === 'DELETE') {
-        const before = list.find(d => String(d.id) === destId) || null;
-        list = list.filter(d => String(d.id) !== destId);
-        writeJson(FILES.destinations, list);
-        audit(req, 'destination.delete', 'destination', destId, before, null, adminActor(req));
-        return sendJson(res, 200, { ok: true });
-      }
-      // Tekshirilgan maydonlar pickDestinationFields orqali, qolgan (frontend) maydonlar o'zgarishsiz saqlanadi
-      const picked = pickDestinationFields(body);
-      const extras = omitKeys(body, KNOWN_DEST_KEYS);
-      const idx = list.findIndex(d => String(d.id) === destId);
-      if (idx === -1) {
-        // Frontenddagi statik manzillardan biri tahrirlansa, server bazasiga ham saqlaymiz
-        const upserted = { ...extras, ...picked, id: Number(destId) || destId, updatedAt: new Date().toISOString() };
-        list.push(upserted);
-        writeJson(FILES.destinations, list);
-        audit(req, 'destination.upsert', 'destination', destId, null, upserted, adminActor(req));
-        return sendJson(res, 200, { ok: true, destination: upserted });
-      }
-      const before = { ...list[idx] };
-      list[idx] = { ...list[idx], ...extras, ...picked, id: list[idx].id, updatedAt: new Date().toISOString() };
-      writeJson(FILES.destinations, list);
-      audit(req, 'destination.update', 'destination', destId, before, list[idx], adminActor(req));
-      return sendJson(res, 200, { ok: true, destination: list[idx] });
-    }
-
-    // --- GUIDES: LIST ---
-    if (req.method === 'GET' && pathname === '/api/guides') {
-      const guides = readJson(FILES.guides, SEED_GUIDES).map(normalizeGuideForClient);
-      // Kutilayotgan/rad etilgan gidlar (va ularning aloqa ma'lumotlari) faqat adminga ko'rinadi
-      const wantAll = urlObj.searchParams.get('approved') === 'false' && isAdmin(req, urlObj);
-      const filtered = wantAll ? guides : guides.filter(g => g.status === 'approved');
-      return sendJson(res, 200, {
-        ok: true,
-        commissionRate: COMMISSION_RATE,
-        guides: filtered
-      });
-    }
-
-    // --- GUIDES: APPLY ---
-    if (req.method === 'POST' && pathname === '/api/guides/apply') {
-      const rl = rateLimit(req, 'guide-apply', 5, 60 * 60 * 1000);
-      if (rl) return tooMany(res, rl);
-      const body = await parseBody(req);
-      const name = String(body.name || '').trim().slice(0, 100);
-      const city = String(body.city || '').trim().slice(0, 100);
-      const country = String(body.country || "O'zbekiston").trim().slice(0, 80);
-      const langs = String(body.langs || "O'zbek, Rus").trim().slice(0, 120);
-      const spec = String(body.spec || body.bio || '').trim().slice(0, 600);
-      const tg = String(body.tg || body.contact || '').trim().replace(/^@/, '').slice(0, 64);
-      const rate = Math.max(5, Math.min(2000, Number(body.rate || body.price) || 50));
-      const exp = Math.max(1, Math.min(50, Number(body.exp) || 3));
-      const about = String(body.about || body.bio || '').trim().slice(0, 1500);
-
-      if (!name || !city || !tg || !spec) {
-        return sendJson(res, 400, { ok: false, error: 'Ism, shahar, aloqa va tavsif majburiy.' });
-      }
-
-      const guides = readJson(FILES.guides, SEED_GUIDES);
-      const newGuide = {
-        id: 'guide_' + crypto.randomBytes(4).toString('hex'),
-        name,
-        city,
-        country,
-        langs,
-        spec,
-        bio: spec,
-        rate,
-        price: rate,
-        exp,
-        tg,
-        contact: '@' + tg,
-        group: String(body.group || '').trim().slice(0, 200),
-        about,
-        approved: false,
-        commissionRate: COMMISSION_RATE,
-        createdAt: new Date().toISOString()
-      };
-      guides.push(newGuide);
-      writeJson(FILES.guides, guides);
-      audit(req, 'guide.apply', 'guide', newGuide.id, null, { name, city, tg }, 'public');
-
-      const tgMsg = [
-        '🧭 <b>Yangi gid arizasi (Manzil)</b>',
-        `🆔 ID: <code>${escHtml(newGuide.id)}</code>`,
-        `👤 Ism/Kompaniya: <b>${escHtml(name)}</b>`,
-        `📍 Hudud: ${escHtml(city)}, ${escHtml(country)}`,
-        `🗣 Tillar: ${escHtml(newGuide.langs)}`,
-        `💰 Stavka: $${rate}/kun (Komissiya: ${Math.round(COMMISSION_RATE * 100)}%)`,
-        `✈️ Aloqa: @${escHtml(tg)}`,
-        `📝 Yo'nalish: ${escHtml(spec)}`
-      ].join('\n');
-
-      const tgRes = await sendTelegramAdminAction(tgMsg, {
-        inline_keyboard: [[
-          { text: '✅ Tasdiqlash', callback_data: 'approve:' + newGuide.id },
-          { text: '❌ Rad etish', callback_data: 'reject:' + newGuide.id }
-        ]]
-      });
-      return sendJson(res, 201, { ok: true, guide: normalizeGuideForClient(newGuide), telegram: { ok: Boolean(tgRes && tgRes.ok) } });
-    }
-
-    // --- TELEGRAM WEBHOOK (maxfiy token bilan himoyalangan) ---
-    if (req.method === 'POST' && pathname === '/api/telegram/webhook') {
-      if (!safeEqual(req.headers['x-telegram-bot-api-secret-token'] || '', TG_WEBHOOK_SECRET)) {
-        return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
-      }
-      const body = await parseBody(req);
-      await processTelegramUpdate(body);
-      return sendJson(res, 200, { ok: true });
-    }
-
-    // --- ADMIN SSO (admin kaliti → 8 soatlik token) ---
-    if (req.method === 'POST' && pathname === '/api/admin/sso') {
-      const body = await parseBody(req);
-      if (!isAdmin(req, urlObj, body)) {
-        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
-      }
-      const users = readJson(FILES.users, []);
-      let adminUser = users.find(u => u.id === 'admin_master');
-      if (!adminUser) {
-        adminUser = {
-          id: 'admin_master',
-          name: 'Manzil Admin',
-          email: 'admin@manzil.uz',
-          role: 'admin',
-          isAdmin: true,
-          plan: [],
-          favorites: [],
-          createdAt: new Date().toISOString()
-        };
-        users.unshift(adminUser);
-        writeJson(FILES.users, users);
-      }
-      const token = signToken({ sub: 'admin_master', email: adminUser.email, role: 'admin' }, ADMIN_TOKEN_TTL);
-      audit(req, 'admin.login', 'session', 'admin_master', null, { expiresInSec: ADMIN_TOKEN_TTL }, 'admin-key');
-      const { passwordHash, ...safeAdmin } = adminUser;
-      return sendJson(res, 200, { ok: true, token, expiresInSec: ADMIN_TOKEN_TTL, user: safeAdmin });
-    }
-
-    // --- ADMIN: AUDIT LOG ---
-    if (req.method === 'GET' && pathname === '/api/admin/audit') {
-      if (!isAdmin(req, urlObj)) return sendJson(res, 401, { ok: false, error: 'Admin ruxsati kerak' });
-      const limit = Math.min(1000, Math.max(1, Number(urlObj.searchParams.get('limit')) || 200));
-      const entity = String(urlObj.searchParams.get('entity') || '');
-      return sendJson(res, 200, { ok: true, entries: readAudit(limit, entity) });
-    }
-
-    // --- ADMIN: STATS & OVERVIEW ---
-    if (req.method === 'GET' && (pathname === '/api/admin/stats' || pathname === '/api/admin/overview')) {
-      if (!isAdmin(req, urlObj)) {
-        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
-      }
-      const customDests = readJson(FILES.destinations, []);
-      const guides = readJson(FILES.guides, SEED_GUIDES).map(normalizeGuideForClient);
-      const feedback = readJson(FILES.feedback, []);
-      const payments = readJson(FILES.payments, []);
-      const users = readJson(FILES.users, []);
-
-      const paidList = payments.filter(isRealPaid);
-      const sandboxPaid = payments.filter(p => p.sandbox && p.status === 'paid').length;
-      const grossRevenue = paidList.reduce((s, p) => s + Number(p.amountUsd || p.amount || p.totalAmount || 0), 0);
-      const commissionRevenue = paidList.reduce((s, p) => {
-        const amt = Number(p.amountUsd || p.amount || p.totalAmount || 0);
-        return s + Number(p.commissionUsd != null ? p.commissionUsd : amt * COMMISSION_RATE);
-      }, 0);
-
-      const approvedGuidesCount = guides.filter(g => g.status === 'approved').length;
-      const pendingGuidesCount = guides.filter(g => g.status === 'pending').length;
-
-      return sendJson(res, 200, {
-        ok: true,
-        commissionRate: COMMISSION_RATE,
-        telegramConfigured: Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID),
-        publicUrl: PUBLIC_URL,
-        destinationsCount: 85 + customDests.length,
-        approvedGuidesCount,
-        pendingGuidesCount,
-        paymentsCount: payments.length,
-        feedbackCount: feedback.length,
-        usersCount: users.length,
-        stats: {
-          totalGuides: guides.length,
-          approvedGuides: approvedGuidesCount,
-          pendingGuides: pendingGuidesCount,
-          rejectedGuides: guides.filter(g => g.status === 'rejected').length,
-          totalPayments: payments.length,
-          paidPayments: paidList.length,
-          sandboxPaidPayments: sandboxPaid,
-          grossRevenue: Math.round(grossRevenue * 100) / 100,
-          commissionRevenue: Math.round(commissionRevenue * 100) / 100,
-          totalFeedback: feedback.length,
-          totalUsers: users.length
-        },
-        guides,
-        feedback,
-        payments
-      });
-    }
-
-    // --- ADMIN: GUIDES LIST, APPROVE, REJECT, DELETE ---
-    if (req.method === 'GET' && pathname === '/api/admin/guides') {
-      if (!isAdmin(req, urlObj)) return sendJson(res, 401, { ok: false, error: 'Admin ruxsati kerak' });
-      const guides = readJson(FILES.guides, SEED_GUIDES).map(normalizeGuideForClient);
-      return sendJson(res, 200, { ok: true, guides });
-    }
-
-    const adminApproveMatch = pathname.match(/^\/api\/(?:admin\/)?guides\/([^/]+)\/approve$/);
-    if (req.method === 'POST' && adminApproveMatch) {
-      const body = await parseBody(req);
-      if (!isAdmin(req, urlObj, body)) {
-        return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
-      }
-      const guideId = decodeURIComponent(adminApproveMatch[1]);
-      const guides = readJson(FILES.guides, SEED_GUIDES);
-      const guide = guides.find(g => String(g.id) === guideId);
-      if (!guide) {
-        return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
-      }
-      const before = { approved: guide.approved, rejected: guide.rejected };
-      guide.approved = true;
-      guide.rejected = false;
-      guide.approvedAt = new Date().toISOString();
-      writeJson(FILES.guides, guides);
-      audit(req, 'guide.approve', 'guide', guide.id, before, { approved: true, rejected: false }, adminActor(req));
-
-      await sendTelegram(`✅ <b>Gid tasdiqlandi!</b>\n👤 ${escHtml(guide.name)} (${escHtml(guide.city)})\n✈️ @${escHtml(guide.tg || '')}`);
-      return sendJson(res, 200, { ok: true, guide: normalizeGuideForClient(guide) });
-    }
-
-    const rejectMatch = pathname.match(/^\/api\/(?:admin\/)?guides\/([^/]+)\/reject$/);
-    if (req.method === 'POST' && rejectMatch) {
-      const body = await parseBody(req);
-      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
-      const guideId = decodeURIComponent(rejectMatch[1]);
-      const guides = readJson(FILES.guides, SEED_GUIDES);
-      const guide = guides.find(g => String(g.id) === guideId);
-      if (!guide) return sendJson(res, 404, { ok: false, error: 'Gid topilmadi' });
-      const before = { approved: guide.approved, rejected: guide.rejected };
-      guide.approved = false;
-      guide.rejected = true;
-      guide.rejectedAt = new Date().toISOString();
-      writeJson(FILES.guides, guides);
-      audit(req, 'guide.reject', 'guide', guide.id, before, { approved: false, rejected: true }, adminActor(req));
-      return sendJson(res, 200, { ok: true, guide: normalizeGuideForClient(guide) });
-    }
-
-    const delGuideMatch = pathname.match(/^\/api\/(?:admin\/)?guides\/([^/]+)(?:\/delete)?$/);
-    if ((req.method === 'DELETE' || (req.method === 'POST' && pathname.endsWith('/delete'))) && delGuideMatch) {
-      const body = req.method === 'POST' ? await parseBody(req) : {};
-      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
-      const guideId = decodeURIComponent(delGuideMatch[1]);
-      const guides = readJson(FILES.guides, SEED_GUIDES);
-      const before = guides.find(g => String(g.id) === guideId) || null;
-      writeJson(FILES.guides, guides.filter(g => String(g.id) !== guideId));
-      audit(req, 'guide.delete', 'guide', guideId, before, null, adminActor(req));
-      return sendJson(res, 200, { ok: true });
-    }
-
-    // --- ADMIN: TELEGRAM WEBHOOK ULASH VA TEST ---
-    if (req.method === 'POST' && pathname === '/api/admin/telegram/sync-webhook') {
-      const body = await parseBody(req);
-      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
-      const result = await syncTelegramWebhook();
-      return sendJson(res, 200, { ok: Boolean(result.ok), result: { ok: Boolean(result.ok), error: result.error } });
-    }
-
-    if (req.method === 'POST' && pathname === '/api/admin/telegram/test') {
-      const body = await parseBody(req);
-      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Ruxsat yo‘q' });
-      const result = await sendTelegramAdminAction('🔔 <b>Manzil Admin Panel:</b> Telegram aloqasi muvaffaqiyatli tekshirildi!');
-      return sendJson(res, 200, { ok: Boolean(result.ok), result: { ok: Boolean(result.ok), skipped: result.skipped } });
-    }
-
-    // --- FEEDBACK: CREATE, LIST & DELETE ---
-    if (req.method === 'POST' && pathname === '/api/feedback') {
-      const rl = rateLimit(req, 'feedback', 5, 10 * 60 * 1000);
-      if (rl) return tooMany(res, rl);
-      const body = await parseBody(req);
-      const name = String(body.name || '').trim().slice(0, 100);
-      const contact = String(body.contact || '').trim().slice(0, 120);
-      const type = String(body.type || 'taklif').trim().slice(0, 30);
-      const message = String(body.message || body.msg || '').trim().slice(0, 3000);
-
-      if (!name || !message) {
-        return sendJson(res, 400, { ok: false, error: 'Ism va xabar matni kiritilishi shart.' });
-      }
-
-      const items = readJson(FILES.feedback, []);
-      const entry = {
-        id: 'fb_' + crypto.randomBytes(4).toString('hex'),
-        name,
-        contact,
-        type,
-        msg: message,
-        message,
-        createdAt: new Date().toISOString()
-      };
-      items.unshift(entry);
-      writeJson(FILES.feedback, items);
-
-      const tgMsg = [
-        `💬 <b>Yangi murojaat (${escHtml(type.toUpperCase())})</b>`,
-        `👤 Ism: <b>${escHtml(name)}</b>`,
-        `📞 Aloqa: ${escHtml(contact || 'ko‘rsatilmagan')}`,
-        `📝 Xabar:\n${escHtml(message)}`
-      ].join('\n');
-      const tgRes = await sendTelegram(tgMsg);
-
-      return sendJson(res, 201, { ok: true, feedback: entry, telegram: { sent: Boolean(tgRes && tgRes.sent) } });
-    }
-
-    if (req.method === 'GET' && (pathname === '/api/feedback' || pathname === '/api/admin/feedback')) {
-      if (!isAdmin(req, urlObj)) {
-        return sendJson(res, 401, { ok: false, error: 'Admin kaliti talab qilinadi' });
-      }
-      const items = readJson(FILES.feedback, []).map(f => ({
-        ...f,
-        message: f.message || f.msg || ''
-      }));
-      return sendJson(res, 200, { ok: true, total: items.length, feedback: items });
-    }
-
-    const delFbMatch = pathname.match(/^\/api\/(?:admin\/)?feedback\/([^/]+)(?:\/delete)?$/);
-    if ((req.method === 'DELETE' || (req.method === 'POST' && pathname.endsWith('/delete'))) && delFbMatch) {
-      const body = req.method === 'POST' ? await parseBody(req) : {};
-      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
-      const fbId = decodeURIComponent(delFbMatch[1]);
-      const items = readJson(FILES.feedback, []);
-      const before = items.find(f => String(f.id) === fbId) || null;
-      writeJson(FILES.feedback, items.filter(f => String(f.id) !== fbId));
-      audit(req, 'feedback.delete', 'feedback', fbId, before, null, adminActor(req));
-      return sendJson(res, 200, { ok: true });
-    }
-
-    // --- REAL AI CHAT (OpenAI & Grok) ---
-    if (req.method === 'POST' && pathname === '/api/ai/chat') {
-      const rl = rateLimit(req, 'ai', 20, 60 * 1000);
-      if (rl) return tooMany(res, rl);
-      const body = await parseBody(req);
-      const message = String(body.message || '').trim();
-      if (!message) {
-        return sendJson(res, 400, { ok: false, error: 'Xabar matni bo‘sh bo‘lmasligi kerak' });
-      }
-      const result = await generateAiReply(message, body.history, body.context, body.provider);
-
-      const chats = readJson(FILES.chats, []);
-      chats.unshift({
-        id: 'chat_' + crypto.randomBytes(4).toString('hex'),
-        provider: result.providerUsed,
-        model: result.model,
-        userMessage: message.slice(0, 500),
-        aiReply: result.reply.slice(0, 1000),
-        createdAt: new Date().toISOString()
-      });
-      if (chats.length > 300) chats.length = 300;
-      writeJson(FILES.chats, chats);
-
-      return sendJson(res, 200, { ok: true, ...result });
-    }
-
-    // --- USER AUTH: REGISTER ---
-    if (req.method === 'POST' && pathname === '/api/auth/register') {
-      const rl = rateLimit(req, 'register', 10, 60 * 60 * 1000);
-      if (rl) return tooMany(res, rl);
-      const body = await parseBody(req);
-      const name = String(body.name || '').trim().slice(0, 100);
-      const emailOrPhone = String(body.emailOrPhone || body.email || '').trim().toLowerCase().slice(0, 120);
-      const password = String(body.password || '');
-      const role = body.role === 'guide' ? 'guide' : 'tourist';
-
-      if (!name || emailOrPhone.length < 3 || password.length < 8 || password.length > 128) {
-        return sendJson(res, 400, { ok: false, error: 'Ism, email/telefon va kamida 8 belgili parol kiriting.' });
-      }
-
-      const users = readJson(FILES.users, []);
-      if (users.some(u => (u.emailOrPhone || u.email) === emailOrPhone)) {
-        return sendJson(res, 409, { ok: false, error: 'Bu email yoki telefon raqami allaqachon ro‘yxatdan o‘tgan.' });
-      }
-
-      const favs = Array.isArray(body.favorites) ? body.favorites.slice(0, 500) : [];
-      const route = Array.isArray(body.route) ? body.route.slice(0, 200) : [];
-      const user = {
-        id: 'usr_' + crypto.randomBytes(5).toString('hex'),
-        name,
-        email: emailOrPhone,
-        emailOrPhone,
-        role,
-        passwordHash: hashPassword(password),
-        favorites: favs,
-        route,
-        savedData: { favorites: favs, route, plan: [], checklist: [] },
-        createdAt: new Date().toISOString()
-      };
-      users.push(user);
-      writeJson(FILES.users, users);
-
-      const token = signToken({ sub: user.id, emailOrPhone: user.emailOrPhone, role: user.role });
-      const { passwordHash, ...safeUser } = user;
-      return sendJson(res, 201, { ok: true, token, user: safeUser });
-    }
-
-    // --- USER AUTH: LOGIN ---
-    if (req.method === 'POST' && pathname === '/api/auth/login') {
-      const body = await parseBody(req);
-      const emailOrPhone = String(body.emailOrPhone || body.email || '').trim().toLowerCase().slice(0, 120);
-      const password = String(body.password || '').slice(0, 128);
-
-      const rl = rateLimit(req, 'login-ip', 20, 15 * 60 * 1000) || rateLimit(req, 'login-acct', 8, 15 * 60 * 1000, emailOrPhone);
-      if (rl) return tooMany(res, rl);
-
-      const users = readJson(FILES.users, []);
-      const user = users.find(u => u.id !== 'admin_master' && (u.emailOrPhone || u.email) === emailOrPhone);
-      // Foydalanuvchi topilmasa ham xesh hisoblanadi (vaqt orqali foydalanuvchini aniqlashni qiyinlashtiradi)
-      const passOk = verifyPassword(password, user ? user.passwordHash : DUMMY_HASH);
-      if (!user || !passOk) {
-        return sendJson(res, 401, { ok: false, error: 'Login yoki parol noto‘g‘ri.' });
-      }
-
-      const token = signToken({ sub: user.id, emailOrPhone: user.emailOrPhone, role: user.role });
-      const { passwordHash, ...safeUser } = user;
-      return sendJson(res, 200, { ok: true, token, user: safeUser });
-    }
-
-    // --- USER AUTH: PROFILE & PAYMENTS ---
-    if (req.method === 'GET' && pathname === '/api/auth/me') {
-      const user = getAuthUser(req);
-      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya talab qilinadi' });
-      const payments = readJson(FILES.payments, []).filter(p => p.userId === user.id);
-      const { passwordHash, ...safeUser } = user;
-      return sendJson(res, 200, { ok: true, user: safeUser, payments });
-    }
-
-    // --- USER AUTH: SYNC PLAN & FAVORITES ---
-    if (req.method === 'POST' && pathname === '/api/auth/sync') {
-      const user = getAuthUser(req);
-      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya talab qilinadi' });
-      const body = await parseBody(req);
-      const users = readJson(FILES.users, []);
-      const idx = users.findIndex(u => u.id === user.id);
-      if (idx !== -1) {
-        const favs = Array.isArray(body.favorites) ? body.favorites.slice(0, 500) : [];
-        const route = Array.isArray(body.route) ? body.route.slice(0, 200) : [];
-        users[idx].favorites = favs;
-        users[idx].route = route;
-        users[idx].savedData = {
-          favorites: favs,
-          route,
-          plan: Array.isArray(body.plan) ? body.plan.slice(0, 200) : [],
-          checklist: Array.isArray(body.checklist) ? body.checklist.slice(0, 200) : [],
-          updatedAt: new Date().toISOString()
-        };
-        writeJson(FILES.users, users);
-        return sendJson(res, 200, { ok: true, savedData: users[idx].savedData });
-      }
-      return sendJson(res, 404, { ok: false, error: 'Foydalanuvchi topilmadi' });
-    }
-
-    // --- PAYMENTS: CREATE ORDER ---
-    if (req.method === 'POST' && pathname === '/api/payments/create') {
-      const rl = rateLimit(req, 'pay-create', 20, 60 * 60 * 1000);
-      if (rl) return tooMany(res, rl);
-      const body = await parseBody(req);
-      const authUser = getAuthUser(req);
-      const days = Math.max(1, Math.min(365, Number(body.days) || 1));
-      const people = Math.max(1, Math.min(100, Number(body.people) || 1));
-      let amountUsd = Math.min(50000, Math.max(1, Number(body.amountUsd) || 50));
-
-      // Agar gid ID si yuborilsa, narx SERVERda hisoblanadi (mijoz narxni o'zgartira olmaydi)
-      let guideRef = null;
-      if (body.guideId) {
-        const guides = readJson(FILES.guides, SEED_GUIDES).map(normalizeGuideForClient);
-        guideRef = guides.find(g => String(g.id) === String(body.guideId) && g.status === 'approved');
-        if (!guideRef) return sendJson(res, 404, { ok: false, error: 'Gid topilmadi yoki tasdiqlanmagan' });
-        amountUsd = Number((guideRef.rate * days * people).toFixed(2));
-      }
-
-      const rateUzs = Math.max(1000, Number(body.rateUzs) || 12850);
-      const amountUzs = Math.round(amountUsd * rateUzs);
-      const provider = ['click', 'payme', 'uzum', 'card', 'stripe'].includes(String(body.provider).toLowerCase())
-        ? String(body.provider).toLowerCase()
-        : 'click';
-
-      const commissionUsd = Number((amountUsd * COMMISSION_RATE).toFixed(2));
-      const guidePayoutUsd = Number((amountUsd - commissionUsd).toFixed(2));
-      const orderId = `MZ-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
-
-      let checkoutUrl = null;
-      let checkoutMode = 'sandbox';
-
-      if (provider === 'click' && CLICK_SERVICE_ID && CLICK_MERCHANT_ID) {
-        checkoutMode = 'redirect';
-        checkoutUrl = `https://my.click.uz/services/pay?service_id=${encodeURIComponent(CLICK_SERVICE_ID)}&merchant_id=${encodeURIComponent(CLICK_MERCHANT_ID)}&amount=${amountUzs}&transaction_param=${encodeURIComponent(orderId)}&return_url=${encodeURIComponent(`${PUBLIC_URL}/?payment=${orderId}`)}`;
-      } else if (provider === 'payme' && PAYME_MERCHANT_ID) {
-        checkoutMode = 'redirect';
-        const payloadB64 = Buffer.from(`m=${PAYME_MERCHANT_ID};ac.order_id=${orderId};a=${amountUzs * 100}`).toString('base64');
-        checkoutUrl = `https://checkout.paycom.uz/${payloadB64}`;
-      } else if ((provider === 'card' || provider === 'stripe') && STRIPE_SECRET_KEY) {
-        try {
-          const params = new URLSearchParams();
-          params.append('mode', 'payment');
-          params.append('success_url', `${PUBLIC_URL}/?payment=${orderId}&status=success`);
-          params.append('cancel_url', `${PUBLIC_URL}/?payment=${orderId}&status=cancel`);
-          params.append('line_items[0][price_data][currency]', 'usd');
-          params.append('line_items[0][price_data][product_data][name]', String(body.title || 'Manzil Sayohat Broni').slice(0, 120));
-          params.append('line_items[0][price_data][unit_amount]', String(Math.round(amountUsd * 100)));
-          params.append('line_items[0][quantity]', '1');
-          params.append('metadata[orderId]', orderId);
-
-          const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${STRIPE_SECRET_KEY}`,
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: params.toString()
-          });
-          const stripeSession = await stripeRes.json();
-          if (stripeRes.ok && stripeSession.url) {
-            checkoutMode = 'redirect';
-            checkoutUrl = stripeSession.url;
-          }
-        } catch (e) {
-          console.error('[stripe] sessiya yaratib bo‘lmadi:', e.message);
-        }
-      }
-
-      // Provayder ulanmagan bo'lsa productionda "demo to'lov" YARATILMAYDI — mijozga aniq xato qaytariladi
-      if (checkoutMode === 'sandbox' && !DEMO_PAYMENTS) {
-        return sendJson(res, 503, {
-          ok: false,
-          code: 'PAYMENT_PROVIDER_UNAVAILABLE',
-          error: 'Bu to‘lov usuli hozircha ulanmagan. Iltimos, boshqa usulni tanlang yoki operator bilan bog‘laning.'
-        });
-      }
-
-      const contactVal = String(body.contact || body.customerContact || (authUser ? authUser.emailOrPhone : '')).trim().slice(0, 120);
-      const order = {
-        id: orderId,
-        orderId,
-        userId: authUser ? authUser.id : null,
-        itemType: String(body.itemType || 'guide').slice(0, 30),
-        title: String(body.title || 'Gid / Tur xizmati').slice(0, 160),
-        guideId: guideRef ? guideRef.id : (body.guideId ? String(body.guideId) : ''),
-        guideName: String(guideRef ? guideRef.name : (body.guideName || 'Manzil Hamkor')).slice(0, 100),
-        guideTg: String(guideRef ? guideRef.tg : (body.guideTg || '')).replace(/^@/, '').slice(0, 64),
-        city: String(body.city || '').slice(0, 100),
-        days,
-        people,
-        customerName: String(body.customerName || (authUser ? authUser.name : 'Mehmon')).trim().slice(0, 100),
-        contact: contactVal,
-        customerContact: contactVal,
-        provider,
-        checkoutMode,
-        checkoutUrl,
-        sandbox: checkoutMode === 'sandbox',
-        priceSource: guideRef ? 'server' : 'client',
-        amountUsd,
-        amountUzs,
-        commissionRate: COMMISSION_RATE,
-        commissionUsd,
-        guidePayoutUsd,
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      };
-
-      const payments = readJson(FILES.payments, []);
-      payments.unshift(order);
-      writeJson(FILES.payments, payments);
-      audit(req, 'payment.create', 'payment', orderId, null, { amountUsd, provider, sandbox: order.sandbox, priceSource: order.priceSource }, authUser ? 'user:' + authUser.id : 'guest');
-
-      return sendJson(res, 201, { ok: true, payment: order, order });
-    }
-
-    // --- PAYMENTS: SANDBOX CONFIRM (faqat dev/demo rejimida, faqat sandbox buyurtmalar uchun) ---
-    if (req.method === 'POST' && pathname === '/api/payments/confirm') {
-      const rl = rateLimit(req, 'pay-confirm', 30, 60 * 60 * 1000);
-      if (rl) return tooMany(res, rl);
-      const body = await parseBody(req);
-      const orderId = String(body.orderId || '').trim();
-      if (!orderId) return sendJson(res, 400, { ok: false, error: 'orderId ko‘rsatilmagan' });
-      const payments = readJson(FILES.payments, []);
-      const order = payments.find(p => p.orderId === orderId || p.id === orderId);
-      if (!order) return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
-      if (!order.sandbox || !DEMO_PAYMENTS) {
-        return sendJson(res, 403, {
-          ok: false,
-          error: 'To‘lov faqat to‘lov provayderi tasdiqlagandan so‘ng «to‘langan» holatga o‘tadi.'
-        });
-      }
-      await markPaid(order, payments, 'sandbox', req, 'sandbox-demo');
-      return sendJson(res, 200, { ok: true, order });
-    }
-
-    // --- PAYMENTS: STRIPE WEBHOOK (imzo tekshiriladi) ---
-    if (req.method === 'POST' && pathname === '/api/payments/webhook/stripe') {
-      const body = await parseBody(req, 256 * 1024);
-      if (!STRIPE_WEBHOOK_SECRET) {
-        return sendJson(res, 503, { ok: false, error: 'STRIPE_WEBHOOK_SECRET sozlanmagan' });
-      }
-      if (!verifyStripeSignature(req.rawBody || '', req.headers['stripe-signature'], STRIPE_WEBHOOK_SECRET)) {
-        return sendJson(res, 400, { ok: false, error: 'Imzo noto‘g‘ri' });
-      }
-      if (body.type === 'checkout.session.completed') {
-        const s = (body.data && body.data.object) || {};
-        const orderId = s.metadata && s.metadata.orderId;
-        const payments = readJson(FILES.payments, []);
-        const order = payments.find(p => p.orderId === orderId);
-        if (order && !order.sandbox && s.payment_status === 'paid' &&
-            s.currency === 'usd' && Number(s.amount_total) === Math.round(order.amountUsd * 100)) {
-          await markPaid(order, payments, 'stripe-webhook', req, 'stripe');
-        } else {
-          audit(req, 'payment.webhook_rejected', 'payment', orderId || '', null, { reason: 'order/amount mismatch yoki to‘lanmagan' }, 'stripe');
-        }
-      }
-      return sendJson(res, 200, { ok: true, received: true });
-    }
-
-    // --- PAYMENTS: CLICK / PAYME WEBHOOK (hali ulanmagan — yolg'on tasdiqlashga yo'l qo'yilmaydi) ---
-    if (req.method === 'POST' && (pathname === '/api/payments/webhook/click' || pathname === '/api/payments/webhook/payme')) {
-      audit(req, 'payment.webhook_unsupported', 'payment', '', null, { path: pathname }, 'public');
-      return sendJson(res, 501, {
-        ok: false,
-        error: 'Click/Payme Merchant API imzo tekshiruvi hali ulanmagan. Buyurtmani admin panelda qo‘lda tasdiqlang.'
-      });
-    }
-
-    // --- PAYMENTS: UPDATE STATUS (Admin) ---
-    const payStatusMatch = pathname.match(/^\/api\/(?:admin\/)?payments\/([^/]+)\/status$/);
-    if (req.method === 'POST' && payStatusMatch) {
-      const body = await parseBody(req);
-      if (!isAdmin(req, urlObj, body)) return sendJson(res, 401, { ok: false, error: 'Admin kaliti noto‘g‘ri' });
-      const payId = decodeURIComponent(payStatusMatch[1]);
-      const newStatus = String(body.status || 'paid');
-      if (!PAYMENT_STATUSES.includes(newStatus)) {
-        return sendJson(res, 400, { ok: false, error: 'Noto‘g‘ri holat. Ruxsat etilgan: ' + PAYMENT_STATUSES.join(', ') });
-      }
-      const payments = readJson(FILES.payments, []);
-      const item = payments.find(p => String(p.orderId) === payId || String(p.id) === payId);
-      if (!item) return sendJson(res, 404, { ok: false, error: 'Buyurtma topilmadi' });
-      const before = { status: item.status };
-      if (newStatus === 'paid') {
-        await markPaid(item, payments, 'admin-manual', req, adminActor(req));
-      } else {
-        item.status = newStatus;
-        item.updatedAt = new Date().toISOString();
-        writeJson(FILES.payments, payments);
-        audit(req, 'payment.status', 'payment', item.orderId, before, { status: newStatus, reason: String(body.reason || '').slice(0, 300) }, adminActor(req));
-      }
-      return sendJson(res, 200, { ok: true, payment: item });
-    }
-
-    // --- PAYMENTS: LIST ---
-    if (req.method === 'GET' && (pathname === '/api/payments' || pathname === '/api/admin/payments')) {
-      const payments = readJson(FILES.payments, []).map(p => ({
-        ...p,
-        id: p.id || p.orderId,
-        contact: p.contact || p.customerContact || ''
-      }));
-      if (isAdmin(req, urlObj)) {
-        const paid = payments.filter(isRealPaid);
-        const totalVolumeUsd = Number(paid.reduce((s, p) => s + (p.amountUsd || 0), 0).toFixed(2));
-        const totalCommissionUsd = Number(paid.reduce((s, p) => s + (p.commissionUsd || 0), 0).toFixed(2));
-        return sendJson(res, 200, {
-          ok: true,
-          summary: { totalOrders: payments.length, paidOrders: paid.length, totalVolumeUsd, totalCommissionUsd },
-          payments
-        });
-      }
-      const user = getAuthUser(req);
-      if (!user) return sendJson(res, 401, { ok: false, error: 'Avtorizatsiya yoki Admin kaliti kerak' });
-      const mine = payments.filter(p => p.userId === user.id);
-      return sendJson(res, 200, { ok: true, payments: mine });
-    }
-
-    // Unknown API route
-    if (pathname.startsWith('/api/')) {
-      return sendJson(res, 404, { ok: false, error: 'API endpoint topilmadi' });
-    }
-
-    // --- STATIC FRONTEND ---
-    serveStatic(req, res, pathname);
-  } catch (err) {
-    const clientErr = /JSON|Payload/.test(String(err && err.message));
-    console.error('[Manzil Server Error]', err);
-    sendJson(res, clientErr ? 400 : 500, { ok: false, error: clientErr ? err.message : 'Server ichki xatoligi' });
+    console.error('[xato]', req.method, req.url, e && e.stack || e);
+    sendJson(res, 500, { ok: false, error: 'Ichki server xatosi.' });
   }
-});
-
-// 10. Telegram Webhook va Kutilayotgan Xabarlarni Sinxronlash
-let _tgOffset = 0;
-async function pollPendingTelegram() {
-  const token = process.env.TELEGRAM_BOT_TOKEN || '';
-  if (!token) return;
-  try {
-    const whInfo = await fetch('https://api.telegram.org/bot' + token + '/getWebhookInfo').then(r => r.json());
-    if (whInfo.ok && (!whInfo.result.url || whInfo.result.pending_update_count > 0)) {
-      if (whInfo.result.url) {
-        await fetch('https://api.telegram.org/bot' + token + '/deleteWebhook', { method: 'POST' });
-      }
-      const res = await fetch('https://api.telegram.org/bot' + token + '/getUpdates?timeout=1&offset=' + _tgOffset).then(r => r.json());
-      if (res.ok && Array.isArray(res.result)) {
-        for (const upd of res.result) {
-          _tgOffset = upd.update_id + 1;
-          await processTelegramUpdate(upd);
-        }
-      }
-    }
-    const pubUrl = String(process.env.PUBLIC_URL || 'https://manzil-app-1.onrender.com').replace(/\/+$/, '');
-    if (pubUrl.startsWith('https://')) {
-      await fetch('https://api.telegram.org/bot' + token + '/setWebhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: pubUrl + '/api/telegram/webhook', ...WEBHOOK_PARAMS })
-      });
-    }
-  } catch (e) {}
 }
-setTimeout(pollPendingTelegram, 3500);
 
-server.listen(PORT, () => {
-  console.log(`\n🚀 Manzil Server ishga tushdi: ${PUBLIC_URL}  [${IS_PROD ? 'production' : 'development'}]`);
-  console.log(`   ├─ Health check: ${PUBLIC_URL}/api/health`);
-  console.log(`   ├─ Telegram bot: ${TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID ? '✅ Ulangan' : '⚠️ Sozlanmagan (.env)'}`);
-  console.log(`   ├─ Real AI Chat: ${OPENAI_API_KEY ? '✅ OpenAI' : ''}${GROK_API_KEY ? ' ✅ Grok (xAI)' : ''}${!OPENAI_API_KEY && !GROK_API_KEY ? 'ℹ️ Lokal fallback rejimi' : ''}`);
-  console.log(`   ├─ To'lov: ${DEMO_PAYMENTS ? '🧪 Sandbox yoqilgan (daromadga qo‘shilmaydi)' : '🔒 Faqat provayder tasdiqlagan to‘lovlar'}`);
-  console.log(`   └─ Komissiya stavkasi: ${Math.round(COMMISSION_RATE * 100)}%\n`);
-});
+const server = http.createServer((req, res) => { handle(req, res).catch(e => { console.error(e); try { res.writeHead(500); res.end(); } catch (_) {} }); });
+server.requestTimeout = 30000; server.headersTimeout = 15000;
+
+if (require.main === module) {
+  bootstrapAdmin().then(() => server.listen(PORT, () => console.log(`Manzil v${VERSION} :${PORT} | baza: ${db.IN_MEMORY ? 'xotirada' : db.DB_PATH} | ${IS_PROD ? 'production' : 'development'}`)));
+  process.on('SIGTERM', () => { server.close(() => process.exit(0)); });
+}
+module.exports = { server, bootstrapAdmin };

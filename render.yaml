@@ -1,0 +1,41 @@
+# Render Blueprint — Dashboard > New > Blueprint > shu repo ni tanlang
+services:
+  - type: web
+    name: manzil
+    runtime: node
+    plan: starter            # Persistent Disk faqat pullik rejada ishlaydi (free rejada baza har deployda o'chadi)
+    region: frankfurt
+    branch: main
+    buildCommand: echo "npm paketlari kerak emas"
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: manzil-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DB_PATH
+        value: /data/manzil.db
+      - key: PUBLIC_URL
+        sync: false          # masalan https://manzil.onrender.com yoki https://manzil.uz
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false          # kamida 12 belgi; birinchi kirishdan keyin panelda almashtiring
+      - key: DEMO_PAYMENTS
+        value: "false"
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ADMIN_CHAT_ID
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
