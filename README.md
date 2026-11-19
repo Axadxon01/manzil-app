@@ -1,10 +1,10 @@
-# Manzil v3
+# Manzil v3.2
 
 Node.js 22+ (`node:sqlite`), **npm paketlarsiz**. Ommaviy sayt `/`, xodimlar paneli `/admin`.
 
 ```bash
 node server.js          # lokal; baza data/manzil.db
-npm test                # 48 ta integratsion test (xotiradagi bazada)
+npm test                # 136 ta integratsion test (xotiradagi bazada, Telegram mock bilan)
 ```
 
 ## Render'ga deploy
@@ -25,3 +25,15 @@ Parollar **ochiq matnda saqlanmaydi** (scrypt xesh). Admin → *Ma'lumotlar baza
 
 ## Pul qoidalari
 Summalar sentlarda · ikki yoqlama ledger · sandbox to'lovlar hisobotga kirmaydi · "to'langan" faqat provayder webhooki (imzo tekshiriladi) yoki moliya xodimining asoslangan qo'lda tasdig'i bilan · qaytarish: so'rov → boshqa xodim tasdiqlaydi → bajariladi (ikki kishi nazorati) · gid ulushi tur yakunlanmaguncha ushlab turiladi.
+
+## v3.2: nima qo'shildi
+- **107 ta manzil** rasmlari bilan (`data/catalog.json`; rasm muallifi va litsenziyasi har biriga yozilgan). Qidiruv, mintaqa, oy filtri; har bir manzil uchun DIY vs gid kalkulyatori.
+- **Namunaviy gid va paketlar** har manzilga biriktirilgan (arab/musulmon davlatlari va O'zbekistonda ayol va erkak gid). Ular aniq "namuna" deb belgilangan: **pul olinmaydi**, mijoz so'rov yuboradi → support murojaati. Haqiqiy hamkorlar yetarli bo'lgach Admin → Gidlar → "namunalarni yashirish".
+- **Gid kabineti** (o'z bronlari, daromad, baho, profil) va **tur operator kabineti** (ariza → admin tasdiqlaydi → paket qo'shadi → har paket tekshiruvdan o'tadi → bronlar).
+- **Mijoz**: bronni bekor qilish (siyosat bo'yicha qaytarish %), gidga baho, Telegram'ni ulash, support.
+- **Telegram bot** (`TELEGRAM_BOT_TOKEN`): bron xabarlari, "Sayohatlarim" (bekor qilish, baho), support (shikoyat/taklif/savol), parolni tiklash kodi, 12 til. Support guruhi: botni guruhga qo'shing → admin paneldagi `/support_here KOD`; xabarga Reply = mijozga javob, `/close` = yopish.
+- **Parolni tiklash**: saytda "Parolni unutdingizmi?" → kod faqat hisobga ulangan Telegram'ga keladi.
+- **Click va Payme** merchant API (imzo/Basic auth, summa tekshiruvi, idempotent). URL'lar `.env.example` da.
+- **SEO**: `/{til}/` sahifalar, `/{til}/destinations/{slug}` (107×12), jurnal maqolalari, huquqiy sahifa, hreflang, canonical, Open Graph, JSON-LD, `sitemap.xml`, `robots.txt`.
+- **Huquqiy**: maxfiylik, foydalanish shartlari, bekor qilish/qaytarish (`/{til}/legal`) — yurist ko'rib chiqishi kerak.
+- **Xavfsizlik**: birinchi kirishda admin parolini almashtirish majburiy; production'da admin/moliya uchun 2FA majburiy; kunlik zaxira nusxa (Admin → Zaxira nusxalar).

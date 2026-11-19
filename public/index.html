@@ -49,7 +49,9 @@ section{padding-block:clamp(72px,10vw,140px);scroll-margin-top:64px}
 .nav .wrap{display:flex;align-items:center;gap:32px;height:80px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:var(--serif);font-size:26px;font-weight:420;letter-spacing:-.02em}
 .brand svg{width:26px;height:26px}
-.nav-links{display:flex;gap:30px;margin-inline-start:24px}
+.nav-links{display:flex;gap:clamp(16px,2vw,30px);margin-inline-start:24px}
+.nav-links a,.nav .acct,.nav .btn-plan{white-space:nowrap}
+@media (max-width:1380px){.nav .btn-plan{display:none}}
 .nav-links a{text-decoration:none;font-size:15px;opacity:.9;position:relative;padding-block:6px}
 .nav-links a:hover{opacity:1}.nav-links a::after{content:"";position:absolute;inset:auto 0 0 0;height:1px;background:currentColor;transform:scaleX(0);transition:transform .25s;transform-origin:left}
 .nav-links a:hover::after{transform:scaleX(1)}
@@ -210,11 +212,52 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
 .vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .mob{display:none}
 
+
+/* ---------- Explorer (107) ---------- */
+.ex-bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:32px 0 14px}
+.ex-bar input,.ex-bar select{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:0 18px;min-height:50px;font-size:15px}
+.ex-bar input{flex:1 1 260px}
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:28px}.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;border:1px solid var(--line);background:transparent;border-radius:999px;padding:0 16px;min-height:42px;cursor:pointer;font-size:14px;color:var(--ink-2)}
+.chips button[aria-pressed=true]{background:var(--ink);color:var(--sand);border-color:var(--ink)}
+.egrid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
+.ecard{background:none;border:0;padding:0;text-align:start;cursor:pointer;color:inherit}
+.ecard .ph{aspect-ratio:4/3;border-radius:var(--r);overflow:hidden;background:var(--sand-2);margin-bottom:12px}
+.ecard .ph img{width:100%;height:100%;object-fit:cover;transition:transform 1s}.ecard:hover .ph img{transform:scale(1.04)}
+.ecard b{font-family:var(--serif);font-weight:400;font-size:21px;display:block;line-height:1.2}
+.ecard span{font-size:13px;color:var(--mute)}
+.ex-more{display:flex;justify-content:center;margin-top:36px}
+/* ---------- Wide dialogs ---------- */
+dialog.wide{width:min(1000px,calc(100% - 32px))}
+.dd-hero{position:relative;aspect-ratio:16/7;background:var(--sand-2)}.dd-hero img{width:100%;height:100%;object-fit:cover}
+.dd-hero .credit2{position:absolute;inset:auto 12px 10px auto;font-size:11px;background:rgba(0,0,0,.45);color:#fff;padding:3px 8px;border-radius:99px}
+.dd-hero .credit2 a{color:#fff}
+[dir=rtl] .dd-hero .credit2{inset:auto auto 10px 12px}
+.dd-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:28px}
+.factrow{display:flex;gap:24px;flex-wrap:wrap;padding:14px 0;border-block:1px solid var(--line)}
+.factrow small{display:block;font-size:12px;color:var(--mute);letter-spacing:.1em;text-transform:uppercase}.factrow b{font-family:var(--serif);font-weight:400;font-size:20px}
+.calc{background:var(--sand);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.calc .row2{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.calc .row2 b{font-family:var(--serif);font-size:24px;font-weight:400}
+.mini{display:flex;flex-direction:column;gap:10px}
+.mi{display:flex;gap:14px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.mi .t{flex:1;min-width:0}.mi .t b{display:block;font-family:var(--serif);font-weight:400;font-size:18px}.mi .t span{font-size:13px;color:var(--mute)}
+.tag{display:inline-block;font-size:11px;letter-spacing:.06em;padding:3px 8px;border-radius:99px;background:var(--sand-2);color:var(--ink-2);margin-inline-start:6px;vertical-align:middle}
+.tag.s{background:#f3e3d6;color:var(--terra-d)}
+.stars{display:flex;gap:6px}.stars button{border:1px solid var(--line);background:var(--card);border-radius:8px;min-width:44px;min-height:44px;font-size:18px;cursor:pointer}.stars button[aria-pressed=true]{background:var(--terra);color:#fff;border-color:var(--terra)}
+.tabs2{display:flex;gap:6px;border-bottom:1px solid var(--line);overflow-x:auto}.tabs2 button{border:0;background:none;padding:10px 14px;min-height:44px;cursor:pointer;color:var(--mute);border-bottom:2px solid transparent;white-space:nowrap}.tabs2 button[aria-selected=true]{color:var(--ink);border-color:var(--terra)}
+.stat4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat4 div{background:var(--sand);border-radius:8px;padding:12px}.stat4 small{display:block;font-size:12px;color:var(--mute)}.stat4 b{font-family:var(--serif);font-size:22px;font-weight:400}
+.fab{position:fixed;inset:auto 22px 22px auto;z-index:45;background:var(--ink);color:var(--sand);border:0;border-radius:999px;min-height:52px;padding:0 20px;font-size:14px;cursor:pointer;box-shadow:var(--shadow)}
+[dir=rtl] .fab{inset:auto auto 22px 22px}
+.chat{display:flex;flex-direction:column;gap:10px;max-height:46vh;overflow:auto;padding:4px}
+.bub{padding:10px 14px;border-radius:14px;max-width:85%;white-space:pre-wrap;font-size:15px}.bub.me{align-self:flex-end;background:var(--ink);color:var(--sand)}.bub.ai{align-self:flex-start;background:var(--sand)}
+.jcard a{text-decoration:none;color:inherit}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}.film .stage img.on{transform:none}}
 
 /* ---------- Tablet ---------- */
 @media (max-width:1100px){
-  .nav-links{display:none}.hosts{grid-template-columns:repeat(2,1fr)}
+  .egrid{grid-template-columns:repeat(3,1fr)}
+  .nav-links{display:none}.menu-btn{display:grid;place-items:center}.hosts{grid-template-columns:repeat(2,1fr)}
   .strip{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;margin-inline:calc(var(--gut) * -1);padding-inline:var(--gut);scroll-padding-inline:var(--gut);scrollbar-width:none}
   .strip::-webkit-scrollbar{display:none}.dcard{flex:0 0 min(300px,64vw);scroll-snap-align:start}
 }
@@ -259,6 +302,12 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
   .dlg{padding:24px 20px calc(24px + env(safe-area-inset-bottom))}
   .grid2{grid-template-columns:1fr 1fr}
   .mob{display:block}.desk{display:none}
+
+  .egrid{grid-template-columns:1fr 1fr;gap:14px}.ecard b{font-size:17px}
+  .dd-grid{grid-template-columns:1fr}.dd-hero{aspect-ratio:4/3}
+  .stat4{grid-template-columns:1fr 1fr}
+  .fab{inset:auto 16px 16px auto;min-height:48px}
+  .ex-bar select{flex:1}
 }
 </style>
 </head>
@@ -272,7 +321,7 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
       Manzil
     </a>
     <nav class="nav-links" aria-label="Primary">
-      <a href="#destinations" data-i18n="nav_dest"></a>
+      <a href="#explore" data-i18n="nav_dest"></a>
       <a href="#featured" data-i18n="nav_journeys"></a>
       <a href="#hosts" data-i18n="nav_hosts"></a>
       <a href="#journal" data-i18n="nav_journal"></a>
@@ -282,7 +331,7 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
       <label class="vh" for="langTop" data-i18n="language"></label>
       <select class="lang" id="langTop" data-lang-select></select>
       <button class="acct" id="acctBtn" type="button"></button>
-      <a class="btn btn-plan" href="/planner.html" data-i18n="plan_trip"></a>
+      <a class="btn btn-plan" href="#explore" data-i18n="plan_trip"></a>
       <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="drawer">
         <span class="vh" data-i18n="menu"></span>
         <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h18M3 16h18" stroke="currentColor" stroke-width="1.5"/></svg>
@@ -297,7 +346,7 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
     <button class="x" id="drawerClose" type="button" data-i18n-aria="close">✕</button>
   </div>
   <nav aria-label="Mobile">
-    <a href="#destinations" data-i18n="nav_dest"></a>
+    <a href="#explore" data-i18n="nav_dest"></a>
     <a href="#featured" data-i18n="nav_journeys"></a>
     <a href="#hosts" data-i18n="nav_hosts"></a>
     <a href="#journal" data-i18n="nav_journal"></a>
@@ -305,13 +354,12 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
     <button type="button" id="drawerAcct"></button>
   </nav>
   <div class="foot">
-    <a class="btn btn-ink" href="/planner.html" data-i18n="plan_trip"></a>
+    <a class="btn btn-ink" href="#explore" data-i18n="plan_trip"></a>
     <select class="lang" data-lang-select aria-label="Language"></select>
   </div>
 </div>
 
 <main id="main">
-  <!-- Hero -->
   <section class="hero" id="top">
     <img class="bg" alt="" fetchpriority="high"
       src="https://images.unsplash.com/photo-1499678329028-101435549a4e?auto=format&fit=crop&w=1600&q=75"
@@ -324,7 +372,7 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
       <h1><span class="a" data-i18n="hero_a"></span> <em class="b" data-i18n="hero_b"></em></h1>
       <p data-i18n="hero_sub"></p>
       <div class="ctas">
-        <a class="btn btn-primary" href="#destinations" data-i18n="explore"></a>
+        <a class="btn btn-primary" href="#explore" data-i18n="explore"></a>
         <button class="btn btn-ghost" type="button" id="filmBtn">
           <svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true"><path d="M1 1l10 6-10 6z" fill="currentColor"/></svg>
           <span data-i18n="watch_film"></span>
@@ -334,17 +382,28 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
     <div class="credit">Vernazza · 44.13°N</div>
   </section>
 
-  <!-- Destinations -->
   <section id="destinations">
     <div class="wrap">
-      <div class="sec-head">
-        <div><div class="kicker" data-i18n="dest_kicker"></div><h2 class="title" data-i18n="dest_title"></h2></div>
-      </div>
+      <div class="sec-head"><div><div class="kicker" data-i18n="dest_kicker"></div><h2 class="title" data-i18n="dest_title"></h2></div></div>
       <div class="strip" id="strip"></div>
     </div>
   </section>
 
-  <!-- Featured -->
+  <section id="explore" style="padding-top:0">
+    <div class="wrap">
+      <div class="kicker" data-i18n="ex_kicker"></div>
+      <h2 class="title" data-i18n="ex_title"></h2>
+      <div class="ex-bar">
+        <input id="exQ" type="search" autocomplete="off" data-i18n-ph="ex_search" aria-label="Search">
+        <select id="exMonth" aria-label="Month"></select>
+        <span id="exCount" style="color:var(--mute);font-size:14px"></span>
+      </div>
+      <div class="chips" id="exRegions" role="group"></div>
+      <div class="egrid" id="exGrid"><div class="skel" style="min-height:220px"></div><div class="skel" style="min-height:220px"></div><div class="skel" style="min-height:220px"></div><div class="skel" style="min-height:220px"></div></div>
+      <div class="ex-more"><button class="btn btn-line" type="button" id="exMore" data-i18n="ex_more"></button></div>
+    </div>
+  </section>
+
   <section id="featured" style="padding-top:0">
     <div class="wrap featured">
       <div class="ph">
@@ -357,16 +416,18 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
         <p style="color:var(--mute);margin:12px 0 0" data-i18n="feat_place"></p>
         <div class="facts">
           <div><small data-i18n="bk_days"></small><b data-i18n="days7"></b></div>
-          <div><small data-i18n="from"></small><b>$1,190</b></div>
+          <div><small data-i18n="from"></small><b id="featPrice">—</b></div>
         </div>
         <div class="tag-est" data-i18n="estimated"></div>
         <p class="story" data-i18n="feat_story"></p>
-        <button class="btn btn-ink" type="button" id="itinBtn" data-i18n="view_itin"></button>
+        <div class="row" style="display:flex;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-ink" type="button" id="itinBtn" data-i18n="view_itin"></button>
+          <button class="btn btn-line" type="button" id="featHosts" data-i18n="seo_see"></button>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- Why us -->
   <section class="why" id="why">
     <div class="wrap">
       <div class="kicker" data-i18n="why_kicker"></div>
@@ -379,12 +440,14 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
     </div>
   </section>
 
-  <!-- Hosts -->
   <section id="hosts">
     <div class="wrap">
       <div class="sec-head" style="margin-bottom:0">
         <div><div class="kicker" data-i18n="hosts_kicker"></div><h2 class="title" data-i18n="hosts_title"></h2><p class="lede" data-i18n="hosts_sub"></p></div>
-        <button class="btn btn-line btn-sm" type="button" id="applyBtn" data-i18n="become_host"></button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-line btn-sm" type="button" id="applyBtn" data-i18n="become_host"></button>
+          <button class="btn btn-line btn-sm" type="button" id="opBtn" data-i18n="become_operator"></button>
+        </div>
       </div>
       <div class="filters">
         <div class="seg" role="group" id="genderSeg">
@@ -399,19 +462,18 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
         <div class="note lock" data-i18n="privacy_note"></div>
       </div>
       <div class="hosts" id="hostGrid" aria-live="polite"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+      <div class="ex-more"><button class="btn btn-line" type="button" id="hostMore" data-i18n="ex_more"></button></div>
     </div>
   </section>
 
-  <!-- Journal -->
   <section id="journal" style="padding-top:0">
     <div class="wrap">
       <hr class="rule" style="margin-bottom:clamp(56px,8vw,100px)">
-      <div class="sec-head"><div><div class="kicker" data-i18n="journal_kicker"></div><h2 class="title" data-i18n="journal_title"></h2></div></div>
+      <div class="sec-head"><div><div class="kicker" data-i18n="journal_kicker"></div><h2 class="title" data-i18n="journal_title"></h2></div><a class="btn btn-line btn-sm" id="jrAll" href="#" data-i18n="jr_all"></a></div>
       <div class="journal" id="journalGrid"></div>
     </div>
   </section>
 
-  <!-- CTA -->
   <section class="cta" id="contact">
     <div class="wrap inner">
       <div><h2 data-i18n="cta_title"></h2><p class="lede" style="margin:18px 0 0" data-i18n="cta_sub"></p></div>
@@ -437,10 +499,12 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
         <p style="color:var(--mute);margin:10px 0 0;max-width:34ch" data-i18n="foot_tag"></p>
       </div>
       <div class="links">
-        <a href="#destinations" data-i18n="nav_dest"></a>
+        <a href="#explore" data-i18n="nav_dest"></a>
         <a href="#hosts" data-i18n="nav_hosts"></a>
-        <a href="/planner.html" data-i18n="foot_planner"></a>
+        <a href="#" id="jrFoot" data-i18n="nav_journal"></a>
         <button type="button" id="applyBtn2" data-i18n="become_host"></button>
+        <button type="button" id="opBtn2" data-i18n="become_operator"></button>
+        <a href="#" id="legalLink" data-i18n="foot_legal"></a>
       </div>
     </div>
     <div class="bot">
@@ -450,15 +514,22 @@ dialog.film{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border-r
   </div>
 </footer>
 
-<!-- Dialogs -->
+<button class="fab" type="button" id="aiBtn">✦ <span data-i18n="ai_title"></span></button>
+
 <dialog id="dlgBook" aria-labelledby="bkH"></dialog>
 <dialog id="dlgAuth" aria-labelledby="auH"></dialog>
-<dialog id="dlgTrips" aria-labelledby="trH"></dialog>
+<dialog id="dlgTrips" class="wide" aria-labelledby="trH"></dialog>
 <dialog id="dlgApply" aria-labelledby="apH"></dialog>
 <dialog id="dlgItin" aria-labelledby="itH"></dialog>
+<dialog id="dlgDest" class="wide" aria-labelledby="ddH"></dialog>
+<dialog id="dlgReq" aria-labelledby="rqH"></dialog>
+<dialog id="dlgCab" class="wide" aria-labelledby="cbH"></dialog>
+<dialog id="dlgAi" aria-labelledby="aiH"></dialog>
 <dialog id="dlgFilm" class="film" aria-label="Film"></dialog>
 
 <script src="/i18n.js"></script>
+<script src="/i18n-ext.js"></script>
+<script src="/articles.js"></script>
 <script>
 'use strict';
 const $ = (s, r = document) => r.querySelector(s);
@@ -466,17 +537,28 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const U = (id, w, h) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}${h ? '&h=' + h : ''}&q=72`;
 const store = { get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} } };
+const money = n => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
 
 /* ---------- i18n ---------- */
 const SUPPORTED = LANGS.map(l => l[0]);
 function pickLang() {
+  if (SUPPORTED.includes(window.__LANG) && location.pathname !== '/') return window.__LANG;
   const saved = store.get('manzil_lang'); if (SUPPORTED.includes(saved)) return saved;
   const q = new URLSearchParams(location.search).get('lang'); if (SUPPORTED.includes(q)) return q;
   for (const n of (navigator.languages || [navigator.language || ''])) { const c = String(n).slice(0, 2).toLowerCase(); if (SUPPORTED.includes(c)) return c; }
-  return 'uz';
+  return window.__LANG || 'uz';
 }
 let LANG = pickLang();
-const t = (k, vars) => { let s = (I18N[LANG] && I18N[LANG][k]) || I18N.en[k] || k; if (vars) for (const v in vars) s = s.replace('{' + v + '}', vars[v]); return s; };
+const t = (k, vars) => { let s = (I18N[LANG] && I18N[LANG][k]) || I18N.en[k] || k; if (vars) for (const v in vars) s = s.split('{' + v + '}').join(vars[v]); return s; };
+const errText = m => { const hit = (window.ERRMAP || []).find(([p]) => String(m || '').startsWith(p)); return hit ? t(hit[1]) : m; };
+const country = iso => { try { return iso ? new Intl.DisplayNames([LANG], { type: 'region' }).of(iso) : ''; } catch (_) { return iso || ''; } };
+const langName = code => { try { return new Intl.DisplayNames([LANG], { type: 'language' }).of(code); } catch (_) { return code; } };
+const langsText = s => /^[a-z]{2,3}(,[a-z]{2,3})*$/.test(s || '') ? s.split(',').map(langName).join(', ') : (s || '');
+const specText = s => String(s || '').startsWith('@') ? t('sp_' + s.slice(1)) : (s || '');
+const monthName = m => { try { return new Intl.DateTimeFormat(LANG, { month: 'long' }).format(new Date(Date.UTC(2026, m - 1, 15))); } catch (_) { return m; } };
+const gLabel = g => g === 'female' ? t('g_female') : g === 'male' ? t('g_male') : '';
+const gIcon = g => g === 'female' ? '♀' : g === 'male' ? '♂' : '';
+const path = p => `/${LANG}${p}`;
 function applyI18n() {
   document.documentElement.lang = LANG;
   document.documentElement.dir = RTL.includes(LANG) ? 'rtl' : 'ltr';
@@ -484,21 +566,27 @@ function applyI18n() {
   $$('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
   $$('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
   $$('[data-lang-select]').forEach(sel => { sel.value = LANG; });
-  renderAcct(); renderStrip(); renderJournal(); renderCityFilter(); renderHosts();
+  $('#jrAll').href = path('/journal'); $('#jrFoot').href = path('/journal'); $('#legalLink').href = path('/legal');
+  document.title = t('seo_home_title');
+  renderAcct(); renderStrip(); renderJournal(); renderExplore(); renderCityFilter(); renderHosts(); renderFeatured();
 }
 $$('[data-lang-select]').forEach(sel => {
   sel.innerHTML = LANGS.map(([c, n]) => `<option value="${c}">${n}</option>`).join('');
-  sel.addEventListener('change', e => { LANG = e.target.value; store.set('manzil_lang', LANG); applyI18n(); });
+  sel.addEventListener('change', e => {
+    LANG = e.target.value; store.set('manzil_lang', LANG);
+    try { history.replaceState(null, '', `/${LANG}/` + location.hash); } catch (_) {}
+    applyI18n(); if (USER) api('/me/lang', { lang: LANG }).catch(() => {});
+  });
 });
 
 /* ---------- API ---------- */
-async function api(path, body) {
+async function api(p, body) {
   const opt = { credentials: 'same-origin', headers: {} };
   if (body !== undefined) { opt.method = 'POST'; opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
   let r;
-  try { r = await fetch('/api' + path, opt); } catch (_) { const e = new Error(t('err_net')); e.net = true; throw e; }
+  try { r = await fetch('/api' + p, opt); } catch (_) { const e = new Error(t('err_net')); e.net = true; throw e; }
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(d.code === 'PAYMENT_PROVIDER_UNAVAILABLE' ? t('pay_unavail') : (d.error || t('err_generic'))); e.status = r.status; e.data = d; throw e; }
+  if (!r.ok) { const e = new Error(d.code === 'PAYMENT_PROVIDER_UNAVAILABLE' ? t('pay_unavail') : errText(d.error || t('err_generic'))); e.status = r.status; e.data = d; throw e; }
   return d;
 }
 
@@ -509,182 +597,394 @@ addEventListener('scroll', onScroll, { passive: true }); onScroll();
 const drawer = $('#drawer'), menuBtn = $('#menuBtn');
 function setDrawer(open) { drawer.classList.toggle('open', open); drawer.setAttribute('aria-hidden', !open); menuBtn.setAttribute('aria-expanded', open); document.body.style.overflow = open ? 'hidden' : ''; }
 menuBtn.onclick = () => setDrawer(true); $('#drawerClose').onclick = () => setDrawer(false);
-$$('#drawer nav a').forEach(a => a.addEventListener('click', () => setDrawer(false)));
+$$('#drawer nav a, #drawer .foot a').forEach(a => a.addEventListener('click', () => setDrawer(false)));
 addEventListener('keydown', e => { if (e.key === 'Escape') setDrawer(false); });
-
-/* ---------- Data ---------- */
-const DESTS = [
-  { k: 'kyoto', img: '1545569341-9eb8b30979d9' },
-  { k: 'amalfi', img: '1760867333704-872f5ff51cdd' },
-  { k: 'marrakech', img: '1597212618440-806262de4f6b' },
-  { k: 'patagonia', img: '1681951002470-06ad64d8e39c' },
-  { k: 'iceland', img: '1476610182048-b716b8518aae' }
-];
-const CITY_IMG = [
-  [/samarq|samark/i, '1715824633691-1fd2bfd3a1ac'], [/buxor|bukhar/i, '1713892218644-5339fd495d58'], [/mo.?ynoq|orol|aral|ustyurt/i, '1500530855697-b586d89ba3ee'],
-  [/istanbul/i, '1541432901042-2d8bd64b4a9b'], [/tbilisi|qozbegi|kazbeg/i, '1506905925346-21bda4d32df4'], [/dubay|dubai|abu/i, '1512453979798-5ea266f8880c'],
-  [/parij|paris/i, '1502602898657-3e91760cbb34'], [/seul|seoul/i, '1538485399081-7191377e8241'], [/marrak|maroka|morocc/i, '1597212618440-806262de4f6b']
-];
-const cityImg = c => (CITY_IMG.find(([re]) => re.test(c || '')) || [0, '1469474968028-56623f02e42e'])[1];
-
-function renderStrip() {
-  $('#strip').innerHTML = DESTS.map(d => `
-    <button class="dcard" type="button" data-dest="${d.k}">
-      <img loading="lazy" alt="" src="${U(d.img, 720, 1050)}" srcset="${U(d.img, 480, 700)} 480w, ${U(d.img, 720, 1050)} 720w" sizes="(max-width:720px) 76vw, 20vw">
-      <span class="go">${esc(t('plan_this'))} →</span>
-      <span class="meta"><span class="name">${esc(t('d_' + d.k))}</span><span class="season" style="display:block">${esc(t('s_' + d.k))}</span></span>
-    </button>`).join('');
-  $$('#strip .dcard').forEach(b => b.onclick = () => { $('#ctaPlace').value = t('d_' + b.dataset.dest); $('#contact').scrollIntoView({ behavior: 'smooth' }); setTimeout(() => $('#ctaEmail').focus({ preventScroll: true }), 600); });
-}
-const JOURNAL = [['j1', '1713892218644-5339fd495d58'], ['j2', '1501785888041-af3ef285b470'], ['j3', '1489749798305-4fea3ae63d43']];
-function renderJournal() {
-  $('#journalGrid').innerHTML = JOURNAL.map(([k, img], i) => `
-    <article class="jcard"><div class="ph"><img loading="lazy" alt="" src="${U(img, 800, 600)}"></div>
-    <small>${esc(t('journal_kicker'))} · 0${i + 1}</small><h3>${esc(t(k + '_t'))}</h3><p>${esc(t(k + '_d'))}</p></article>`).join('');
-}
-
-/* ---------- Hosts ---------- */
-let HOSTS = null, FILTER = { gender: '', city: '' };
-async function loadHosts() {
-  try { HOSTS = (await api('/guides')).guides || []; } catch (_) { HOSTS = []; }
-  renderCityFilter(); renderHosts();
-}
-function renderCityFilter() {
-  const sel = $('#cityFilter'); if (!HOSTS) return;
-  const cities = [...new Set(HOSTS.map(h => h.city))].sort();
-  sel.innerHTML = `<option value="">${esc(t('f_city'))}</option>` + cities.map(c => `<option ${c === FILTER.city ? 'selected' : ''}>${esc(c)}</option>`).join('');
-}
-$('#cityFilter').onchange = e => { FILTER.city = e.target.value; renderHosts(); };
-$$('#genderSeg button').forEach(b => b.onclick = () => { FILTER.gender = b.dataset.g; $$('#genderSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); renderHosts(); });
-const gLabel = g => g === 'female' ? t('g_female') : g === 'male' ? t('g_male') : '';
-const gIcon = g => g === 'female' ? '♀' : g === 'male' ? '♂' : '';
-function renderHosts() {
-  if (!HOSTS) return;
-  const list = HOSTS.filter(h => (!FILTER.gender || h.gender === FILTER.gender) && (!FILTER.city || h.city === FILTER.city));
-  $('#hostGrid').innerHTML = list.length ? list.map(h => `
-    <article class="hcard">
-      <div class="ph"><img loading="lazy" alt="" src="${U(cityImg(h.city), 640, 440)}">${h.gender ? `<span class="chip">${gIcon(h.gender)} ${esc(gLabel(h.gender))}</span>` : ''}</div>
-      <div class="body">
-        <div class="who"><h3>${esc(h.city)}</h3><span class="alias">${esc(t('host'))} ${esc(h.alias)}</span></div>
-        <p class="spec">${esc(h.spec || '')}</p>
-        <div class="lines"><span>${esc(h.langs || '')}</span><span>${esc(t('years', { n: h.exp }))}${h.verified ? ' · ✓ ' + esc(t('verified')) : ''}${h.rating ? ' · ★ ' + h.rating : ''}</span></div>
-        <div class="foot"><span class="price"><b>$${Number(h.rate)}</b> <span>${esc(t('per_day'))}</span></span><button class="btn btn-ink btn-sm" type="button" data-book="${esc(h.id)}">${esc(t('book'))}</button></div>
-      </div>
-    </article>`).join('') : `<div class="empty">${esc(t('no_hosts'))}</div>`;
-  $$('[data-book]').forEach(b => b.onclick = () => openBooking(b.dataset.book));
-}
 
 /* ---------- Dialog helpers ---------- */
 function openDlg(id, html) { const d = $('#' + id); d.innerHTML = html; if (!d.open) d.showModal(); $$('[data-close]', d).forEach(b => b.onclick = () => d.close()); return d; }
 $$('dialog').forEach(d => d.addEventListener('click', e => { if (e.target === d) d.close(); }));
 const head = (id, title) => `<header><h2 id="${id}">${esc(title)}</h2><button class="x" type="button" data-close aria-label="${esc(t('close'))}">✕</button></header>`;
+const msg = (text, err) => `<div class="msg ${err ? 'err' : ''}">${esc(text)}</div>`;
+
+/* ---------- Catalog ---------- */
+let CAT = [], CATMAP = {}, EX = { q: '', region: '', month: '', limit: 24 };
+const dName = slug => { const d = CATMAP[slug]; return d ? (d.names[LANG] || d.names.en) : slug; };
+const REGIONS = ['uzbekistan', 'central_asia', 'middle_east', 'europe', 'asia', 'americas', 'africa_oceania'];
+async function loadCatalog() {
+  try { CAT = (await api('/catalog')).destinations || []; } catch (_) { CAT = []; }
+  CATMAP = Object.fromEntries(CAT.map(d => [d.slug, d]));
+  renderExplore(); renderStrip(); renderHosts(); renderCityFilter(); renderFeatured(); handleHash();
+}
+function renderExplore() {
+  const grid = $('#exGrid'); if (!CAT.length) return;
+  $('#exRegions').innerHTML = [['', t('ex_all')], ...REGIONS.map(r => [r, t('r_' + r)])].map(([v, l]) => `<button type="button" data-r="${v}" aria-pressed="${EX.region === v}">${esc(l)}</button>`).join('');
+  $$('#exRegions button').forEach(b => b.onclick = () => { EX.region = b.dataset.r; EX.limit = 24; renderExplore(); });
+  const ms = $('#exMonth'); ms.innerHTML = `<option value="">${esc(t('ex_month'))}</option>` + Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${String(EX.month) === String(i + 1) ? 'selected' : ''}>${esc(monthName(i + 1))}</option>`).join('');
+  const q = EX.q.trim().toLowerCase();
+  const list = CAT.filter(d => (!EX.region || d.region === EX.region) && (!EX.month || (d.months || []).includes(+EX.month))
+    && (!q || Object.values(d.names).some(n => n.toLowerCase().includes(q)) || country(d.country).toLowerCase().includes(q)));
+  $('#exCount').textContent = t('ex_count', { n: list.length });
+  grid.innerHTML = list.slice(0, EX.limit).map(d => `<button class="ecard" type="button" data-slug="${d.slug}"><div class="ph"><img loading="lazy" alt="" src="${esc(d.img)}"></div><b>${esc(d.names[LANG] || d.names.en)}</b><span>${esc(country(d.country))} · ${esc(t('ex_from', { n: d.from }))}</span></button>`).join('');
+  $$('#exGrid .ecard').forEach(b => b.onclick = () => openDest(b.dataset.slug));
+  $('#exMore').style.display = list.length > EX.limit ? '' : 'none';
+}
+$('#exQ').addEventListener('input', e => { EX.q = e.target.value; EX.limit = 24; renderExplore(); });
+$('#exMonth').addEventListener('change', e => { EX.month = e.target.value; EX.limit = 24; renderExplore(); });
+$('#exMore').onclick = () => { EX.limit += 24; renderExplore(); };
+
+const STRIP = [['kyoto', 'kyoto-and-osaka', '1545569341-9eb8b30979d9'], ['amalfi', 'amalfi-coast', '1760867333704-872f5ff51cdd'], ['marrakech', 'casablanca-and-marrakesh', '1597212618440-806262de4f6b'], ['patagonia', 'patagonia', '1681951002470-06ad64d8e39c'], ['iceland', 'reykjavik', '1476610182048-b716b8518aae']];
+function renderStrip() {
+  $('#strip').innerHTML = STRIP.map(([k, slug, img]) => `
+    <button class="dcard" type="button" data-slug="${slug}">
+      <img loading="lazy" alt="" src="${U(img, 720, 1050)}" srcset="${U(img, 480, 700)} 480w, ${U(img, 720, 1050)} 720w" sizes="(max-width:720px) 76vw, 20vw">
+      <span class="go">${esc(t('plan_this'))} →</span>
+      <span class="meta"><span class="name">${esc(t('d_' + k))}</span><span class="season" style="display:block">${esc(t('s_' + k))}</span></span>
+    </button>`).join('');
+  $$('#strip .dcard').forEach(b => b.onclick = () => openDest(b.dataset.slug));
+}
+function renderFeatured() {
+  const d = CATMAP['samarkand']; if (!d) return;
+  // Taxminiy narx katalog ma'lumotlaridan: (mehmonxona/2 + ovqat + transport + faoliyat + gid/4) × 7 kun
+  fetch('/api/catalog/samarkand', { credentials: 'same-origin' }).then(r => r.json()).then(x => {
+    const p = (x.packages || []).filter(p => p.days >= 5).sort((a, b) => a.priceUsd - b.priceUsd)[0] || (x.packages || [])[0];
+    if (p) $('#featPrice').textContent = money(p.priceUsd * 7 / p.days);
+  }).catch(() => {});
+}
+$('#featHosts').onclick = () => openDest('samarkand');
+
+/* ---------- Destination dialog ---------- */
+const flightsUrl = name => `https://www.google.com/travel/flights?q=${encodeURIComponent('Flights from Tashkent to ' + name)}`;
+async function openDest(slug) {
+  const d0 = CATMAP[slug]; if (!d0) return;
+  try { history.replaceState(null, '', location.pathname + location.search + '#d=' + slug); } catch (_) {}
+  const dlg = openDlg('dlgDest', `<div class="skel" style="min-height:420px;border-radius:0"></div>`);
+  dlg.addEventListener('close', () => { if (location.hash.startsWith('#d=')) try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {} }, { once: true });
+  let x; try { x = await api('/catalog/' + slug); } catch (e) { dlg.innerHTML = `<div class="dlg">${head('ddH', dName(slug))}${msg(e.message, 1)}</div>`; return; }
+  const d = x.destination, name = d.names[LANG] || d.names.en, budget = Math.round(d.cost.hotel / 2 + d.cost.food + d.cost.transport + d.cost.activities);
+  const months = (d.months || []).map(monthName).join(', ');
+  const hostRate = Math.min(160, Math.max(30, Math.round((d.cost.activities * 2.2 + 20) / 5) * 5));
+  const credit = d.credit ? `${esc(t('photo_by'))}: ${esc(d.credit.artist)} · <a href="${esc(d.credit.source)}" target="_blank" rel="noopener nofollow">${esc(d.credit.license)}</a>` : '';
+  dlg.innerHTML = `<div class="dd-hero"><img alt="${esc(name)}" src="${esc(d.imgLarge || d.img)}"><span class="credit2">${credit}</span></div>
+  <div class="dlg">${head('ddH', name)}
+    <div class="kicker">${esc(t('r_' + d.region))} · ${esc(country(d.country))}</div>
+    <p style="margin:0;color:var(--ink-2)">${esc(LANG === 'uz' && d.descUz ? d.descUz : t('dd_auto', { name, country: country(d.country), months, budget }))}</p>
+    <div class="factrow"><div><small>${esc(t('dd_best'))}</small><b>${esc(months)}</b></div><div><small>${esc(t('dd_budget'))}</small><b>~${money(budget)}</b></div></div>
+    <div class="dd-grid">
+      <div>
+        <h3 class="serif" style="font-size:24px;margin:8px 0 12px">${esc(t('dd_packages'))}</h3><div class="mini" id="ddPk"></div>
+        <h3 class="serif" style="font-size:24px;margin:24px 0 12px">${esc(t('dd_hosts'))}</h3><div class="mini" id="ddHosts"></div>
+      </div>
+      <div>
+        <div class="calc">
+          <b class="serif" style="font-size:20px">${esc(t('dd_diy_title'))}</b>
+          <div class="grid2"><label class="lbl">${esc(t('dd_days'))}<input class="inp" id="cDays" type="number" min="1" max="30" value="5" inputmode="numeric"></label><label class="lbl">${esc(t('dd_people'))}<input class="inp" id="cPpl" type="number" min="1" max="20" value="2" inputmode="numeric"></label></div>
+          <div class="row2"><span>${esc(t('dd_flights'))}</span><b id="cFl"></b></div>
+          <div class="row2"><span>${esc(t('dd_diy'))}</span><b id="cDiy"></b></div>
+          <div class="row2"><span>${esc(t('dd_with_host'))}</span><b id="cHost"></b></div>
+          <small style="color:var(--mute)">${esc(t('dd_total'))} · ${esc(t('dd_calc_note'))}</small>
+          ${d.cost.flight ? `<a class="btn btn-line btn-sm" target="_blank" rel="noopener" href="${esc(flightsUrl(d.names.en))}">${esc(t('dd_search_flights'))} ↗</a>` : ''}
+        </div>
+        <p style="font-size:13px;color:var(--mute)">${esc(t('dd_budget_note'))}</p>
+        <a class="btn btn-line btn-sm" href="${path('/destinations/' + d.slug)}">${esc(t('dd_open_page'))} →</a>
+      </div>
+    </div>
+  </div>`;
+  $$('[data-close]', dlg).forEach(b => b.onclick = () => dlg.close());
+  const calc = () => { const days = Math.max(1, Math.min(30, +$('#cDays', dlg).value || 1)), ppl = Math.max(1, Math.min(20, +$('#cPpl', dlg).value || 1));
+    const fl = d.cost.flight * ppl, diy = fl + budget * days * ppl, host = diy + hostRate * days;
+    $('#cFl', dlg).textContent = d.cost.flight ? money(fl) : '—'; $('#cDiy', dlg).textContent = money(diy); $('#cHost', dlg).textContent = money(host); };
+  $('#cDays', dlg).oninput = calc; $('#cPpl', dlg).oninput = calc; calc();
+  $('#ddPk', dlg).innerHTML = x.packages.length ? x.packages.map(p => `<div class="mi"><div class="t"><b>${esc(pkgTitle(p))}${p.sample ? `<span class="tag s">${esc(t('pk_sample'))}</span>` : ''}</b><span>${esc(t('pk_days', { n: p.days }))} · ${esc(t('from'))} ${money(p.priceUsd)} ${esc(t('pk_per_person'))}${p.priceStatus === 'estimated' ? ' · ' + esc(t('estimated').split(' — ')[0]) : ''}</span></div><button class="btn btn-ink btn-sm" type="button" data-pk="${esc(p.id)}">${esc(p.sample ? t('pk_request') : t('pk_book'))}</button></div>`).join('') : `<div class="empty">—</div>`;
+  $('#ddHosts', dlg).innerHTML = x.hosts.length ? x.hosts.map(h => `<div class="mi"><div class="t"><b>${esc(t('host'))} ${esc(h.alias)} ${h.gender ? `<span class="tag">${gIcon(h.gender)} ${esc(gLabel(h.gender))}</span>` : ''}${h.sample ? `<span class="tag s">${esc(t('h_sample'))}</span>` : ''}</b><span>${esc(specText(h.spec))} · ${esc(langsText(h.langs))} · ${money(h.rate)} ${esc(t('per_day'))}</span></div><button class="btn btn-ink btn-sm" type="button" data-host="${esc(h.id)}">${esc(h.sample ? t('pk_request') : t('book'))}</button></div>`).join('') : `<div class="empty">${esc(t('dd_none_hosts'))}<br><button class="btn btn-line btn-sm" type="button" id="ddReq" style="margin-top:10px">${esc(t('pk_request'))}</button></div>`;
+  const pkById = Object.fromEntries(x.packages.map(p => [p.id, p])), hById = Object.fromEntries(x.hosts.map(h => [h.id, h]));
+  $$('[data-pk]', dlg).forEach(b => b.onclick = () => { const p = pkById[b.dataset.pk]; dlg.close(); p.sample ? openRequest({ kind: 'package', id: p.id, title: pkgTitle(p), note: t('pk_sample_note') }) : openPackageBooking(p); });
+  $$('[data-host]', dlg).forEach(b => b.onclick = () => { const h = hById[b.dataset.host]; dlg.close(); h.sample ? openRequest({ kind: 'host', id: h.id, title: `${t('host')} ${h.alias} · ${dName(h.dest)}`, note: t('h_sample_note'), gender: h.gender }) : openBooking(h); });
+  const rq = $('#ddReq', dlg); if (rq) rq.onclick = () => { dlg.close(); openRequest({ kind: 'trip', title: name, dest: d.slug }); };
+}
+function pkgTitle(p) { return p.title || t('pk_k_' + p.kind, { place: dName(p.dest) }); }
+function handleHash() { const m = location.hash.match(/^#d=([a-z0-9-]+)/); if (m && CATMAP[m[1]]) openDest(m[1]); }
+
+/* ---------- Journal ---------- */
+function renderJournal() {
+  $('#journalGrid').innerHTML = (window.ARTICLES || []).slice(0, 6).map(a => { const [ti, sub] = a.t[LANG] || a.t.en;
+    return `<article class="jcard"><a href="${path('/journal/' + a.slug)}"><div class="ph"><img loading="lazy" alt="" src="${U(a.img, 800, 600)}"></div>
+    <small>${esc(t('journal_kicker'))} · ${esc(t('jr_min', { n: a.min }))}</small><h3>${esc(ti)}</h3><p>${esc(sub)}</p></a></article>`; }).join('');
+}
+
+/* ---------- Hosts ---------- */
+let HOSTS = null, FILTER = { gender: '', dest: '' }, HOST_LIMIT = 8;
+async function loadHosts() { try { HOSTS = (await api('/guides')).guides || []; } catch (_) { HOSTS = []; } renderCityFilter(); renderHosts(); }
+function hostPlace(h) { return h.dest ? dName(h.dest) : h.city; }
+function renderCityFilter() {
+  const sel = $('#cityFilter'); if (!HOSTS) return;
+  const places = [...new Set(HOSTS.map(h => h.dest || h.city))].map(v => [v, CATMAP[v] ? dName(v) : v]).sort((a, b) => a[1].localeCompare(b[1], LANG));
+  sel.innerHTML = `<option value="">${esc(t('f_city'))}</option>` + places.map(([v, l]) => `<option value="${esc(v)}" ${v === FILTER.dest ? 'selected' : ''}>${esc(l)}</option>`).join('');
+}
+$('#cityFilter').onchange = e => { FILTER.dest = e.target.value; HOST_LIMIT = 8; renderHosts(); };
+$$('#genderSeg button').forEach(b => b.onclick = () => { FILTER.gender = b.dataset.g; HOST_LIMIT = 8; $$('#genderSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); renderHosts(); });
+$('#hostMore').onclick = () => { HOST_LIMIT += 12; renderHosts(); };
+function hostImg(h) { const d = CATMAP[h.dest]; return d ? d.img : U('1469474968028-56623f02e42e', 640, 440); }
+function renderHosts() {
+  if (!HOSTS) return;
+  const list = HOSTS.filter(h => (!FILTER.gender || h.gender === FILTER.gender) && (!FILTER.dest || (h.dest || h.city) === FILTER.dest));
+  $('#hostGrid').innerHTML = list.length ? list.slice(0, HOST_LIMIT).map(h => `
+    <article class="hcard">
+      <div class="ph"><img loading="lazy" alt="" src="${esc(hostImg(h))}">${h.gender ? `<span class="chip">${gIcon(h.gender)} ${esc(gLabel(h.gender))}</span>` : ''}</div>
+      <div class="body">
+        <div class="who"><h3>${esc(hostPlace(h))}</h3><span class="alias">${esc(t('host'))} ${esc(h.alias)}</span></div>
+        <p class="spec">${esc(specText(h.spec))}${h.sample ? ` <span class="tag s">${esc(t('h_sample'))}</span>` : ''}</p>
+        <div class="lines"><span>${esc(langsText(h.langs))}</span><span>${esc(t('years', { n: h.exp }))}${h.verified ? ' · ✓ ' + esc(t('verified')) : ''}${h.rating ? ' · ★ ' + h.rating : ''}</span></div>
+        <div class="foot"><span class="price"><b>${money(h.rate)}</b> <span>${esc(t('per_day'))}</span></span><button class="btn btn-ink btn-sm" type="button" data-book="${esc(h.id)}">${esc(h.sample ? t('pk_request') : t('book'))}</button></div>
+      </div>
+    </article>`).join('') : `<div class="empty">${esc(t('no_hosts'))}</div>`;
+  $('#hostMore').style.display = list.length > HOST_LIMIT ? '' : 'none';
+  $$('[data-book]').forEach(b => b.onclick = () => { const h = HOSTS.find(x => x.id === b.dataset.book); h.sample ? openRequest({ kind: 'host', id: h.id, title: `${t('host')} ${h.alias} · ${hostPlace(h)}`, note: t('h_sample_note'), gender: h.gender }) : openBooking(h); });
+}
 
 /* ---------- Auth ---------- */
-let USER = null, AFTER_LOGIN = null;
-async function loadMe() { try { USER = (await api('/auth/me')).user; } catch (_) { USER = null; } renderAcct(); }
-function renderAcct() {
-  const label = USER ? t('my_trips') : t('sign_in');
-  $('#acctBtn').textContent = label; $('#drawerAcct').textContent = label;
-}
+let USER = null, ME = null, AFTER_LOGIN = null;
+async function loadMe() { try { ME = await api('/auth/me'); USER = ME.user; } catch (_) { USER = null; ME = null; } renderAcct(); }
+function renderAcct() { const label = USER ? t('my_trips') : t('sign_in'); $('#acctBtn').textContent = label; $('#drawerAcct').textContent = label; }
 $('#acctBtn').onclick = () => USER ? openTrips() : openAuth();
 $('#drawerAcct').onclick = () => { setDrawer(false); USER ? openTrips() : openAuth(); };
+function needLogin(fn, note) { if (USER) return fn(); AFTER_LOGIN = fn; openAuth(note); }
 function openAuth(note) {
   const d = openDlg('dlgAuth', `<form class="dlg" id="auForm" novalidate>${head('auH', t('au_title'))}
-    ${note ? `<div class="msg">${esc(note)}</div>` : ''}
+    ${note ? msg(note) : ''}
     <label class="lbl">${esc(t('au_email'))}<input class="inp" name="email" type="email" autocomplete="email" required></label>
     <label class="lbl">${esc(t('au_pass'))}<input class="inp" name="password" type="password" autocomplete="current-password" minlength="8" required><span>${esc(t('au_hint'))}</span></label>
     <label class="lbl">${esc(t('au_name'))}<input class="inp" name="name" autocomplete="name" maxlength="80"></label>
-    <div class="msg err" id="auErr" hidden></div>
-    <div class="grid2"><button class="btn btn-ink" type="submit" data-mode="login">${esc(t('au_login'))}</button><button class="btn btn-line" type="submit" data-mode="register">${esc(t('au_register'))}</button></div></form>`);
+    <div id="auErr"></div>
+    <div class="grid2"><button class="btn btn-ink" type="submit" data-mode="login">${esc(t('au_login'))}</button><button class="btn btn-line" type="submit" data-mode="register">${esc(t('au_register'))}</button></div>
+    <button class="link" type="button" id="forgot" style="align-self:flex-start">${esc(t('au_forgot'))}</button></form>`);
   const f = $('#auForm', d);
+  $('#forgot', d).onclick = () => openReset(f.email.value);
   f.onsubmit = async e => {
     e.preventDefault();
-    const mode = (e.submitter && e.submitter.dataset.mode) || 'login', fd = new FormData(f), err = $('#auErr', d);
-    err.hidden = true;
-    const email = String(fd.get('email') || '').trim();
+    const mode = (e.submitter && e.submitter.dataset.mode) || 'login', fd = new FormData(f), email = String(fd.get('email') || '').trim();
+    $('#auErr', d).innerHTML = '';
     try {
-      await api('/auth/' + mode, { email, password: fd.get('password'), name: String(fd.get('name') || '').trim() || email.split('@')[0] });
+      await api('/auth/' + mode, { email, password: fd.get('password'), name: String(fd.get('name') || '').trim() || email.split('@')[0], lang: LANG });
       await loadMe(); d.close();
       if (AFTER_LOGIN) { const fn = AFTER_LOGIN; AFTER_LOGIN = null; fn(); }
-    } catch (ex) { err.textContent = ex.message; err.hidden = false; }
+    } catch (ex) { $('#auErr', d).innerHTML = msg(ex.message, 1); }
+  };
+}
+function openReset(email) {
+  const d = openDlg('dlgAuth', `<form class="dlg" id="rsForm" novalidate>${head('auH', t('rs_title'))}
+    <p style="margin:0;color:var(--ink-2)">${esc(t('rs_step1'))}</p>
+    <label class="lbl">${esc(t('au_email'))}<input class="inp" name="email" type="email" autocomplete="email" required value="${esc(email || '')}"></label>
+    <button class="btn btn-line" type="button" id="rsSend">${esc(t('rs_send'))}</button>
+    <div id="rsInfo"></div>
+    <label class="lbl">${esc(t('rs_code'))}<input class="inp" name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label>
+    <label class="lbl">${esc(t('rs_new'))}<input class="inp" name="password" type="password" autocomplete="new-password" minlength="8"><span>${esc(t('au_hint'))}</span></label>
+    <div id="rsMsg"></div>
+    <button class="btn btn-ink" type="submit">${esc(t('gc_save'))}</button>
+    <p style="margin:0;font-size:13px;color:var(--mute)">${esc(t('rs_hint'))}</p></form>`);
+  const f = $('#rsForm', d);
+  $('#rsSend', d).onclick = async () => {
+    try { await api('/auth/reset/request', { email: f.email.value.trim() });
+      const bot = ME && ME.telegram && ME.telegram.bot; $('#rsInfo', d).innerHTML = msg(t('rs_sent')) + (bot ? `<a class="link" href="https://t.me/${esc(bot)}" target="_blank" rel="noopener">${esc(t('rs_open_bot'))} ↗</a>` : '');
+    } catch (ex) { $('#rsInfo', d).innerHTML = msg(ex.message, 1); }
+  };
+  f.onsubmit = async e => { e.preventDefault();
+    try { await api('/auth/reset/confirm', { email: f.email.value.trim(), code: f.code.value.trim(), password: f.password.value }); f.innerHTML = head('auH', t('rs_title')) + msg(t('rs_done')) + `<button class="btn btn-ink" type="button" id="toLogin">${esc(t('au_login'))}</button>`; $$('[data-close]', d).forEach(b => b.onclick = () => d.close()); $('#toLogin', d).onclick = () => openAuth(); }
+    catch (ex) { $('#rsMsg', d).innerHTML = msg(ex.message, 1); }
   };
 }
 
-/* ---------- Booking ---------- */
-function openBooking(id) {
-  const h = (HOSTS || []).find(x => x.id === id); if (!h) return;
-  if (!USER) { AFTER_LOGIN = () => openBooking(id); return openAuth(t('bk_need_login')); }
+/* ---------- Booking (real hosts & packages) ---------- */
+const providerSelect = () => `<label class="lbl">${esc(t('bk_pay'))}<select class="inp" name="provider"><option value="click">Click</option><option value="payme">Payme</option><option value="stripe">${esc(t('bk_card'))}</option></select></label>`;
+async function submitOrder(d, body, box, btn) {
+  btn.disabled = true; box.innerHTML = '';
+  try {
+    const r = await api('/payments/create', { ...body, lang: LANG });
+    if (r.checkoutUrl) { location.href = r.checkoutUrl; return; }
+    if (r.sandbox) {
+      box.innerHTML = `<div class="msg">${esc(t('bk_sandbox', { code: r.code }))}<br><button class="btn btn-line btn-sm" type="button" id="sbx" style="margin-top:10px">${esc(t('bk_confirm_sbx'))}</button></div>`;
+      $('#sbx', d).onclick = async () => { try { await api('/payments/sandbox-confirm', { paymentId: r.paymentId }); d.close(); openTrips(); } catch (ex) { box.innerHTML = msg(ex.message, 1); } };
+      return;
+    }
+    box.innerHTML = msg(t('bk_created', { code: r.code }));
+  } catch (ex) {
+    if (ex.data && ex.data.code === 'SAMPLE_OFFER') { d.close(); return openRequest({ kind: body.packageId ? 'package' : 'host', id: body.packageId || body.guideId, title: '', note: t('pk_sample_note') }); }
+    box.innerHTML = msg(ex.message, 1); btn.disabled = false;
+  }
+}
+function openBooking(h) {
+  needLogin(() => {
+    const min = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const d = openDlg('dlgBook', `<form class="dlg" id="bkForm" novalidate>${head('bkH', t('bk_title'))}
+      <div class="hostline"><img alt="" src="${esc(hostImg(h))}"><div><b class="serif" style="font-size:20px">${esc(hostPlace(h))}</b><div style="font-size:13px;color:var(--mute)">${esc(t('host'))} ${esc(h.alias)}${h.gender ? ' · ' + gIcon(h.gender) + ' ' + esc(gLabel(h.gender)) : ''} · ${money(h.rate)} ${esc(t('per_day'))}</div></div></div>
+      <div class="note lock" style="font-size:13px">${esc(t('privacy_note'))}</div>
+      <div class="grid2"><label class="lbl">${esc(t('bk_date'))}<input class="inp" name="travelDate" type="date" min="${min}" required></label><label class="lbl">${esc(t('bk_days'))}<input class="inp" name="days" type="number" min="1" max="60" value="2" inputmode="numeric"></label></div>
+      <div class="grid2"><label class="lbl">${esc(t('bk_people'))}<input class="inp" name="people" type="number" min="1" max="50" value="2" inputmode="numeric"></label>${providerSelect()}</div>
+      <label class="lbl">${esc(t('bk_name'))}<input class="inp" name="customerName" autocomplete="name" required value="${esc(USER.name || '')}"></label>
+      <label class="lbl">${esc(t('bk_contact'))}<input class="inp" name="contact" required value="${esc(USER.email || '')}"></label>
+      <div class="sum"><span>${esc(t('bk_total'))}<br><small style="color:var(--mute)">${esc(t('bk_total_note'))}</small></span><b id="bkTotal"></b></div>
+      <div id="bkMsg" role="status"></div><button class="btn btn-primary" type="submit" id="bkSubmit">${esc(t('bk_submit'))}</button></form>`);
+    const f = $('#bkForm', d), total = () => { $('#bkTotal', d).textContent = money(Number(h.rate) * Math.max(1, Math.min(60, parseInt(f.days.value, 10) || 1))); };
+    f.days.oninput = total; total();
+    f.onsubmit = e => { e.preventDefault(); if (!f.travelDate.value) return f.travelDate.focus();
+      submitOrder(d, { guideId: h.id, genderPref: h.gender || undefined, travelDate: f.travelDate.value, days: +f.days.value, people: +f.people.value, provider: f.provider.value, customerName: f.customerName.value.trim(), contact: f.contact.value.trim() }, $('#bkMsg', d), $('#bkSubmit', d)); };
+  }, t('bk_need_login'));
+}
+function openPackageBooking(p) {
+  needLogin(() => {
+    const min = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const d = openDlg('dlgBook', `<form class="dlg" id="pkForm" novalidate>${head('bkH', pkgTitle(p))}
+      <p style="margin:0;color:var(--mute)">${esc(t('pk_days', { n: p.days }))}${p.operator ? ' · ' + esc(t('tr_operator')) + ': ' + esc(p.operator) : ''}</p>
+      ${p.description ? `<p style="margin:0">${esc(p.description)}</p>` : ''}
+      ${p.itinerary && p.itinerary.length ? `<ol class="itin">${p.itinerary.map((x, i) => `<li><span>${esc(t('day'))} ${i + 1}</span><div>${esc(x)}</div></li>`).join('')}</ol>` : ''}
+      <div class="grid2"><label class="lbl">${esc(t('bk_date'))}<input class="inp" name="travelDate" type="date" min="${min}" required></label><label class="lbl">${esc(t('bk_people'))}<input class="inp" name="people" type="number" min="1" max="${p.maxPeople}" value="2" inputmode="numeric"></label></div>
+      ${providerSelect()}
+      <label class="lbl">${esc(t('bk_name'))}<input class="inp" name="customerName" autocomplete="name" required value="${esc(USER.name || '')}"></label>
+      <label class="lbl">${esc(t('bk_contact'))}<input class="inp" name="contact" required value="${esc(USER.email || '')}"></label>
+      <div class="sum"><span>${esc(t('bk_total'))}</span><b id="pkTotal"></b></div>
+      <div id="pkMsg" role="status"></div><button class="btn btn-primary" type="submit" id="pkSubmit">${esc(t('bk_submit'))}</button></form>`);
+    const f = $('#pkForm', d), total = () => { $('#pkTotal', d).textContent = money(p.priceUsd * Math.max(1, Math.min(p.maxPeople, parseInt(f.people.value, 10) || 1))); };
+    f.people.oninput = total; total();
+    f.onsubmit = e => { e.preventDefault(); if (!f.travelDate.value) return f.travelDate.focus();
+      submitOrder(d, { packageId: p.id, travelDate: f.travelDate.value, people: +f.people.value, provider: f.provider.value, customerName: f.customerName.value.trim(), contact: f.contact.value.trim() }, $('#pkMsg', d), $('#pkSubmit', d)); };
+  }, t('bk_need_login'));
+}
+
+/* ---------- Request (sample offers, trips, support) ---------- */
+function openRequest({ kind, id, title, note, gender, dest, message }) {
   const min = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-  const d = openDlg('dlgBook', `<form class="dlg" id="bkForm" novalidate>${head('bkH', t('bk_title'))}
-    <div class="hostline"><img alt="" src="${U(cityImg(h.city), 160, 160)}"><div><b class="serif" style="font-size:20px">${esc(h.city)}</b><div style="font-size:13px;color:var(--mute)">${esc(t('host'))} ${esc(h.alias)}${h.gender ? ' · ' + gIcon(h.gender) + ' ' + esc(gLabel(h.gender)) : ''} · $${Number(h.rate)} ${esc(t('per_day'))}</div></div></div>
-    <div class="note lock" style="font-size:13px">${esc(t('privacy_note'))}</div>
-    <div class="grid2"><label class="lbl">${esc(t('bk_date'))}<input class="inp" name="travelDate" type="date" min="${min}" required></label>
-    <label class="lbl">${esc(t('bk_days'))}<input class="inp" name="days" type="number" min="1" max="60" value="2" inputmode="numeric"></label></div>
-    <div class="grid2"><label class="lbl">${esc(t('bk_people'))}<input class="inp" name="people" type="number" min="1" max="50" value="2" inputmode="numeric"></label>
-    <label class="lbl">${esc(t('bk_pay'))}<select class="inp" name="provider"><option value="click">Click</option><option value="payme">Payme</option><option value="stripe">${esc(t('bk_card'))}</option></select></label></div>
-    <label class="lbl">${esc(t('bk_name'))}<input class="inp" name="customerName" autocomplete="name" required value="${esc(USER.name || '')}"></label>
-    <label class="lbl">${esc(t('bk_contact'))}<input class="inp" name="contact" required value="${esc(USER.email || '')}"></label>
-    <div class="sum"><span>${esc(t('bk_total'))}<br><small style="color:var(--mute)">${esc(t('bk_total_note'))}</small></span><b id="bkTotal"></b></div>
-    <div id="bkMsg" role="status"></div>
-    <button class="btn btn-primary" type="submit" id="bkSubmit">${esc(t('bk_submit'))}</button></form>`);
-  const f = $('#bkForm', d), total = () => { $('#bkTotal', d).textContent = '$' + (Number(h.rate) * Math.max(1, Math.min(60, parseInt(f.days.value, 10) || 1))).toLocaleString(); };
-  f.days.oninput = total; total();
-  f.onsubmit = async e => {
-    e.preventDefault();
-    const box = $('#bkMsg', d), btn = $('#bkSubmit', d);
-    if (!f.travelDate.value) { f.travelDate.focus(); return; }
-    btn.disabled = true; box.innerHTML = '';
-    try {
-      const r = await api('/payments/create', { guideId: h.id, genderPref: h.gender || undefined, travelDate: f.travelDate.value, days: +f.days.value, people: +f.people.value, provider: f.provider.value, customerName: f.customerName.value.trim(), contact: f.contact.value.trim() });
-      if (r.checkoutUrl) { location.href = r.checkoutUrl; return; }
-      if (r.sandbox) {
-        box.innerHTML = `<div class="msg">${esc(t('bk_sandbox', { code: r.code }))}<br><button class="btn btn-line btn-sm" type="button" id="sbx" style="margin-top:10px">${esc(t('bk_confirm_sbx'))}</button></div>`;
-        $('#sbx', d).onclick = async () => { try { await api('/payments/sandbox-confirm', { paymentId: r.paymentId }); d.close(); openTrips(); } catch (ex) { box.innerHTML = `<div class="msg err">${esc(ex.message)}</div>`; } };
-        return;
-      }
-      box.innerHTML = `<div class="msg">${esc(t('bk_created', { code: r.code }))}</div>`;
-    } catch (ex) { box.innerHTML = `<div class="msg err">${esc(ex.message)}</div>`; btn.disabled = false; }
-  };
+  const d = openDlg('dlgReq', `<form class="dlg" id="rqForm" novalidate>${head('rqH', t('rq_title'))}
+    ${title ? `<b class="serif" style="font-size:20px">${esc(title)}</b>` : ''}${note ? `<div class="note" style="font-size:13px">${esc(note)}</div>` : ''}
+    <div class="grid2"><label class="lbl">${esc(t('bk_date'))}<input class="inp" name="travelDate" type="date" min="${min}"></label><label class="lbl">${esc(t('bk_people'))}<input class="inp" name="people" type="number" min="1" max="50" value="2" inputmode="numeric"></label></div>
+    <label class="lbl">${esc(t('bk_name'))}<input class="inp" name="name" autocomplete="name" required value="${esc(USER ? USER.name : '')}"></label>
+    <label class="lbl">${esc(t('bk_contact'))}<input class="inp" name="contact" required value="${esc(USER ? USER.email : '')}"></label>
+    <label class="lbl">${esc(t('rq_msg'))}<textarea class="inp" name="message" maxlength="1000">${esc(message || '')}</textarea></label>
+    <div id="rqMsg" role="status"></div><button class="btn btn-primary" type="submit">${esc(t('rq_send'))}</button></form>`);
+  const f = $('#rqForm', d);
+  f.onsubmit = async e => { e.preventDefault();
+    try { const r = await api('/requests', { kind, id, dest, genderPref: gender, travelDate: f.travelDate.value, people: +f.people.value, name: f.name.value.trim(), contact: f.contact.value.trim(), message: f.message.value.trim(), lang: LANG });
+      f.innerHTML = head('rqH', t('rq_title')) + msg(t('rq_sent', { code: r.ticket })); $$('[data-close]', d).forEach(b => b.onclick = () => d.close());
+    } catch (ex) { $('#rqMsg', d).innerHTML = msg(ex.message, 1); } };
 }
 
 /* ---------- My trips ---------- */
 async function openTrips() {
-  const d = openDlg('dlgTrips', `<div class="dlg">${head('trH', t('tr_title'))}<div id="trList" style="display:flex;flex-direction:column;gap:12px"><div class="skel" style="min-height:120px"></div></div>
-    <button class="btn btn-line btn-sm" type="button" id="logout" style="align-self:flex-start">${esc(t('au_logout'))}</button></div>`);
-  $('#logout', d).onclick = async () => { try { await api('/auth/logout', {}); } catch (_) {} USER = null; renderAcct(); d.close(); };
+  const d = openDlg('dlgTrips', `<div class="dlg">${head('trH', t('tr_title'))}<div id="trTop"></div><div id="trList" style="display:flex;flex-direction:column;gap:12px"><div class="skel" style="min-height:120px"></div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-line btn-sm" type="button" id="trSupport">${esc(t('tr_support'))}</button><button class="btn btn-line btn-sm" type="button" id="logout">${esc(t('au_logout'))}</button></div></div>`);
+  $('#logout', d).onclick = async () => { try { await api('/auth/logout', {}); } catch (_) {} USER = null; ME = null; renderAcct(); d.close(); };
+  $('#trSupport', d).onclick = () => { d.close(); openRequest({ kind: 'trip', title: t('tr_support') }); };
+  await loadMe();
+  const tg = ME && ME.telegram, roles = (ME && ME.roles) || {};
+  $('#trTop', d).innerHTML = `<div class="note" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${esc(t('tr_tg_hint'))}</span>${tg && tg.linked ? `<b>${esc(t('tr_tg_connected'))}</b>` : (tg && tg.enabled ? `<button class="btn btn-ink btn-sm" type="button" id="tgLink">${esc(t('tr_tg_connect'))}</button>` : '')}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">${roles.guide ? `<button class="btn btn-line btn-sm" type="button" id="cabG">${esc(t('cab_guide'))}</button>` : ''}${roles.operator ? `<button class="btn btn-line btn-sm" type="button" id="cabO">${esc(t('cab_operator'))}</button>` : ''}</div>`;
+  const tl = $('#tgLink', d); if (tl) tl.onclick = async () => { try { const r = await api('/me/telegram-link', {}); window.open(r.url, '_blank', 'noopener'); } catch (ex) { $('#trTop', d).insertAdjacentHTML('beforeend', msg(ex.message, 1)); } };
+  const cg = $('#cabG', d); if (cg) cg.onclick = () => { d.close(); openGuideCabinet(); };
+  const co = $('#cabO', d); if (co) co.onclick = () => { d.close(); openOperator(); };
   try {
     const { bookings } = await api('/my/bookings');
     $('#trList', d).innerHTML = bookings.length ? bookings.map(b => {
-      const st = t('st_' + b.status), wait = ['awaiting_payment', 'pending'].includes(b.status);
+      const wait = ['awaiting_payment', 'pending'].includes(b.status);
       let g = '';
       if (b.guide) g = b.guide.revealed
         ? `<div class="reveal"><b>${esc(t('tr_guide'))}:</b> ${esc(b.guide.name)}${b.guide.telegram ? ` · <a href="https://t.me/${esc(String(b.guide.telegram).replace(/[^A-Za-z0-9_]/g, ''))}" target="_blank" rel="noopener">Telegram @${esc(String(b.guide.telegram).replace(/[^A-Za-z0-9_]/g, ''))}</a>` : ''}</div>`
         : `<div class="reveal" style="color:var(--mute)">🔒 ${esc(t('tr_guide_hidden'))}</div>`;
-      return `<div class="trip"><span class="st ${wait ? 'wait' : ''}">${esc(st)}${b.sandbox ? ' · test' : ''}</span><b class="serif" style="font-size:21px">${esc(b.city || b.title)}</b>
-        <span style="font-size:14px;color:var(--mute)">${esc(b.code)} · ${esc(b.travelDate || '')} · ${b.days} ${esc(t('bk_days').toLowerCase())} · $${b.amountUsd}</span>${g}</div>`;
+      if (b.operator) g += `<div class="reveal"><b>${esc(t('tr_operator'))}:</b> ${esc(b.operator.company)}${b.operator.phone ? ' · ' + esc(b.operator.phone) : ''}</div>`;
+      return `<div class="trip" data-id="${esc(b.id)}"><span class="st ${wait ? 'wait' : ''}">${esc(t('st_' + b.status))}${b.sandbox ? ' · test' : ''}</span><b class="serif" style="font-size:21px">${esc(CATMAP[b.city] ? dName(b.city) : (b.city || b.title))}</b>
+        <span style="font-size:14px;color:var(--mute)">${esc(b.code)} · ${esc(b.travelDate || '')} · ${b.days} ${esc(t('bk_days').toLowerCase())} · ${money(b.amountUsd)}</span>${g}
+        ${b.refunds && b.refunds.length ? `<span style="font-size:13px;color:var(--mute)">↩ ${b.refunds.map(r => money(r.amountUsd) + ' · ' + esc(r.status)).join(', ')}</span>` : ''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${b.canCancel ? `<button class="btn btn-line btn-sm" type="button" data-cancel="${esc(b.id)}" data-pct="${b.cancelRefundPct}" data-code="${esc(b.code)}">${esc(t('tr_cancel'))}</button>` : ''}${b.canReview ? `<button class="btn btn-ink btn-sm" type="button" data-rate="${esc(b.id)}">${esc(t('tr_rate'))}</button>` : ''}</div>
+        <div class="rateBox"></div></div>`;
     }).join('') : `<div class="empty">${esc(t('tr_empty'))}</div>`;
-  } catch (ex) { $('#trList', d).innerHTML = `<div class="msg err">${esc(ex.message)}</div>`; }
+    $$('[data-cancel]', d).forEach(btn => btn.onclick = async () => {
+      if (!confirm(t('tr_cancel_confirm', { code: btn.dataset.code, pct: btn.dataset.pct }))) return;
+      try { await api(`/my/bookings/${btn.dataset.cancel}/cancel`, {}); openTrips(); } catch (ex) { btn.insertAdjacentHTML('afterend', msg(ex.message, 1)); }
+    });
+    $$('[data-rate]', d).forEach(btn => btn.onclick = () => {
+      const box = btn.closest('.trip').querySelector('.rateBox'); let val = 5;
+      box.innerHTML = `<div class="stars" role="group">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-v="${n}" aria-pressed="${n === 5}">${'★'.repeat(n)}</button>`).join('')}</div><label class="lbl" style="margin-top:8px">${esc(t('tr_comment'))}<textarea class="inp" maxlength="1000"></textarea></label><button class="btn btn-primary btn-sm" type="button" style="margin-top:8px">${esc(t('gc_save'))}</button>`;
+      $$('.stars button', box).forEach(s => s.onclick = () => { val = +s.dataset.v; $$('.stars button', box).forEach(x => x.setAttribute('aria-pressed', x === s)); });
+      box.querySelector('.btn-primary').onclick = async () => { try { await api(`/my/bookings/${btn.dataset.rate}/review`, { rating: val, serviceRating: val, comment: box.querySelector('textarea').value }); box.innerHTML = msg(t('tr_rated')); btn.remove(); } catch (ex) { box.insertAdjacentHTML('beforeend', msg(ex.message, 1)); } };
+    });
+  } catch (ex) { $('#trList', d).innerHTML = msg(ex.message, 1); }
 }
+
+/* ---------- Host cabinet ---------- */
+async function openGuideCabinet() {
+  const d = openDlg('dlgCab', `<div class="dlg">${head('cbH', t('cab_guide'))}<div id="cb"><div class="skel" style="min-height:200px"></div></div></div>`);
+  try {
+    const [me, bk] = await Promise.all([api('/guide/me'), api('/guide/bookings')]); const g = me.guide;
+    $('#cb', d).innerHTML = `${g.status !== 'approved' ? msg(t('gc_pending')) : ''}
+      <div class="stat4"><div><small>${esc(t('gc_bookings'))}</small><b>${me.stats.bookings}</b></div><div><small>${esc(t('gc_earned'))}</small><b>${money(me.stats.earnedUsd)}</b></div><div><small>${esc(t('gc_paid'))}</small><b>${money(me.stats.paidOutUsd)}</b></div><div><small>${esc(t('gc_rating'))}</small><b>${me.stats.rating ? '★ ' + me.stats.rating : '—'}</b></div></div>
+      <div class="tabs2" role="tablist"><button role="tab" aria-selected="true" data-tab="b">${esc(t('gc_bookings'))}</button><button role="tab" aria-selected="false" data-tab="p">${esc(t('gc_profile'))}</button></div>
+      <div id="tabB" class="mini">${bk.bookings.length ? bk.bookings.map(b => `<div class="mi"><div class="t"><b>${esc(b.code)} · ${esc(b.travelDate || '')}</b><span>${esc(t('st_' + b.status))} · ${b.days} ${esc(t('bk_days').toLowerCase())} · ${b.people} ${esc(t('bk_people').toLowerCase())} · ${money(b.payoutUsd)}${b.genderPref ? ' · ' + gIcon(b.genderPref) : ''}</span><span>${b.customer ? esc(b.customer.name) + ' · ' + esc(b.customer.contact) : '🔒 ' + esc(t('gc_customer_hidden'))}</span></div></div>`).join('') : `<div class="empty">${esc(t('gc_none'))}</div>`}</div>
+      <form id="tabP" class="mini" hidden novalidate>
+        <label class="lbl">${esc(t('ap_spec'))}<input class="inp" name="spec" maxlength="200" value="${esc(specText(g.spec))}"></label>
+        <label class="lbl">${esc(t('ap_langs'))}<input class="inp" name="langs" maxlength="120" value="${esc(langsText(g.langs))}"></label>
+        <div class="grid2"><label class="lbl">${esc(t('ap_rate'))}<input class="inp" name="rate" type="number" min="5" max="2000" value="${esc(g.rate)}"></label><label class="lbl">${esc(t('ap_tg'))}<input class="inp" name="tg" maxlength="64" value="${esc(g.tg || '')}"></label></div>
+        <label class="lbl">${esc(t('op_about'))}<textarea class="inp" name="about" maxlength="1000">${esc(g.about || '')}</textarea></label>
+        <div id="gpMsg"></div><button class="btn btn-ink" type="submit">${esc(t('gc_save'))}</button></form>`;
+    $$('[data-tab]', d).forEach(b => b.onclick = () => { $$('[data-tab]', d).forEach(x => x.setAttribute('aria-selected', x === b)); $('#tabB', d).hidden = b.dataset.tab !== 'b'; $('#tabP', d).hidden = b.dataset.tab !== 'p'; });
+    const f = $('#tabP', d); f.onsubmit = async e => { e.preventDefault(); try { await api('/guide/profile', { spec: f.spec.value, langs: f.langs.value, rate: f.rate.value, tg: f.tg.value, about: f.about.value }); $('#gpMsg', d).innerHTML = msg(t('gc_saved')); } catch (ex) { $('#gpMsg', d).innerHTML = msg(ex.message, 1); } };
+  } catch (ex) { $('#cb', d).innerHTML = msg(ex.message, 1); }
+}
+
+/* ---------- Tour operator ---------- */
+function openOperator() {
+  needLogin(async () => {
+    const d = openDlg('dlgCab', `<div class="dlg">${head('cbH', t('cab_operator'))}<div id="cb"><div class="skel" style="min-height:200px"></div></div></div>`);
+    let me = null; if (ME && ME.roles && ME.roles.operator) { try { me = await api('/operator/me'); } catch (_) {} }
+    if (!me) {
+      $('#cb', d).innerHTML = `<form class="mini" id="opApply" novalidate><b class="serif" style="font-size:22px">${esc(t('become_operator'))}</b>
+        <label class="lbl">${esc(t('op_company'))}<input class="inp" name="company" required maxlength="120"></label>
+        <div class="grid2"><label class="lbl">${esc(t('op_phone'))}<input class="inp" name="phone" required maxlength="40" inputmode="tel"></label><label class="lbl">${esc(t('op_license'))}<input class="inp" name="license" maxlength="80"></label></div>
+        <label class="lbl">${esc(t('op_about'))}<textarea class="inp" name="about" maxlength="1000"></textarea></label><div id="opMsg"></div><button class="btn btn-primary" type="submit">${esc(t('op_apply'))}</button></form>`;
+      const f = $('#opApply', d); f.onsubmit = async e => { e.preventDefault(); try { await api('/operator/apply', Object.fromEntries(new FormData(f))); openOperator(); } catch (ex) { $('#opMsg', d).innerHTML = msg(ex.message, 1); } };
+      return;
+    }
+    const o = me.operator, live = o.status === 'approved';
+    const stLabel = s => ({ approved: t('st_live'), pending: t('st_review'), rejected: t('st_rejected'), archived: t('st_archived') }[s] || s);
+    const destOpts = CAT.slice().sort((a, b) => (a.names[LANG] || a.names.en).localeCompare(b.names[LANG] || b.names.en, LANG)).map(x => `<option value="${x.slug}">${esc(x.names[LANG] || x.names.en)}</option>`).join('');
+    $('#cb', d).innerHTML = `${live ? '' : msg(t('op_pending'))}<b class="serif" style="font-size:22px">${esc(o.company)}</b>
+      <div class="stat4"><div><small>${esc(t('gc_bookings'))}</small><b>${me.stats.bookings}</b></div><div><small>${esc(t('gc_earned'))}</small><b>${money(me.stats.earnedUsd)}</b></div><div><small>${esc(t('gc_paid'))}</small><b>${money(me.stats.paidOutUsd)}</b></div><div><small>${esc(t('gc_status'))}</small><b style="font-size:16px">${esc(stLabel(o.status))}</b></div></div>
+      <div class="tabs2" role="tablist"><button role="tab" aria-selected="true" data-tab="k">${esc(t('dd_packages'))}</button>${live ? `<button role="tab" aria-selected="false" data-tab="n">${esc(t('op_new_pkg'))}</button>` : ''}<button role="tab" aria-selected="false" data-tab="b">${esc(t('gc_bookings'))}</button></div>
+      <div id="tK" class="mini">${me.packages.length ? me.packages.map(p => `<div class="mi"><div class="t"><b>${esc(p.title)}</b><span>${esc(dName(p.dest))} · ${esc(t('pk_days', { n: p.days }))} · ${money(p.priceUsd)} ${esc(t('pk_per_person'))} · ${esc(stLabel(p.status))}</span></div>${p.status !== 'archived' ? `<button class="btn btn-line btn-sm" type="button" data-arch="${esc(p.id)}">${esc(t('op_archive'))}</button>` : ''}</div>`).join('') : `<div class="empty">${esc(t('op_none'))}</div>`}</div>
+      ${live ? `<form id="tN" class="mini" hidden novalidate>
+        <label class="lbl">${esc(t('op_pkg_title'))}<input class="inp" name="title" required maxlength="120"></label>
+        <label class="lbl">${esc(t('op_dest'))}<select class="inp" name="dest">${destOpts}</select></label>
+        <div class="grid2"><label class="lbl">${esc(t('dd_days'))}<input class="inp" name="days" type="number" min="1" max="30" value="5"></label><label class="lbl">${esc(t('op_price'))}<input class="inp" name="priceUsd" type="number" min="10" max="20000"></label></div>
+        <label class="lbl">${esc(t('op_max'))}<input class="inp" name="maxPeople" type="number" min="1" max="50" value="8"></label>
+        <label class="lbl">${esc(t('op_desc'))}<textarea class="inp" name="description" maxlength="2000"></textarea></label>
+        <label class="lbl">${esc(t('op_itin'))}<textarea class="inp" name="itinerary" rows="5"></textarea></label>
+        <div id="npMsg"></div><button class="btn btn-primary" type="submit">${esc(t('op_submit'))}</button></form>` : ''}
+      <div id="tB" class="mini" hidden></div>`;
+    $$('[data-tab]', d).forEach(b => b.onclick = async () => { $$('[data-tab]', d).forEach(x => x.setAttribute('aria-selected', x === b)); ['K', 'N', 'B'].forEach(k => { const el = $('#t' + k, d); if (el) el.hidden = b.dataset.tab !== k.toLowerCase(); });
+      if (b.dataset.tab === 'b') { const r = await api('/operator/bookings').catch(() => ({ bookings: [] })); $('#tB', d).innerHTML = r.bookings.length ? r.bookings.map(x => `<div class="mi"><div class="t"><b>${esc(x.code)} · ${esc(x.travelDate || '')}</b><span>${esc(t('st_' + x.status))} · ${x.people} · ${money(x.amountUsd)}</span><span>${x.customer ? esc(x.customer.name) + ' · ' + esc(x.customer.contact) : '🔒 ' + esc(t('gc_customer_hidden'))}</span></div></div>`).join('') : `<div class="empty">${esc(t('gc_none'))}</div>`; } });
+    $$('[data-arch]', d).forEach(b => b.onclick = async () => { await api(`/operator/packages/${b.dataset.arch}/update`, { archive: true }).catch(() => {}); openOperator(); });
+    const f = $('#tN', d); if (f) f.onsubmit = async e => { e.preventDefault();
+      try { await api('/operator/packages', { title: f.title.value, dest: f.dest.value, days: +f.days.value, priceUsd: +f.priceUsd.value, maxPeople: +f.maxPeople.value, description: f.description.value, itinerary: f.itinerary.value.split('\n').map(s => s.trim()).filter(Boolean) }); openOperator(); }
+      catch (ex) { $('#npMsg', d).innerHTML = msg(ex.message, 1); } };
+  }, t('become_operator'));
+}
+$('#opBtn').onclick = openOperator; $('#opBtn2').onclick = openOperator;
 
 /* ---------- Become a host ---------- */
 function openApply() {
+  const destOpts = CAT.slice().sort((a, b) => (a.names[LANG] || a.names.en).localeCompare(b.names[LANG] || b.names.en, LANG)).map(x => `<option value="${x.slug}">${esc(x.names[LANG] || x.names.en)}</option>`).join('');
   const d = openDlg('dlgApply', `<form class="dlg" id="apForm" novalidate>${head('apH', t('ap_title'))}
     <div class="note">${esc(t('ap_note'))}</div>
     <label class="lbl">${esc(t('ap_name'))}<input class="inp" name="name" required maxlength="80"></label>
-    <div class="grid2"><label class="lbl">${esc(t('ap_city'))}<input class="inp" name="city" required maxlength="80"></label>
+    <div class="grid2"><label class="lbl">${esc(t('op_dest'))}<select class="inp" name="dest">${destOpts}</select></label>
     <label class="lbl">${esc(t('ap_gender'))}<select class="inp" name="gender" required><option value=""></option><option value="female">${esc(t('g_female'))}</option><option value="male">${esc(t('g_male'))}</option></select></label></div>
+    <label class="lbl">${esc(t('ap_city'))}<input class="inp" name="city" required maxlength="80"></label>
     <div class="grid2"><label class="lbl">${esc(t('ap_tg'))}<input class="inp" name="tg" required maxlength="64" placeholder="@username"></label>
     <label class="lbl">${esc(t('ap_rate'))}<input class="inp" name="rate" type="number" min="5" max="2000" required inputmode="decimal"></label></div>
     <label class="lbl">${esc(t('ap_langs'))}<input class="inp" name="langs" maxlength="120"></label>
     <label class="lbl">${esc(t('ap_spec'))}<textarea class="inp" name="spec" maxlength="200"></textarea></label>
-    <div id="apMsg" role="status"></div>
-    <button class="btn btn-primary" type="submit">${esc(t('ap_submit'))}</button></form>`);
+    <div id="apMsg" role="status"></div><button class="btn btn-primary" type="submit">${esc(t('ap_submit'))}</button></form>`);
   const f = $('#apForm', d);
-  f.onsubmit = async e => {
-    e.preventDefault(); const box = $('#apMsg', d);
-    try { await api('/guides/apply', Object.fromEntries(new FormData(f))); f.innerHTML = head('apH', t('ap_title')) + `<div class="msg">${esc(t('ap_ok'))}</div>`; $$('[data-close]', d).forEach(b => b.onclick = () => d.close()); }
-    catch (ex) { box.innerHTML = `<div class="msg err">${esc(ex.message)}</div>`; }
-  };
+  f.dest.onchange = () => { if (!f.city.value) f.city.value = dName(f.dest.value); };
+  f.onsubmit = async e => { e.preventDefault();
+    try { await api('/guides/apply', Object.fromEntries(new FormData(f))); f.innerHTML = head('apH', t('ap_title')) + msg(t('ap_ok')); $$('[data-close]', d).forEach(b => b.onclick = () => d.close()); }
+    catch (ex) { $('#apMsg', d).innerHTML = msg(ex.message, 1); } };
 }
 $('#applyBtn').onclick = openApply; $('#applyBtn2').onclick = openApply;
 
@@ -692,33 +992,53 @@ $('#applyBtn').onclick = openApply; $('#applyBtn2').onclick = openApply;
 $('#itinBtn').onclick = () => openDlg('dlgItin', `<div class="dlg">${head('itH', t('itin_title'))}<p style="margin:0;color:var(--mute)">${esc(t('feat_place'))} · ${esc(t('days7'))}</p>
   <ol class="itin">${[1, 2, 3, 4, 5, 6, 7].map(i => `<li><span>${esc(t('day'))} ${i}</span><div>${esc(t('itin' + i))}</div></li>`).join('')}</ol>
   <div class="tag-est" style="margin:0">${esc(t('estimated'))}</div>
-  <a class="btn btn-primary" href="#contact" data-close>${esc(t('cta_title'))}</a></div>`);
+  <button class="btn btn-primary" type="button" id="itReq">${esc(t('pk_request'))}</button></div>`) && ($('#itReq').onclick = () => { $('#dlgItin').close(); openRequest({ kind: 'trip', title: t('feat_title'), dest: 'samarkand', message: t('feat_place') + ' · ' + t('days7') }); });
 
-/* ---------- Film (photo story) ---------- */
+/* ---------- Film (photo story with journal links) ---------- */
 let filmTimer = null;
 $('#filmBtn').onclick = () => {
-  const shots = [['1499678329028-101435549a4e', 'Vernazza'], ['1545569341-9eb8b30979d9', t('d_kyoto')], ['1760867333704-872f5ff51cdd', t('d_amalfi')], ['1597212618440-806262de4f6b', t('d_marrakech')], ['1681951002470-06ad64d8e39c', t('d_patagonia')], ['1476610182048-b716b8518aae', t('d_iceland')], ['1715824633691-1fd2bfd3a1ac', 'Samarkand']];
-  const d = openDlg('dlgFilm', `<div class="stage">${shots.map(([id], i) => `<img alt="" src="${U(id, 1920)}" class="${i ? '' : 'on'}">`).join('')}</div><div class="cap" id="cap">${esc(shots[0][1])}</div><button class="x" type="button" data-close aria-label="${esc(t('close'))}">✕</button><span class="vh">${esc(t('film_title'))}</span>`);
+  const A = window.ARTICLES || [];
+  const shots = [['1499678329028-101435549a4e', 'Vernazza'], ['1715824633691-1fd2bfd3a1ac', dName('samarkand'), A[4]], ['1545569341-9eb8b30979d9', t('d_kyoto')], ['1760867333704-872f5ff51cdd', t('d_amalfi')], ['1541432901042-2d8bd64b4a9b', dName('istanbul'), A[3]], ['1597212618440-806262de4f6b', t('d_marrakech')], ['1681951002470-06ad64d8e39c', t('d_patagonia')], ['1476610182048-b716b8518aae', t('d_iceland')], ['1500530855697-b586d89ba3ee', (A[1] && (A[1].t[LANG] || A[1].t.en)[0]) || '', A[1]]];
+  const cap = s => `${esc(s[1])}${s[2] ? `<br><a href="${path('/journal/' + s[2].slug)}" style="font-size:16px;color:#fff">${esc((s[2].t[LANG] || s[2].t.en)[0])} →</a>` : ''}`;
+  const d = openDlg('dlgFilm', `<div class="stage">${shots.map(([id], i) => `<img alt="" src="${U(id, 1920)}" class="${i ? '' : 'on'}">`).join('')}</div><div class="cap" id="cap">${cap(shots[0])}</div><button class="x" type="button" data-close aria-label="${esc(t('close'))}">✕</button><span class="vh">${esc(t('film_title'))}</span>`);
   let i = 0; clearInterval(filmTimer);
-  filmTimer = setInterval(() => { const imgs = $$('.stage img', d); imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); $('#cap', d).textContent = shots[i][1]; }, 4200);
+  filmTimer = setInterval(() => { const imgs = $$('.stage img', d); imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); $('#cap', d).innerHTML = cap(shots[i]); }, 4500);
   d.addEventListener('close', () => clearInterval(filmTimer), { once: true });
+};
+
+/* ---------- AI chat ---------- */
+const AIH = [];
+$('#aiBtn').onclick = () => {
+  const d = openDlg('dlgAi', `<div class="dlg">${head('aiH', t('ai_title'))}<div class="chat" id="chat">${AIH.map(m => `<div class="bub ${m.role === 'user' ? 'me' : 'ai'}">${esc(m.content)}</div>`).join('')}</div>
+    <form id="aiF" style="display:flex;gap:8px"><input class="inp" name="q" required maxlength="500" placeholder="${esc(t('ai_ph'))}"><button class="btn btn-ink" type="submit">${esc(t('ai_send'))}</button></form><small style="color:var(--mute)">${esc(t('ai_note'))}</small></div>`);
+  const f = $('#aiF', d), chat = $('#chat', d);
+  f.onsubmit = async e => { e.preventDefault(); const q = f.q.value.trim(); if (!q) return; f.q.value = '';
+    AIH.push({ role: 'user', content: q }); chat.insertAdjacentHTML('beforeend', `<div class="bub me">${esc(q)}</div><div class="bub ai" id="typing">…</div>`); chat.scrollTop = 1e9;
+    try { const r = await api('/ai/chat', { message: `[${LANG}] ` + q, history: AIH.slice(-8) }); AIH.push({ role: 'assistant', content: r.reply }); $('#typing', d).outerHTML = `<div class="bub ai">${esc(r.reply)}</div>`; }
+    catch (ex) { $('#typing', d).outerHTML = `<div class="bub ai">${esc(ex.message)}</div>`; }
+    chat.scrollTop = 1e9; };
 };
 
 /* ---------- CTA ---------- */
 $('#ctaForm').onsubmit = async e => {
   e.preventDefault();
-  const email = $('#ctaEmail').value.trim(), place = $('#ctaPlace').value.trim(), msg = $('#ctaMsg');
-  msg.className = 'formmsg';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { msg.textContent = t('bad_email'); msg.classList.add('err'); return; }
-  try { await api('/feedback', { type: 'trip_request', contact: email, message: `Trip request (${LANG}): ${place || '—'}` }); msg.textContent = t('cta_ok'); e.target.reset(); }
-  catch (ex) { msg.textContent = ex.message; msg.classList.add('err'); }
+  const email = $('#ctaEmail').value.trim(), place = $('#ctaPlace').value.trim(), m = $('#ctaMsg');
+  m.className = 'formmsg';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { m.textContent = t('bad_email'); m.classList.add('err'); return; }
+  try { await api('/feedback', { type: 'trip_request', contact: email, lang: LANG, message: `Trip request (${LANG}): ${place || '—'}` }); m.textContent = t('cta_ok'); e.target.reset(); }
+  catch (ex) { m.textContent = ex.message; m.classList.add('err'); }
 };
+
+/* ---------- Image fallback (rasm yuklanmasa — tinch fon) ---------- */
+document.addEventListener('error', e => { const im = e.target; if (im.tagName !== 'IMG' || im.dataset.fb) return; im.dataset.fb = 1; im.removeAttribute('srcset');
+  im.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E8DCC8"/><stop offset="1" stop-color="#C9B79A"/></linearGradient></defs><rect width="4" height="3" fill="url(#g)"/></svg>'); }, true);
 
 /* ---------- Boot ---------- */
 $('#yr').textContent = new Date().getFullYear();
 applyI18n();
-loadHosts();
-loadMe().then(() => { if (new URLSearchParams(location.search).get('order') && USER) openTrips(); });
+loadCatalog().then(loadHosts);
+loadMe().then(() => { const qs = new URLSearchParams(location.search); if (qs.get('order') && USER) openTrips(); if (qs.get('reset')) openReset(); });
+addEventListener('hashchange', handleHash);
 </script>
 </body>
 </html>

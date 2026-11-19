@@ -1,10 +1,10 @@
 # Render Blueprint — Dashboard > New > Blueprint > shu repo ni tanlang
 services:
   - type: web
-    name: manzil
+    name: manzil-app
     runtime: node
     plan: starter            # Persistent Disk faqat pullik rejada ishlaydi (free rejada baza har deployda o'chadi)
-    region: frankfurt
+    region: ohio            # mavjud manzil-app xizmati bilan bir xil (disk mintaqani o'zgartirib bo'lmaydi)
     branch: main
     buildCommand: echo "npm paketlari kerak emas"
     startCommand: node server.js
@@ -36,6 +36,18 @@ services:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_ADMIN_CHAT_ID
+        sync: false          # ixtiyoriy: support guruhini /support_here KOD bilan ham ulash mumkin
+      - key: CLICK_SERVICE_ID
         sync: false
+      - key: CLICK_MERCHANT_ID
+        sync: false
+      - key: CLICK_SECRET_KEY
+        sync: false
+      - key: PAYME_MERCHANT_ID
+        sync: false
+      - key: PAYME_KEY
+        sync: false
+      - key: BACKUP_DIR
+        value: /data/backups
       - key: OPENAI_API_KEY
         sync: false

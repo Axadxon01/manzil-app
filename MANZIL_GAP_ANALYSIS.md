@@ -13,7 +13,7 @@ Belgilar: ✅ ishlaydi (sinovdan o'tdi) · ⚠️ qisman / shart bilan · ❌ ha
 | Ma'lumot JSON fayllarda | 🔧 SQLite (+ eski JSONdan bir martalik import) |
 | Admin = bitta umumiy kalit | 🔧 8 rol, individual hisob, RBAC, 2FA (TOTP) |
 | To'lov "tasdiqlash" tugmasi hamma uchun | 🔧 faqat provayder webhooki yoki moliya xodimi (izoh majburiy) |
-| Click/Payme to'lovi | ❌ merchant API hali yo'q — tanlansa aniq xato (503/501) |
+| Click/Payme to'lovi | ✅ v3.2: merchant API (Click SHOP, Payme JSON-RPC) — merchant kalitlari kiritilishi kerak |
 
 ## 2. Bu so'rovdagi talablar
 | Talab | Holat |
@@ -34,9 +34,9 @@ Belgilar: ✅ ishlaydi (sinovdan o'tdi) · ⚠️ qisman / shart bilan · ❌ ha
 | verified/estimated/unavailable narx belgisi | ⚠️ backend va admin'da bor; saytning barcha kartochkalarida to'liq ko'rsatilmagan |
 | Shaxsiy sayohat rejalashtiruvchi (kunma-kun) | ❌ |
 | Gid marketplace: ariza, tasdiqlash, to'xtatish, band qilish | ✅ |
-| Gid shaxsiy kabineti (o'z buyurtmalari, bandlik) | ❌ |
-| Tur operatorlar (hamkor akkaunt, paketlar) | ❌ (buyurtmalarda "hamkor" ulushi hisoblanadi, lekin akkaunt yo'q) |
-| Mijoz: buyurtmalar tarixi, bekor qilish, baho | ✅ API; ⚠️ saytda UI hali yo'q (API tayyor: `/api/my/bookings`) |
+| Gid shaxsiy kabineti (o'z buyurtmalari, bandlik) | ✅ v3.2 |
+| Tur operatorlar (hamkor akkaunt, paketlar) | ✅ v3.2: ariza, tasdiq, paketlar, bronlar |
+| Mijoz: buyurtmalar tarixi, bekor qilish, baho | ✅ v3.2: saytda va Telegram botda |
 | Admin: dashboard, buyurtmalar, to'lovlar, qaytarish, foydalanuvchilar, gidlar, manzillar, fikr, sozlamalar, audit | ✅ |
 | Admin: Reports (konversiya, cohort) | ⚠️ asosiy ko'rsatkichlar bor; chuqur hisobotlar ❌ |
 | AI boshqaruvi (foydalanish/xarajat) | ⚠️ so'rovlar soni va fallback; xarajat hisobi ❌ |
