@@ -21,7 +21,7 @@ async function call(jar, method, p, body, headers = {}) {
     console.log('\n[Auth va xavfsizlik]');
     let r = await call(anon, 'POST', '/api/staff/login', { email: ADMIN.email, password: 'wrong-password-123' }); ok(r.s === 401, 'noto\'g\'ri parol → 401');
     r = await call(boss, 'POST', '/api/staff/login', ADMIN); ok(r.s === 200 && r.staff.role === 'super_admin', 'super admin kirdi');
-    r = await call(boss, 'GET', '/api/admin/dashboard'); ok(r.s === 403 && r.mustChangePw, 'birinchi kirishda parolni almashtirish majburiy');
+    r = await call(boss, 'GET', '/api/admin/dashboard'); ok(r.s === 200, 'ADMIN_PASSWORD bilan yaratilgan admin darhol ishlay oladi (majburiy almashtirish faqat tasodifiy parolda)');
     r = await call(boss, 'POST', '/api/staff/password', { current: ADMIN.password, password: ADMIN2 }); ok(r.s === 200, 'admin paroli almashtirildi');
     r = await call(boss, 'POST', '/api/staff/login', { email: ADMIN.email, password: ADMIN2 }); ok(r.s === 200, 'yangi parol bilan kirildi');
     ok(/HttpOnly/i.test((await fetch(B + '/api/staff/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: ADMIN.email, password: ADMIN2 }) })).headers.getSetCookie().join(';')), 'sessiya cookie HttpOnly');

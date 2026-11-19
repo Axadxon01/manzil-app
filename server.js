@@ -48,6 +48,10 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 db.importLegacyJson();
 db.seedSampleGuides();
 try { const r = catalog.seedSamples(); if (!r.skipped) console.log('[catalog] namunaviy gidlar:', r.hosts, 'paketlar:', r.pkgs); } catch (e) { console.error('[catalog] seed', e.message); }
+// Baza doimiy diskdami (Render Persistent Disk /data)? Vaqtinchalik bazada 2FA sirlari har qayta ishga tushishda o'chadi —
+// u holda 2FA majburiy qilinmaydi (aks holda admin har safar qaytadan sozlashga majbur bo'lardi), panelda ogohlantirish ko'rsatiladi.
+const PERSISTENT_DB = !db.IN_MEMORY && (process.env.PERSISTENT_DB === 'true' || /^\/data\//.test(String(db.DB_PATH || '')));
+const REQUIRE_2FA = IS_PROD && (process.env.REQUIRE_STAFF_2FA === 'true' || (process.env.REQUIRE_STAFF_2FA !== 'false' && PERSISTENT_DB));
 async function bootstrapAdmin() {
   if (db.get('SELECT COUNT(*) c FROM staff').c > 0) return;
   const email = str(process.env.ADMIN_EMAIL || 'admin@manzil.local', 120).toLowerCase();
@@ -57,8 +61,10 @@ async function bootstrapAdmin() {
     pw = crypto.randomBytes(12).toString('base64url'); generated = true;
   }
   const id = db.uid('st_');
-  // Muhitdan berilgan parol ham bir martalik hisoblanadi: birinchi kirishda almashtirish majburiy
-  db.run('INSERT INTO staff(id,name,email,role,password_hash,must_change_pw,created_at) VALUES(?,?,?,?,?,?,?)', id, 'Bosh administrator', email, 'super_admin', await sec.hashPassword(pw), 1, db.now());
+  // Tasodifiy parol bir martalik: almashtirish majburiy. ADMIN_PASSWORD (Render maxfiy sozlamasi) egasi tanlagan parol —
+  // vaqtinchalik bazada har qayta ishga tushishda u qayta yoziladi, shuning uchun majburiy almashtirish "parol qaytib qoldi" chalkashligini keltirib chiqarardi.
+  // Parolni almashtirish: Render → Environment → ADMIN_PASSWORD (yoki doimiy diskda — admin paneldan).
+  db.run('INSERT INTO staff(id,name,email,role,password_hash,must_change_pw,created_at) VALUES(?,?,?,?,?,?,?)', id, 'Bosh administrator', email, 'super_admin', await sec.hashPassword(pw), generated ? 1 : 0, db.now());
   sec.audit(core.SYSTEM, 'staff.bootstrap', 'staff', id, null, { email, role: 'super_admin' });
   if (generated) {
     console.log('\n==================================================================');
@@ -401,7 +407,7 @@ route('POST', '/api/staff/login', {}, async ({ req, res, body }) => {
   return { ok: true, staff: staffView(db.get('SELECT * FROM staff WHERE id=?', s.id)) };
 });
 route('POST', '/api/staff/logout', {}, ({ req, res }) => { sec.destroySession(req, res, 'staff'); return { ok: true }; });
-route('GET', '/api/staff/me', { auth: 'staff' }, ({ staff }) => ({ ok: true, staff: staffView(staff), perms: sec.permsOf(staff), roles: sec.ROLE_LABELS }));
+route('GET', '/api/staff/me', { auth: 'staff' }, ({ staff }) => ({ ok: true, staff: staffView(staff), perms: sec.permsOf(staff), roles: sec.ROLE_LABELS, system: { persistentDb: PERSISTENT_DB, require2fa: REQUIRE_2FA } }));
 route('POST', '/api/staff/password', { auth: 'staff' }, async ({ req, staff, body }) => {
   rl(req, 'staff-pw', 5, 3600 * 1000, staff.id);
   if (!(await sec.verifyPassword(body.current, staff.password_hash)).ok) throw new HttpError(403, 'Joriy parol noto\'g\'ri.');
@@ -820,7 +826,7 @@ async function handle(req, res) {
       if (!ctx.staff) throw new HttpError(401, 'Tizimga kiring.');
       if (ctx.staff.must_change_pw && !['/api/staff/password', '/api/staff/me', '/api/staff/logout'].includes(url.pathname)) throw new HttpError(403, 'Avval parolni almashtiring.', { mustChangePw: true });
       // Pul va tizim huquqlari bor rollar uchun 2FA majburiy (productionda; REQUIRE_STAFF_2FA=false bilan o'chiriladi)
-      if (IS_PROD && process.env.REQUIRE_STAFF_2FA !== 'false' && !ctx.staff.totp_enabled && ['super_admin', 'admin', 'finance_manager'].includes(ctx.staff.role)
+      if (REQUIRE_2FA && !ctx.staff.totp_enabled && ['super_admin', 'admin', 'finance_manager'].includes(ctx.staff.role)
         && !['/api/staff/password', '/api/staff/me', '/api/staff/logout', '/api/staff/2fa/setup', '/api/staff/2fa/enable'].includes(url.pathname)) throw new HttpError(403, 'Avval ikki bosqichli himoyani (2FA) yoqing.', { need2fa_setup: true });
       const ok = r.opts.anyPerm ? r.opts.anyPerm.some(p => sec.can(ctx.staff, p)) : sec.can(ctx.staff, r.opts.perm);
       if (!ok) { sec.audit(core.staffActor(ctx.staff), 'access.denied', 'route', url.pathname, null, { perm: r.opts.perm || r.opts.anyPerm }, req); throw new HttpError(403, 'Bu amal uchun ruxsatingiz yo\'q.'); }
