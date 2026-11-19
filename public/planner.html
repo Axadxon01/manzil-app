@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Manzil — Sayohat rejasi va byudjet</title>
+<meta name="description" content="Manzil — 105 ta manzil bo'yicha shaxsiy sayohat narxi va tur narxini solishtirish, qulay oylar, aviachipta havolalari, gidlar katalogi, real xarita, AI yordamchi va to'lov." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#F6F1E8;--surface:#FFFDF9;--surface-soft:#EFE7DA;--ink:#1C1917;--muted:#78716C;
+    --line:rgba(28,25,23,.12);--teal:#1C1917;--teal-2:#44403C;--gold:#C45C26;--gold-soft:#F6E7DC;
+    --rose:#C45C26;--blue:#6B7F5A;--shadow:0 12px 32px -12px rgba(28,25,23,.16);
+    --radius:18px;--radius-sm:12px
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:'Geist',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased}
+  img{display:block;max-width:100%}
+  button,input,select,textarea{font:inherit;color:inherit}
+  a{color:inherit;text-decoration:none}
+  .container{width:min(1260px,calc(100% - 32px));margin:0 auto}
+
+  /* Header */
+  header{position:sticky;top:0;z-index:40;background:rgba(244,247,246,.88);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:11px}
+  .logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--teal),var(--teal-2));color:#fff;display:grid;place-items:center;font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:21px;box-shadow:0 8px 20px rgba(15,92,77,.25)}
+  .brand-name{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:21px;letter-spacing:-.02em}
+  .brand-sub{font-size:11.5px;color:var(--muted)}
+  .nav-links{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .nav-links a{padding:7px 12px;border-radius:999px;font-size:13.5px;font-weight:600;color:var(--muted);transition:.2s}
+  .nav-links a:hover{background:var(--surface);color:var(--ink)}
+  .nav-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+  .btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:999px;font-size:13.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.2s}
+  .btn:hover{border-color:#b7cac4;transform:translateY(-1px)}
+  .btn-primary{background:var(--teal);border-color:var(--teal);color:#fff;box-shadow:0 8px 20px rgba(15,92,77,.2)}
+  .btn-primary:hover{background:var(--teal-2);border-color:var(--teal-2)}
+  .btn-gold{background:var(--gold);border-color:var(--gold);color:#fff}
+  .btn-danger{background:#fff0f2;border-color:#f5c2c9;color:var(--rose)}
+  .btn-danger:hover{background:var(--rose);color:#fff}
+  .btn-sm{padding:6px 11px;font-size:12.5px}
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;background:var(--surface-soft);color:var(--teal)}
+  .badge-gold{background:var(--gold-soft);color:#8a5a10}
+  .badge-rose{background:#fdecef;color:var(--rose)}
+  .badge-blue{background:#eaf1ff;color:var(--blue)}
+
+  /* Hero */
+  .hero{padding:28px 0 18px}
+  .hero-card{background:radial-gradient(1200px 420px at 90% -10%,rgba(23,124,104,.22),transparent 60%),linear-gradient(135deg,#0d3f35 0%,#125648 58%,#1a6b59 100%);color:#fff;border-radius:26px;padding:32px;box-shadow:var(--shadow);display:grid;grid-template-columns:1.35fr .95fr;gap:24px;align-items:center}
+  .hero h1{font-family:'Fraunces',Georgia,serif;font-size:clamp(28px,4vw,44px);line-height:1.12;margin:10px 0 12px;letter-spacing:-.02em}
+  .hero p{margin:0 0 18px;color:rgba(255,255,255,.84);font-size:15.5px;max-width:60ch}
+  .hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+  .stat-box{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:12px 14px}
+  .stat-box strong{display:block;font-size:21px;font-weight:800}
+  .stat-box span{font-size:12px;color:rgba(255,255,255,.8)}
+  .hero-panel{background:rgba(255,255,255,.97);color:var(--ink);border-radius:20px;padding:20px;box-shadow:0 18px 40px rgba(0,0,0,.18)}
+  .hero-panel h3{margin:0 0 4px;font-size:16.5px}
+  .hero-panel small{color:var(--muted);display:block;margin-bottom:12px}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+  .field label{font-size:12px;font-weight:700;color:var(--muted)}
+  .field input,.field select,.field textarea{width:100%;padding:9px 11px;border-radius:11px;border:1px solid var(--line);background:#fff;font-size:13.5px}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid rgba(15,92,77,.2);border-color:var(--teal)}
+
+  /* Filter bar */
+  .controls{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px;margin:14px 0 20px;box-shadow:var(--shadow)}
+  .controls-top{display:grid;grid-template-columns:1.5fr repeat(4,1fr) auto;gap:10px;align-items:end}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .chip{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg);font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s}
+  .chip.active,.chip:hover{background:var(--teal);color:#fff;border-color:var(--teal)}
+
+  /* Section header */
+  .sec-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:28px 0 14px;flex-wrap:wrap}
+  .sec-head h2{font-family:'Fraunces',Georgia,serif;font-size:26px;margin:0}
+  .sec-head p{margin:3px 0 0;color:var(--muted);font-size:14px}
+
+  /* Destination Cards */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;box-shadow:0 6px 24px rgba(15,44,37,.05);transition:.22s}
+  .card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+  .card-media{position:relative;height:185px;background:#dce7e3;overflow:hidden}
+  .card-media img{width:100%;height:100%;object-fit:cover;transition:transform .4s}
+  .card:hover .card-media img{transform:scale(1.04)}
+  .card-top-badges{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:6px;pointer-events:none}
+  .pill-dark{background:rgba(15,34,29,.78);color:#fff;backdrop-filter:blur(6px);padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700}
+  .fav-btn{pointer-events:auto;width:32px;height:32px;border-radius:50%;border:none;background:rgba(255,255,255,.92);cursor:pointer;display:grid;place-items:center;font-size:15px}
+  .fav-btn.active{color:var(--rose)}
+  .card-body{padding:15px;display:flex;flex-direction:column;gap:10px;flex:1}
+  .card-title{display:flex;justify-content:space-between;align-items:start;gap:8px}
+  .card-title h3{margin:0;font-size:17.5px;line-height:1.25}
+  .card-sub{font-size:12.5px;color:var(--muted)}
+  .compare-box{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--bg);padding:9px;border-radius:12px;border:1px solid var(--line)}
+  .price-col{padding:4px 6px;border-radius:8px}
+  .price-col.win{background:#e6f4f0;border:1px solid #b6ded2}
+  .price-col small{display:block;font-size:11px;color:var(--muted);font-weight:700}
+  .price-col strong{font-size:15.5px;color:var(--ink)}
+  .months-row{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:12px;color:var(--muted)}
+  .m-tag{padding:2px 7px;border-radius:6px;background:var(--surface-soft);color:var(--teal);font-weight:700;font-size:11px}
+  .card-actions{margin-top:auto;display:grid;grid-template-columns:1fr 1fr auto;gap:7px;padding-top:6px}
+
+  /* Map + Planner Split */
+  .map-wrap{display:grid;grid-template-columns:1.25fr .95fr;gap:18px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:var(--shadow)}
+  #googleMap{width:100%;height:460px;border-radius:16px;background:#e4ece9;border:1px solid var(--line)}
+  .map-side{display:flex;flex-direction:column;gap:10px;max-height:460px;overflow:auto}
+  .route-item{border:1px solid var(--line);border-radius:13px;padding:11px;background:var(--bg);display:flex;justify-content:space-between;align-items:center;gap:10px}
+
+  /* Guides */
+  .guides-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .guide-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 20px rgba(15,44,37,.04)}
+  .guide-head{display:flex;align-items:center;gap:12px}
+  .avatar{width:50px;height:50px;border-radius:15px;background:linear-gradient(135deg,var(--teal),var(--gold));color:#fff;font-weight:800;display:grid;place-items:center;font-size:18px;flex-shrink:0}
+
+  /* AI + Feedback */
+  .two-col{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;margin-top:26px}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:var(--shadow)}
+  .chat-box{height:310px;overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:15px;padding:12px;display:flex;flex-direction:column;gap:9px;margin-bottom:10px}
+  .msg{max-width:85%;padding:10px 13px;border-radius:14px;font-size:13.5px;white-space:pre-wrap}
+  .msg.ai{background:#fff;border:1px solid var(--line);align-self:flex-start}
+  .msg.user{background:var(--teal);color:#fff;align-self:flex-end}
+
+  /* Modal */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(11,26,22,.58);backdrop-filter:blur(5px);display:none;place-items:center;z-index:80;padding:16px}
+  .modal-backdrop.open{display:grid}
+  .modal{background:var(--surface);border-radius:22px;width:min(780px,100%);max-height:90vh;overflow:auto;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.28);border:1px solid var(--line)}
+  .modal-xl{width:min(1040px,100%)}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:14px}
+  .breakdown-table{width:100%;border-collapse:collapse;font-size:13.5px;margin:10px 0}
+  .breakdown-table th,.breakdown-table td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left}
+  .breakdown-table th{background:var(--bg);font-size:12px;color:var(--muted)}
+
+  /* Admin Panel Styles */
+  .admin-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+  .admin-stat-card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}
+  .admin-stat-card strong{display:block;font-size:20px;color:var(--teal)}
+  .admin-stat-card span{font-size:11.5px;color:var(--muted);font-weight:600}
+  .admin-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:10px}
+  .admin-list{display:flex;flex-direction:column;gap:10px;max-height:420px;overflow:auto}
+  .admin-row{border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--bg);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+
+  .toast{position:fixed;bottom:18px;right:18px;background:#132a24;color:#fff;padding:11px 16px;border-radius:12px;font-size:13.5px;font-weight:600;box-shadow:0 12px 30px rgba(0,0,0,.25);z-index:100;display:none}
+  .toast.show{display:block}
+  footer{margin-top:42px;padding:26px 0;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+
+  @media (max-width:1024px){
+    .hero-card,.map-wrap,.two-col{grid-template-columns:1fr}
+    .controls-top{grid-template-columns:1fr 1fr}
+    .cards,.guides-grid{grid-template-columns:repeat(2,1fr)}
+    .admin-stats{grid-template-columns:repeat(2,1fr)}
+  }
+  @media (max-width:640px){
+    .cards,.guides-grid,.grid-2,.controls-top{grid-template-columns:1fr}
+    .hero-card{padding:20px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container nav">
+    <a href="/" class="brand">
+      <div class="logo">M</div>
+      <div>
+        <div class="brand-name">Manzil</div>
+        <div class="brand-sub">Shaxsiy sayohat vs Tur • Aviachiptalar • Gidlar • Xarita</div>
+      </div>
+    </a>
+    <nav class="nav-links">
+      <a href="#catalog">Manzillar (105)</a>
+      <a href="#mapSection">Jonli Xarita</a>
+      <a href="#guidesSection">Gidlar</a>
+      <a href="#aiSection">AI Yordamchi</a>
+      <a href="#feedbackSection">Shikoyat & Taklif</a>
+    </nav>
+    <div class="nav-actions">
+      <select id="currencySelect" class="btn btn-sm" aria-label="Valyuta">
+        <option value="USD">$ USD</option>
+        <option value="UZS">so'm UZS</option>
+      </select>
+      <button class="btn btn-sm" id="favFilterBtn">❤️ Saqlangan (<span id="favCount">0</span>)</button>
+      <a class="btn btn-sm" href="/admin" rel="noopener" title="Xodimlar uchun">🔐 Xodimlar</a>
+      <button class="btn btn-primary btn-sm" id="authBtn">👤 Kirish / Kabinet</button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-card">
+      <div>
+        <span class="badge" style="background:rgba(255,255,255,.15);color:#fff">🇺🇿 O'zbekiston + 🌍 Dunyo • 105 ta tanlangan manzil</span>
+        <h1>O'zingiz borgan arzonmi yoki tur-paket bilan?</h1>
+        <p>Har bir manzil uchun aviachipta, mehmonxona, ovqatlanish, transport va chiptalarni hisoblab, tayyor agentlik turlari bilan taqqoslang. Qulay oylarni biling, chiptaga o'ting, gid yollang va xaritada marshrut tuzing.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a href="#catalog" class="btn btn-gold">🧭 105 ta manzilni ko'rish</a>
+          <button class="btn" style="background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.25);color:#fff" onclick="openPaymentModal('Manzil PRO — Shaxsiy marshrut va cheksiz AI', 19)">💳 Xizmat uchun to'lov</button>
+        </div>
+        <div class="hero-stats">
+          <div class="stat-box"><strong id="totalPlaces">105</strong><span>O'zbekiston va xorij manzillari</span></div>
+          <div class="stat-box"><strong id="avgSaving">~28%</strong><span>DIY orqali o'rtacha tejash</span></div>
+          <div class="stat-box"><strong id="guideCountStat">6+</strong><span>Tasdiqlangan mahalliy gidlar</span></div>
+        </div>
+      </div>
+
+      <div class="hero-panel">
+        <h3>⚡ Tezkor Sayohat Kalkulyatori</h3>
+        <small>Parametrlarni o'zgartiring — barcha 105 ta manzil narxi avtomatik yangilanadi</small>
+        <div class="grid-2">
+          <div class="field">
+            <label>Qayerdan uchish / chiqish</label>
+            <select id="originCity">
+              <option value="TAS">Toshkent (TAS)</option>
+              <option value="SKD">Samarqand (SKD)</option>
+              <option value="BHK">Buxoro (BHK)</option>
+              <option value="UGC">Urganch (UGC)</option>
+              <option value="FEG">Farg'ona (FEG)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Sayohat davomiyligi (kun)</label>
+            <input type="number" id="tripDays" min="1" max="30" value="5" />
+          </div>
+          <div class="field">
+            <label>Sayohatchilar soni</label>
+            <input type="number" id="travelersCount" min="1" max="12" value="2" />
+          </div>
+          <div class="field">
+            <label>Qaysi oyda borasiz?</label>
+            <select id="travelMonth">
+              <option value="0">Barcha oylar</option>
+              <option value="1">Yanvar</option><option value="2">Fevral</option><option value="3">Mart</option>
+              <option value="4" selected>Aprel</option><option value="5">May</option><option value="6">Iyun</option>
+              <option value="7">Iyul</option><option value="8">Avgust</option><option value="9">Sentabr</option>
+              <option value="10">Oktabr</option><option value="11">Noyabr</option><option value="12">Dekabr</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Tur darajasi</label>
+          <select id="comfortLevel">
+            <option value="0.82">Budget / Hostel & Poyezd</option>
+            <option value="1" selected>Standard / 3-4★ Mehmonxona</option>
+            <option value="1.45">Comfort+ / 5★ & Biznes</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FILTER BAR -->
+  <section class="controls" id="catalog">
+    <div class="controls-top">
+      <div class="field" style="margin:0">
+        <label>Manzil, davlat yoki shahar qidirish</label>
+        <input type="search" id="searchInput" placeholder="Masalan: Samarqand, Istanbul, Parij, Bali, Zomin..." />
+      </div>
+      <div class="field" style="margin:0">
+        <label>Yo'nalish turi</label>
+        <select id="scopeFilter">
+          <option value="all">Barchasi (105)</option>
+          <option value="uz">🇺🇿 O'zbekiston ichida</option>
+          <option value="world">🌍 Xorijiy davlatlar</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label>Mintaqa</label>
+        <select id="regionFilter">
+          <option value="all">Barcha mintaqalar</option>
+          <option value="O'zbekiston">O'zbekiston</option>
+          <option value="Markaziy Osiyo">Markaziy Osiyo</option>
+          <option value="Yaqin Sharq">Yaqin Sharq</option>
+          <option value="Yevropa">Yevropa</option>
+          <option value="Osiyo">Osiyo</option>
+          <option value="Amerika">Amerika</option>
+          <option value="Afrika va Okeaniya">Afrika va Okeaniya</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label>Saralash</label>
+        <select id="sortSelect">
+          <option value="popular">Mashhurlik bo'yicha</option>
+          <option value="diyAsc">DIY eng arzon</option>
+          <option value="tourAsc">Tur eng arzon</option>
+          <option value="savingDesc">Eng katta tejamkorlik</option>
+        </select>
+      </div>
+      <button class="btn" id="resetFiltersBtn">Tozalash</button>
+    </div>
+    <div class="chips" id="tagChips">
+      <button class="chip active" data-tag="all">✨ Barchasi</button>
+      <button class="chip" data-tag="diy-win">💸 O'zingiz borgan arzon</button>
+      <button class="chip" data-tag="tour-win">🧳 Tur bilan arzon</button>
+      <button class="chip" data-tag="visa-free">🛂 Vizasiz</button>
+      <button class="chip" data-tag="beach">🏖️ Dengiz va Plyaj</button>
+      <button class="chip" data-tag="history">🏛️ Tarixiy</button>
+      <button class="chip" data-tag="nature">🏔️ Tabiat va Tog'</button>
+      <button class="chip" data-tag="city">🌆 Megapolis</button>
+    </div>
+  </section>
+
+  <!-- CATALOG -->
+  <div class="sec-head">
+    <div>
+      <h2>Manzillar va DIY vs Tur Taqqoslash</h2>
+      <p id="resultSummary">105 ta manzil ko'rsatilmoqda</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" id="loadMoreBtn">Ko'proq ko'rsatish</button>
+    </div>
+  </div>
+  <section class="cards" id="cardsGrid"></section>
+
+  <!-- MAP SECTION -->
+  <section id="mapSection" style="margin-top:34px">
+    <div class="sec-head">
+      <div>
+        <h2>🗺️ Interaktiv Google Xarita va Marshrut Rejalashtiruvchi</h2>
+        <p>Har bir manzilning real koordinatalari, Google Maps yo'nalishi va shaxsiy marshrut ro'yxati</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="focusMapScope('uz')">🇺🇿 O'zbekiston xaritasi</button>
+        <button class="btn btn-sm" onclick="focusMapScope('world')">🌍 Dunyo xaritasi</button>
+        <button class="btn btn-primary btn-sm" onclick="openGoogleDirections()">🧭 Google Maps'da marshrut ochish</button>
+      </div>
+    </div>
+    <div class="map-wrap">
+      <div>
+        <div id="googleMap"></div>
+        <div id="mapStatus" style="font-size:12.5px;color:var(--muted);margin-top:8px">Xarita yuklanmoqda...</div>
+      </div>
+      <div class="map-side">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>📍 Tanlangan marshrut nuqtalari (<span id="routeCount">0</span>)</strong>
+          <button class="btn btn-sm" onclick="clearRoute()">Tozalash</button>
+        </div>
+        <div id="routeList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GUIDES SECTION -->
+  <section id="guidesSection" style="margin-top:34px">
+    <div class="sec-head">
+      <div>
+        <h2>🧭 Gidlar Katalogi va Ro'yxatdan O'tish</h2>
+        <p>O'zbekiston va xorijiy shaharlarda tasdiqlangan mahalliy gidlar. O'zingiz ham gid sifatida ariza qoldiring.</p>
+      </div>
+      <button class="btn btn-primary" onclick="openGuideModal()">➕ Gid sifatida ro'yxatdan o'tish</button>
+    </div>
+    <div class="guides-grid" id="guidesGrid"></div>
+  </section>
+
+  <!-- AI + FEEDBACK -->
+  <section class="two-col" id="aiSection">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px">
+        <div>
+          <h3 style="margin:0">🤖 Manzil AI Sayohat Maslahatchisi</h3>
+          <small style="color:var(--muted)" id="aiProviderBadge">OpenAI / Grok ulangan holat tekshirilmoqda...</small>
+        </div>
+        <button class="btn btn-sm" onclick="askQuickAi()">✨ Tavsiya so'rash</button>
+      </div>
+      <div class="chat-box" id="chatBox">
+        <div class="msg ai">Assalomu alaykum! Men Manzil AI yordamchisiman. Qaysi davlatga yoki O'zbekiston shahriga bormoqchisiz? Byudjet, kun soni va oyini yozing — DIY yoki tur arzonroq tushishini hisoblab beraman.</div>
+      </div>
+      <form id="chatForm" style="display:flex;gap:8px">
+        <input type="text" id="chatInput" placeholder="Masalan: Aprelda 2 kishiga Istanbulga 5 kun necha pul?" style="flex:1;padding:10px 12px;border-radius:12px;border:1px solid var(--line)" required />
+        <button class="btn btn-primary" type="submit">Yuborish</button>
+      </form>
+    </div>
+
+    <div class="panel" id="feedbackSection">
+      <h3 style="margin:0 0 4px">📩 Shikoyat, Taklif va Hamkorlik</h3>
+      <small style="color:var(--muted);display:block;margin-bottom:12px">Narx xatoligi, yangi manzil taklifi yoki gid/agentlik hamkorligi uchun yozing</small>
+      <form id="feedbackForm">
+        <div class="field">
+          <label>Murojaat turi</label>
+          <select id="fbType">
+            <option value="Taklif">💡 Yangi manzil / funksiyaga taklif</option>
+            <option value="Shikoyat">⚠️ Narx yoki gid bo'yicha shikoyat</option>
+            <option value="Hamkorlik">🤝 Tur agentlik / aviakassa hamkorligi</option>
+          </select>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>Ismingiz</label><input type="text" id="fbName" required placeholder="Ism familiya" /></div>
+          <div class="field"><label>Telefon yoki Telegram</label><input type="text" id="fbContact" required placeholder="+998 90 ... yoki @username" /></div>
+        </div>
+        <div class="field"><label>Xabar matni</label><textarea id="fbMessage" rows="3" required placeholder="Batafsil yozing..."></textarea></div>
+        <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">Yuborish</button>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="container" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div><strong>Manzil</strong> — 105 ta manzil, DIY vs Tur taqqoslash, aviachipta havolalari, gidlar va AI sayohat platformasi.</div>
+    <div>© <span id="yearNow"></span> Manzil Travel Ecosystem</div>
+  </div>
+</footer>
+
+<!-- DETAIL / COMPARISON MODAL -->
+<div class="modal-backdrop" id="detailModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3 id="mTitle" style="margin:0">Manzil</h3>
+        <small id="mSub" style="color:var(--muted)"></small>
+      </div>
+      <button class="btn btn-sm" onclick="closeModal('detailModal')">✕ Yopish</button>
+    </div>
+    <div id="mBody"></div>
+  </div>
+</div>
+
+<!-- GUIDE REGISTER MODAL -->
+<div class="modal-backdrop" id="guideModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 style="margin:0">🧭 Gid sifatida ro'yxatdan o'tish</h3>
+      <button class="btn btn-sm" onclick="closeModal('guideModal')">✕</button>
+    </div>
+    <form id="guideForm">
+      <div class="grid-2">
+        <div class="field"><label>To'liq ismingiz</label><input id="gName" required placeholder="Masalan: Jasur Karimov" /></div>
+        <div class="field"><label>Shahar / Davlat</label><input id="gCity" required placeholder="Samarqand, O'zbekiston" /></div>
+        <div class="field"><label>Tillar</label><input id="gLangs" required placeholder="O'zbek, Rus, Ingliz" /></div>
+        <div class="field"><label>Kunlik xizmat narxi ($ USD)</label><input id="gPrice" type="number" min="10" max="1000" value="60" required /></div>
+        <div class="field"><label>Tajriba (yil)</label><input id="gExp" type="number" min="1" max="40" value="4" required /></div>
+        <div class="field"><label>Telefon / Telegram</label><input id="gContact" required placeholder="@username yoki +998..." /></div>
+      </div>
+      <div class="field"><label>O'zingiz va ekskursiya yo'nalishlaringiz haqida</label><textarea id="gBio" rows="3" required placeholder="Tarixiy obidalar, gastronomik turlar, tog' marshrutlari..."></textarea></div>
+      <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">Arizani yuborish</button>
+    </form>
+  </div>
+</div>
+
+<!-- AUTH / CABINET MODAL -->
+<div class="modal-backdrop" id="authModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 style="margin:0" id="authModalTitle">👤 Shaxsiy kabinet</h3>
+      <button class="btn btn-sm" onclick="closeModal('authModal')">✕</button>
+    </div>
+    <div id="authModalBody"></div>
+  </div>
+</div>
+
+<!-- PAYMENT MODAL -->
+<div class="modal-backdrop" id="paymentModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 style="margin:0">💳 Manzil To'lov Markazi</h3>
+      <button class="btn btn-sm" onclick="closeModal('paymentModal')">✕</button>
+    </div>
+    <div id="paymentBody"></div>
+  </div>
+</div>
+
+
+<div class="toast" id="toast"></div>
+
+<script>
+const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY";
+const MONTH_NAMES = ["","Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"];
+const USD_TO_UZS = 12850;
+
+// 105 ta manzil bazasi (O'zbekiston + Dunyo)
+const RAW_DESTINATIONS = [
+  // O'ZBEKISTON (25 ta)
+  ["Samarqand","O'zbekiston","O'zbekiston","uz",39.6542,66.9597,0,38,18,12,15,210,[3,4,5,9,10,11],["history","diy-win","visa-free"],"Registon, Shohi Zinda, Go'ri Amir va Afrosiyob tezyurar poyezdi."],
+  ["Buxoro","O'zbekiston","O'zbekiston","uz",39.7747,64.4286,0,35,16,10,12,195,[3,4,5,9,10,11],["history","diy-win","visa-free"],"Ark qal'asi, Poi Kalon majmuasi va qadimiy savdo gumbazlari."],
+  ["Xiva (Ichan-Qal'a)","O'zbekiston","O'zbekiston","uz",41.3783,60.3639,45,34,15,10,14,230,[3,4,5,9,10],["history","diy-win","visa-free"],"Ochiq osmon ostidagi muzey shahar va minoralar manzarasi."],
+  ["Zomin milliy bog'i","O'zbekiston","O'zbekiston","uz",39.9606,68.3958,18,45,18,12,8,185,[5,6,7,8,9],["nature","diy-win","visa-free"],"Archa o'rmonlari, shisha ko'prik va toza tog' havosi."],
+  ["Chimyon va Amirsoy","O'zbekiston","O'zbekiston","uz",41.5269,70.0175,15,65,24,15,22,260,[1,2,6,7,8,12],["nature","diy-win","visa-free"],"Kanat yo'li, chang'i kurorti va yozgi tog' sayrlari."],
+  ["Chorvoq suv ombori","O'zbekiston","O'zbekiston","uz",41.6225,69.9683,12,55,22,12,10,210,[5,6,7,8,9],["nature","beach","diy-win","visa-free"],"Toshkent yaqinidagi moviy suv havzasi va dam olish maskanlari."],
+  ["Shahrisabz","O'zbekiston","O'zbekiston","uz",39.0578,66.8342,14,30,15,10,8,175,[3,4,5,9,10],["history","diy-win","visa-free"],"Oqsaroy qoldiqlari va Kitob dovoni manzaralari."],
+  ["Termiz va Boysun","O'zbekiston","O'zbekiston","uz",37.2242,67.2783,42,32,14,12,10,220,[3,4,10,11],["history","nature","diy-win","visa-free"],"Fayoztepa, Sulton Saodat va YuNESKO merosi Boysun tog'lari."],
+  ["Nukus va Mo'ynoq (Orol)","O'zbekiston","O'zbekiston","uz",42.4619,59.6166,55,34,15,25,12,290,[4,5,9,10],["history","nature","diy-win","visa-free"],"Savitskiy muzeyi va Orol dengizi kemalar qabristoni."],
+  ["Qo'qon va Rishton","O'zbekiston","O'zbekiston","uz",40.5286,70.9425,16,32,14,10,8,170,[3,4,5,9,10],["history","diy-win","visa-free"],"Xudoyorxon o'rdasi va mashhur Rishton kulolchilik ustaxonalari."],
+  ["Marg'ilon va Farg'ona","O'zbekiston","O'zbekiston","uz",40.4711,71.7247,18,34,15,10,8,175,[3,4,5,9,10],["history","diy-win","visa-free"],"Yodgorlik ipak fabrikasi va vodiy bog'lari."],
+  ["Namangan (Chust va Pop)","O'zbekiston","O'zbekiston","uz",41.0011,71.6725,18,30,14,10,6,165,[4,5,9,10],["nature","diy-win","visa-free"],"Afsonalar bog'i, Chust pichoqchiligi va tog' soylari."],
+  ["Nurota va Aydarko'l","O'zbekiston","O'zbekiston","uz",40.5614,65.6886,20,42,16,18,8,215,[4,5,9,10],["nature","diy-win","visa-free"],"O'tov lagerlari, tuyada sayr va Qizilqum cho'l kechalari."],
+  ["Sentob qishlog'i (Nurota)","O'zbekiston","O'zbekiston","uz",40.6167,66.6833,22,35,14,15,5,190,[4,5,6,9,10],["nature","diy-win","visa-free"],"Ekoturizm, tosh uylar va Nurota tog' etaklari."],
+  ["Konigil va Urgut","O'zbekiston","O'zbekiston","uz",39.6931,67.0583,8,34,15,10,6,160,[3,4,5,9,10],["history","diy-win","visa-free"],"Samarqand qog'oz fabrikasi va Chor Chinor bog'i."],
+  ["G'ijduvon va Vobkent","O'zbekiston","O'zbekiston","uz",40.1000,64.6833,10,30,15,8,5,155,[3,4,5,9,10],["history","diy-win","visa-free"],"Kulolchilik maktabi, G'ijduvon shashliklari va minora."],
+  ["Nanay va Yangiobod","O'zbekiston","O'zbekiston","uz",41.5200,70.1100,14,40,16,12,6,180,[5,6,7,8,9],["nature","diy-win","visa-free"],"Chotqol tog' tizmasi va salqin soy bo'ylari."],
+  ["Sangzor va Baxmal","O'zbekiston","O'zbekiston","uz",39.7333,67.6167,15,32,14,10,5,160,[5,6,7,8,9],["nature","diy-win","visa-free"],"Olma bog'lari va tog' yaylovlari."],
+  ["Denov va Sangardak","O'zbekiston","O'zbekiston","uz",38.2675,67.8986,38,34,14,14,6,205,[4,5,6,9,10],["nature","diy-win","visa-free"],"Sangardak sharsharasi va subtropik tabiat."],
+  ["Toshkent shahar turi","O'zbekiston","O'zbekiston","uz",41.2995,69.2401,0,48,22,10,14,195,[3,4,5,9,10,11],["city","history","diy-win","visa-free"],"Chorsu, Hazrati Imom, Magic City, Tashkent City va metro."],
+  ["Langar ota (Qashqadaryo)","O'zbekiston","O'zbekiston","uz",38.8833,66.7500,20,30,13,14,5,175,[4,5,9,10],["history","nature","diy-win","visa-free"],"Qizil kanyonlar va qadimiy tog' ziyoratgohi."],
+  ["Andijon va Xonobod","O'zbekiston","O'zbekiston","uz",40.7821,72.3442,20,34,15,10,7,175,[4,5,6,9,10],["nature","city","diy-win","visa-free"],"Xonobod sihatgohlari va Farg'ona vodiysi sharqi."],
+  ["Ellikqal'a (Tuproqqal'a)","O'zbekiston","O'zbekiston","uz",41.9261,60.8228,48,32,14,18,8,235,[4,5,9,10],["history","diy-win","visa-free"],"Qadimiy Xorazm qal'alari va Aqchako'l."],
+  ["Qarshi va Koson","O'zbekiston","O'zbekiston","uz",38.8606,65.7891,22,30,14,10,5,165,[3,4,5,9,10],["history","diy-win","visa-free"],"Qarshi ko'prigi, Odina masjidi va voha madaniyati."],
+  ["Jizzax va Tuzkon ko'li","O'zbekiston","O'zbekiston","uz",40.1158,67.8422,14,32,14,12,5,165,[4,5,9,10],["nature","diy-win","visa-free"],"Aydar-Arnasoy ko'llar tizimi va baliq ovlash."],
+
+  // MARKAZIY OSIYO VA YAQIN SHARQ (20 ta)
+  ["Olmaota","Qozog'iston","Markaziy Osiyo","world",43.2220,76.8512,135,55,26,14,18,460,[5,6,7,8,9,12],["nature","city","diy-win","visa-free"],"Medeu, Shimbuloq, Katta Olmaota ko'li va Charyn kanyoni."],
+  ["Ostona","Qozog'iston","Markaziy Osiyo","world",51.1694,71.4491,150,58,25,14,16,490,[5,6,7,8,9],["city","diy-win","visa-free"],"Bayterek, Xon Shatir va zamonaviy me'morchilik."],
+  ["Issiqko'l (Cholpon-Ota)","Qirg'iziston","Markaziy Osiyo","world",42.6494,77.0822,120,45,20,14,12,390,[6,7,8,9],["beach","nature","diy-win","visa-free"],"Tog'lar orasidagi ulkan ko'l va Grigoryev darasi."],
+  ["Bishkek va Ala-Archa","Qirg'iziston","Markaziy Osiyo","world",42.8746,74.5698,110,44,20,12,10,370,[4,5,6,9,10],["nature","city","diy-win","visa-free"],"Ala-Archa milliy bog'i va qirg'iz oshxonasi."],
+  ["Dushanbe va Iskandarko'l","Tojikiston","Markaziy Osiyo","world",38.5598,68.7870,95,46,20,16,10,360,[4,5,6,9,10],["nature","diy-win","visa-free"],"Fann tog'lari, Iskandarko'l va Hisor qal'asi."],
+  ["Ashxobod","Turkmaniston","Markaziy Osiyo","world",37.9601,58.3261,180,65,24,15,15,620,[3,4,5,10,11],["city","history"],["Oq marmar shahar va Darvoza gaz krateri."]],
+  ["Istanbul","Turkiya","Yaqin Sharq","world",41.0082,28.9784,290,68,30,14,22,740,[4,5,6,9,10,11],["history","city","diy-win","visa-free"],"Ayasofya, Bosfor bo'g'ozi, Grand Bazaar va Taksim."],
+  ["Antaliya","Turkiya","Yaqin Sharq","world",36.8969,30.7133,330,85,28,14,18,690,[5,6,7,8,9,10],["beach","tour-win","visa-free"],"All-inclusive dengiz kurortlari, Kaleichi va sharsharalar."],
+  ["Kappadokiya","Turkiya","Yaqin Sharq","world",38.6431,34.8289,340,78,28,16,45,860,[4,5,6,9,10],["nature","history","diy-win","visa-free"],"Havo sharlari, g'or mehmonxonalar va yerosti shaharlari."],
+  ["Bodrum","Turkiya","Yaqin Sharq","world",37.0344,27.4305,350,92,32,16,20,780,[5,6,7,8,9],["beach","tour-win","visa-free"],"Egey dengizi sohillari va oq uylar."],
+  ["Dubay","BAA","Yaqin Sharq","world",25.2048,55.2708,310,115,42,22,38,940,[1,2,3,11,12],["city","beach","tour-win","visa-free"],"Burj Khalifa, Dubai Mall, cho'l safari va Marina."],
+  ["Abu-Dabi","BAA","Yaqin Sharq","world",24.4539,54.3773,300,105,38,20,35,890,[1,2,3,11,12],["city","beach","diy-win","visa-free"],"Shayx Zayd masjidi, Luvr Abu-Dabi va Yas oroli."],
+  ["Doha","Qatar","Yaqin Sharq","world",25.2854,51.5310,320,95,36,16,25,840,[1,2,3,11,12],["city","beach","diy-win","visa-free"],"Souq Waqif, Islom san'ati muzeyi va Kornish."],
+  ["Sharm-al-Shayx","Misr","Yaqin Sharq","world",27.9158,34.3300,360,82,25,14,25,680,[3,4,5,10,11,12],["beach","tour-win"],"Qizil dengiz marjon riflari va all-inclusive kurortlar."],
+  ["Qohira va Giza","Misr","Yaqin Sharq","world",30.0444,31.2357,370,65,24,16,24,790,[2,3,4,10,11,12],["history","diy-win"],"Ehromlar, Sfinks va Misr milliy muzeyi."],
+  ["Ar-Riyod","Saudiya Arabistoni","Yaqin Sharq","world",24.7136,46.6753,340,95,35,18,24,920,[1,2,3,11,12],["city","history","diy-win"],"Kingdom Centre, Diriyah va Boulevard World."],
+  ["Jidda va Makka","Saudiya Arabistoni","Yaqin Sharq","world",21.4858,39.1925,350,90,32,18,15,880,[1,2,3,11,12],["history","city","diy-win"],"Al-Balad tarixiy markazi va Qizil dengiz sohillari."],
+  ["Masqat","Ummon","Yaqin Sharq","world",23.5880,58.3829,340,92,34,20,20,910,[1,2,3,11,12],["nature","beach","diy-win","visa-free"],"Sulton Qobus masjidi, Vadi Shab va tog' fyordlari."],
+  ["Amman va Petra","Iordaniya","Yaqin Sharq","world",31.9454,35.9284,390,78,30,22,40,980,[3,4,5,10,11],["history","nature","diy-win"],"Qoyalarga o'yilgan Petra va O'lik dengiz."],
+  ["Tbilisi va Kazbegi","Gruziya","Markaziy Osiyo","world",41.7151,44.8271,240,56,24,14,14,610,[4,5,6,9,10],["history","nature","diy-win","visa-free"],"Eski Tbilisi, Kavkaz tog'lari va gruzin mehmondo'stligi."],
+
+  // YEVROPA (28 ta)
+  ["Boku","Ozarbayjon","Yevropa","world",40.4093,49.8671,210,58,25,12,15,560,[4,5,6,9,10],["city","history","diy-win","visa-free"],"Icheri-Sheher, Olov minoralari va Kaspiy bulvari."],
+  ["Parij","Fransiya","Yevropa","world",48.8566,2.3522,520,135,52,22,38,1490,[4,5,6,9,10],["city","history","diy-win"],"Eyfel minorasi, Luvr, Monmartr va Sena sayri."],
+  ["Nitsa va Kot-d'Azur","Fransiya","Yevropa","world",43.7102,7.2620,540,140,50,20,25,1520,[5,6,7,8,9],["beach","city","diy-win"],"O'rta yer dengizi sohillari, Monako va Kann."],
+  ["Rim","Italiya","Yevropa","world",41.9028,12.4964,490,118,45,18,34,1340,[4,5,6,9,10],["history","city","diy-win"],"Kolizey, Vatikan, Trevi favvorasi va italyan oshxonasi."],
+  ["Venetsiya","Italiya","Yevropa","world",45.4408,12.3155,500,138,48,22,32,1460,[4,5,9,10],["history","city","diy-win"],"Kanallar, San-Marko maydoni va gondolalar."],
+  ["Milan","Italiya","Yevropa","world",45.4642,9.1900,480,122,46,18,28,1360,[4,5,9,10],["city","history","diy-win"],"Duomo sobori, moda kvartali va Komo ko'li."],
+  ["Barselona","Ispaniya","Yevropa","world",41.3874,2.1686,510,120,44,18,32,1350,[4,5,6,9,10],["city","beach","history","diy-win"],"Sagrada Familia, Park Guell va Barseloneta plyaji."],
+  ["Madrid","Ispaniya","Yevropa","world",40.4168,-3.7038,510,112,42,16,28,1290,[3,4,5,9,10],["city","history","diy-win"],"Prado muzeyi, Qirollik saroyi va Retiro bog'i."],
+  ["London","Buyuk Britaniya","Yevropa","world",51.5072,-0.1276,560,155,55,26,35,1680,[5,6,7,8,9],["city","history","diy-win"],"Big Ben, Britaniya muzeyi, Tauer ko'prigi."],
+  ["Praga","Chexiya","Yevropa","world",50.0755,14.4378,440,86,32,14,22,1040,[4,5,6,9,10],["history","city","diy-win"],"Karlov ko'prigi, Eski shahar va arzon Yevropa muhiti."],
+  ["Vena","Avstriya","Yevropa","world",48.2082,16.3738,460,108,42,16,26,1220,[4,5,6,9,10,12],["history","city","diy-win"],"Shonbrunn saroyi, opera va klassik qahvaxonalar."],
+  ["Budapesht","Vengriya","Yevropa","world",47.4979,19.0402,430,82,30,14,22,980,[4,5,6,9,10],["history","city","diy-win"],"Parlament binosi, termal hammomlar va Dunay."],
+  ["Berlin","Germaniya","Yevropa","world",52.5200,13.4050,470,105,38,18,24,1190,[5,6,7,8,9],["city","history","diy-win"],"Brandenburg darvozasi, Muzeylar oroli."],
+  ["Myunxen","Germaniya","Yevropa","world",48.1351,11.5820,480,118,42,18,26,1280,[5,6,7,8,9,10],["city","nature","diy-win"],"Marienplatz, Noyshvanshtayn qal'asi va Bavariya."],
+  ["Amsterdam","Niderlandiya","Yevropa","world",52.3676,4.9041,510,138,48,18,32,1450,[4,5,6,7,8,9],["city","history","diy-win"],"Kanallar, Van Gog muzeyi va lolalar bog'i."],
+  ["Syurix va Interlaken","Shveytsariya","Yevropa","world",46.9480,7.4474,550,175,65,32,45,1890,[5,6,7,8,9,12],["nature","city","diy-win"],"Alp tog'lari, ko'llar va panoramali poyezdlar."],
+  ["Afina va Santorini","Gretsiya","Yevropa","world",37.9838,23.7275,460,115,38,18,26,1260,[5,6,7,8,9,10],["beach","history","diy-win"],"Akropol, Egey dengizi va oq-ko'k orollar."],
+  ["Lissabon","Portugaliya","Yevropa","world",38.7223,-9.1393,540,102,38,16,24,1220,[4,5,6,9,10],["city","beach","diy-win"],"Sariq tramvaylar, Belem minorasi va Atlantika sohillari."],
+  ["Varshava va Krakov","Polsha","Yevropa","world",52.2297,21.0122,410,78,28,14,18,920,[5,6,7,8,9],["history","city","diy-win"],"Eski shahar maydonlari va Vavel qal'asi."],
+  ["Stokgolm","Shvetsiya","Yevropa","world",59.3293,18.0686,520,132,50,22,28,1460,[5,6,7,8],["city","nature","diy-win"],"Gamla Stan orollari va Skandinaviya dizayni."],
+  ["Oslo va Fjordlar","Norvegiya","Yevropa","world",59.9139,10.7522,550,148,58,28,32,1640,[6,7,8],["nature","city","diy-win"],"Norvegiya fyordlari va shimoliy tabiat."],
+  ["Reykyavik","Islandiya","Yevropa","world",64.1466,-21.9426,680,165,62,32,45,1920,[6,7,8,9,10,2],["nature","diy-win"],"Geizerlar, sharsharalar, Moviy laguna va shimol yog'dusi."],
+  ["Dubrovnik","Xorvatiya","Yevropa","world",42.6507,18.0944,470,112,38,16,28,1210,[5,6,7,8,9],["beach","history","diy-win"],"Adriatika dengizi va qadimiy qal'a devorlari."],
+  ["Belgrad","Serbiya","Yevropa","world",44.7866,20.4489,390,72,26,12,15,860,[4,5,6,9,10],["city","history","diy-win","visa-free"],"Kalemegdan qal'asi, Dunay va Sava qo'shilishi."],
+  ["Chernogoriya (Kotor)","Chernogoriya","Yevropa","world",42.4247,18.7712,410,84,30,14,18,930,[5,6,7,8,9],["beach","nature","diy-win","visa-free"],"Kotor ko'rfazi, Budva plyajlari va tog'lar."],
+  ["Moskva","Rossiya","Yevropa","world",55.7558,37.6173,260,72,30,14,20,690,[5,6,7,8,9,12],["city","history","diy-win","visa-free"],"Qizil maydon, Kreml, VDNH va Zaryadye."],
+  ["Sankt-Peterburg","Rossiya","Yevropa","world",59.9311,30.3609,280,74,30,14,22,720,[5,6,7,8],["history","city","diy-win","visa-free"],"Ermitaj, Petergof favvoralari va oq tunlar."],
+  ["Minsk","Belarus","Yevropa","world",53.9006,27.5590,270,64,25,12,15,640,[5,6,7,8,9],["city","nature","diy-win","visa-free"],"Mir va Nesvij qal'alari, toza xiyobonlar."],
+
+  // OSIYO (22 ta)
+  ["Kuala-Lumpur","Malayziya","Osiyo","world",3.1390,101.6869,390,62,22,12,18,890,[1,2,3,6,7,8,12],["city","diy-win","visa-free"],"Petronas minoralari, Batu g'orlari va tropik bog'lar."],
+  ["Langkavi","Malayziya","Osiyo","world",6.3500,99.8000,430,78,24,14,20,960,[1,2,3,4,11,12],["beach","nature","diy-win","visa-free"],"SkyBridge ko'prigi, duty-free orol va oq plyajlar."],
+  ["Bangkok","Tailand","Osiyo","world",13.7563,100.5018,410,58,20,12,20,860,[1,2,3,11,12],["city","history","diy-win","visa-free"],"Qirollik saroyi, suzuvchi bozorlar va tungi ko'cha taomlari."],
+  ["Phuket","Tailand","Osiyo","world",7.8804,98.3923,450,82,25,14,24,940,[1,2,3,4,11,12],["beach","nature","tour-win","visa-free"],"Phi-Phi orollari, Andaman dengizi va tropik plyajlar."],
+  ["Pattaya","Tailand","Osiyo","world",12.9236,100.8825,420,64,22,12,20,840,[1,2,3,11,12],["beach","city","tour-win","visa-free"],"Haqiqat ibodatxonasi, Marjon oroli va ko'ngilochar bog'lar."],
+  ["Bali (Ubud va Kuta)","Indoneziya","Osiyo","world",-8.4095,115.1889,520,74,24,14,22,1090,[4,5,6,7,8,9,10],["beach","nature","diy-win","visa-free"],"Guruch terrasalar, sharsharalar, Uluwatu va okean."],
+  ["Singapur","Singapur","Osiyo","world",1.3521,103.8198,460,145,45,16,35,1420,[2,3,4,7,8,9],["city","nature","diy-win"],"Marina Bay Sands, Gardens by the Bay va Sentosa."],
+  ["Seul","Janubiy Koreya","Osiyo","world",37.5665,126.9780,470,92,34,14,22,1180,[4,5,9,10,11],["city","history","diy-win"],"Gyeongbokgung saroyi, Myeongdong va Namsan minorasi."],
+  ["Busan","Janubiy Koreya","Osiyo","world",35.1796,129.0756,490,86,32,14,18,1150,[4,5,6,9,10],["beach","city","diy-win"],"Haeundae plyaji, Gamcheon madaniy qishlog'i."],
+  ["Tokio","Yaponiya","Osiyo","world",35.6762,139.6503,580,115,40,18,28,1490,[3,4,5,10,11],["city","history","diy-win"],"Shibuya, Asakusa, sakura mavsumi va zamonaviy texnologiya."],
+  ["Kioto va Osaka","Yaponiya","Osiyo","world",35.0116,135.7681,590,110,38,18,26,1460,[3,4,5,10,11],["history","city","diy-win"],"Fushimi Inari, bambuk o'rmoni va Osaka ko'cha taomlari."],
+  ["Pekin","Xitoy","Osiyo","world",39.9042,116.4074,410,76,26,12,24,960,[4,5,9,10],["history","city","diy-win","visa-free"],"Buyuk Xitoy devori, Taqiqlangan shahar va Samoviy ibodatxona."],
+  ["Shanxay","Xitoy","Osiyo","world",31.2304,121.4737,420,84,28,12,24,1010,[3,4,5,10,11],["city","diy-win","visa-free"],"The Bund qirg'og'i, Pudong osmono'par binolari."],
+  ["Xaynan (Sanya)","Xitoy","Osiyo","world",18.2528,109.5119,430,82,26,14,20,890,[1,2,3,4,11,12],["beach","nature","tour-win","visa-free"],"Xitoyning Gavayisi — issiq dengiz va tropik bog'lar."],
+  ["Gonkong","Xitoy","Osiyo","world",22.3193,114.1694,450,118,38,14,25,1260,[3,4,10,11,12],["city","nature","diy-win"],"Viktoriya cho'qqisi, simfoniya chiroqlari va Lantau."],
+  ["Xanoy va Xalong ko'rfazi","Vyetnam","Osiyo","world",21.0278,105.8342,460,54,18,12,22,920,[2,3,4,10,11],["nature","history","diy-win"],"Xalong ko'rfazi kruizi va qadimiy Xanoy ko'chalari."],
+  ["Fukuok oroli","Vyetnam","Osiyo","world",10.2899,103.9840,470,72,22,12,22,930,[1,2,3,4,11,12],["beach","tour-win","visa-free"],"Uzun kanat yo'li, Safari park va tiniq dengiz."],
+  ["Dehli, Agra va Jaypur","Hindiston","Osiyo","world",28.6139,77.2090,340,48,18,14,22,780,[1,2,3,10,11,12],["history","diy-win"],"Toj Mahal, Qizil qal'a va Oltin uchburchak."],
+  ["Goa","Hindiston","Osiyo","world",15.2993,74.1240,380,58,20,12,15,820,[1,2,3,11,12],["beach","nature","diy-win"],"Hind okeani plyajlari va tropik dam olish."],
+  ["Maldiv orollari","Maldiv","Osiyo","world",3.2028,73.2207,520,210,55,35,30,1780,[1,2,3,4,11,12],["beach","tour-win","visa-free"],"Suv ustidagi villalar, marjon riflari va moviy lagunalar."],
+  ["Kolombo va Kandi","Shri-Lanka","Osiyo","world",6.9271,79.8612,440,62,20,14,22,940,[1,2,3,4,12],["nature","beach","diy-win"],"Choy plantatsiyalari, Ella poyezdi va okean sohillari."],
+  ["Katmandu va Pokhara","Nepal","Osiyo","world",27.7172,85.3240,430,46,18,14,20,860,[3,4,5,10,11],["nature","history","diy-win"],"Himolay tog'lari, Everest panoramasi va Phewa ko'li."],
+
+  // AMERIKA, AFRIKA VA OKEANIYA (10 ta)
+  ["Nyu-York","AQSH","Amerika","world",40.7128,-74.0060,820,185,65,24,42,2350,[4,5,6,9,10,12],["city","history","diy-win"],"Tayms-skver, Ozodlik haykali, Central Park va Brodvey."],
+  ["Los-Anjeles","AQSH","Amerika","world",34.0522,-118.2437,860,175,60,28,45,2320,[4,5,6,9,10],["city","beach","diy-win"],"Gollivud, Santa-Monika plyaji va Universal Studios."],
+  ["Mayami","AQSH","Amerika","world",25.7617,-80.1918,840,170,58,24,35,2240,[1,2,3,4,11,12],["beach","city","diy-win"],"South Beach, Art Deco va Evergleyds."],
+  ["Toronto va Niagara","Kanada","Amerika","world",43.6532,-79.3832,810,155,54,22,32,2090,[5,6,7,8,9,10],["city","nature","diy-win"],"CN Tower va muhtasham Niagara sharsharasi."],
+  ["Kankun","Meksika","Amerika","world",21.1619,-86.8515,890,135,42,20,35,1980,[1,2,3,4,11,12],["beach","history","tour-win"],"Karib dengizi, Chichen-Itsa ehromlari va all-inclusive."],
+  ["Rio-de-Janeyro","Braziliya","Amerika","world",-22.9068,-43.1729,940,105,36,18,28,1950,[4,5,6,8,9,10],["beach","nature","diy-win"],"Kopakabana plyaji, Masih haykali va Shakar tog'i."],
+  ["Kasablanka va Marokash","Marokash","Afrika va Okeaniya","world",31.6295,-7.9811,560,78,28,16,20,1240,[3,4,5,10,11],["history","nature","diy-win"],"Jemaa el-Fnaa maydoni, Sahroi Kabir va moviy Chefchaouen."],
+  ["Zanzibar","Tanzaniya","Afrika va Okeaniya","world",-6.1659,39.2026,640,95,30,18,24,1480,[1,2,6,7,8,9,10],["beach","nature","tour-win"],"Hind okeani oq qumlari va Stone Town."],
+  ["Keyptaun","JAR","Afrika va Okeaniya","world",-33.9249,18.4241,720,98,34,20,28,1590,[1,2,3,11,12],["nature","beach","diy-win"],"Stol tog'i, Yaxshi Umid burni va pingvinlar."],
+  ["Sidney","Avstraliya","Afrika va Okeaniya","world",-33.8688,151.2093,880,155,55,24,35,2190,[3,4,9,10,11],["city","beach","diy-win"],"Sidney opera teatri, Bondi plyaji va Moviy tog'lar."]
+];
+
+let DESTINATIONS = RAW_DESTINATIONS.map((d, idx) => ({
+  id: idx + 1,
+  name: d[0], country: d[1], region: d[2], scope: d[3],
+  lat: d[4], lng: d[5],
+  flightBase: d[6], hotelNight: d[7], foodDay: d[8], transportDay: d[9], activitiesDay: d[10],
+  tourBase5d: d[11], bestMonths: d[12], tags: d[13], desc: d[14]
+}));
+
+const DEFAULT_GUIDES = []; // gidlar serverdan anonim holda keladi
+
+let state = {
+  currency: localStorage.getItem("manzil_curr") || "USD",
+  favorites: JSON.parse(localStorage.getItem("manzil_favs") || "[]"),
+  route: JSON.parse(localStorage.getItem("manzil_route") || "[]"),
+  onlyFavs: false,
+  tag: "all",
+  visibleCount: 18,
+  guides: [...DEFAULT_GUIDES],
+  user: null,
+  adminTab: "stats",
+  editingDestId: null
+};
+
+let mapInstance = null;
+let mapMarkers = [];
+let infoWindow = null;
+
+const $ = id => document.getElementById(id);
+
+function showToast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.classList.remove("show"), 3200);
+}
+
+function formatMoney(usd) {
+  const val = Math.round(usd);
+  if (state.currency === "UZS") {
+    return (val * USD_TO_UZS).toLocaleString("uz-UZ") + " so'm";
+  }
+  return "$" + val.toLocaleString("en-US");
+}
+
+function getPlaceImg(dest) {
+  const kw = dest.scope === "uz"
+    ? `${dest.name} Uzbekistan architecture landscape`
+    : `${dest.name} ${dest.country} landmark travel`;
+  return `https://source.unsplash.com/800x520/?${encodeURIComponent(kw)}`;
+}
+
+function getFallbackImg(dest) {
+  const colors = ["#0f5c4d","#1b4965","#5c4d7d","#8c5a2b","#2b6cb0"];
+  const bg = colors[dest.id % colors.length];
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='800' height='520'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='${bg}'/><stop offset='100%' stop-color='#132a24'/></linearGradient></defs><rect width='800' height='520' fill='url(#g)'/><text x='50%' y='47%' fill='#ffffff' font-family='Georgia,serif' font-size='38' font-weight='bold' text-anchor='middle'>${dest.name}</text><text x='50%' y='57%' fill='#d6e2de' font-family='Arial,sans-serif' font-size='20' text-anchor='middle'>${dest.country} • ${dest.region}</text></svg>`;
+  return "data:image/svg+xml;utf8," + encodeURIComponent(svg).replace(/'/g, "%27");
+}
+
+function calculateCosts(dest) {
+  const days = Math.max(1, Number($("tripDays").value) || 5);
+  const ppl = Math.max(1, Number($("travelersCount").value) || 2);
+  const mult = Number($("comfortLevel").value) || 1;
+  const origin = $("originCity").value;
+  const originBonus = origin === "TAS" ? 0 : (dest.scope === "world" ? 45 : 15);
+
+  const flightTotal = (dest.flightBase + originBonus) * ppl;
+  const rooms = Math.ceil(ppl / 2);
+  const hotelTotal = dest.hotelNight * mult * days * rooms;
+  const foodTotal = dest.foodDay * mult * days * ppl;
+  const transportTotal = dest.transportDay * days * ppl;
+  const activitiesTotal = dest.activitiesDay * days * ppl;
+  const diyTotal = Math.round(flightTotal + hotelTotal + foodTotal + transportTotal + activitiesTotal);
+
+  const tourPerPerson = (dest.tourBase5d * (0.35 + 0.13 * days) * (0.65 + 0.35 * mult));
+  const groupDiscount = ppl >= 3 ? 0.94 : 1;
+  const tourTotal = Math.round(tourPerPerson * ppl * groupDiscount);
+
+  const diff = tourTotal - diyTotal;
+  const winner = diff >= 0 ? "diy" : "tour";
+  return { days, ppl, flightTotal, hotelTotal, foodTotal, transportTotal, activitiesTotal, diyTotal, tourTotal, diff, winner };
+}
+
+function getFlightLinks(dest) {
+  const origin = $("originCity").value;
+  const q = encodeURIComponent(`${origin} to ${dest.name} flights`);
+  return {
+    aviasales: `https://www.aviasales.uz/search/${origin}0105${dest.scope === "uz" ? "UGC" : "IST"}1?marker=manzil&q=${q}`,
+    google: `https://www.google.com/travel/flights?q=${q}`,
+    skyscanner: `https://www.skyscanner.net/transport/flights/${origin.toLowerCase()}/?q=${q}`,
+    uzairways: dest.scope === "uz"
+      ? `https://eticket.railway.uz/`
+      : `https://www.uzairways.com/uz`
+  };
+}
+
+function getFilteredDestinations() {
+  const q = $("searchInput").value.trim().toLowerCase();
+  const scope = $("scopeFilter").value;
+  const region = $("regionFilter").value;
+  const month = Number($("travelMonth").value);
+  const sort = $("sortSelect").value;
+
+  let list = DESTINATIONS.filter(d => {
+    if (state.onlyFavs && !state.favorites.includes(d.id)) return false;
+    if (scope !== "all" && d.scope !== scope) return false;
+    if (region !== "all" && d.region !== region) return false;
+    if (month > 0 && !d.bestMonths.includes(month)) return false;
+    if (q && !(`${d.name} ${d.country} ${d.region} ${d.desc}`.toLowerCase().includes(q))) return false;
+    if (state.tag !== "all") {
+      const calc = calculateCosts(d);
+      if (state.tag === "diy-win" && calc.winner !== "diy") return false;
+      if (state.tag === "tour-win" && calc.winner !== "tour") return false;
+      if (!["diy-win","tour-win"].includes(state.tag) && !d.tags.includes(state.tag)) return false;
+    }
+    return true;
+  });
+
+  if (sort === "diyAsc") list.sort((a,b) => calculateCosts(a).diyTotal - calculateCosts(b).diyTotal);
+  if (sort === "tourAsc") list.sort((a,b) => calculateCosts(a).tourTotal - calculateCosts(b).tourTotal);
+  if (sort === "savingDesc") list.sort((a,b) => Math.abs(calculateCosts(b).diff) - Math.abs(calculateCosts(a).diff));
+  return list;
+}
+
+function renderCards() {
+  const list = getFilteredDestinations();
+  $("totalPlaces").textContent = DESTINATIONS.length;
+  $("resultSummary").textContent = `${list.length} ta manzil topildi (ko'rsatilmoqda: ${Math.min(list.length, state.visibleCount)})`;
+  const slice = list.slice(0, state.visibleCount);
+  $("loadMoreBtn").style.display = list.length > state.visibleCount ? "inline-flex" : "none";
+
+  $("cardsGrid").innerHTML = slice.map(d => {
+    const c = calculateCosts(d);
+    const isFav = state.favorites.includes(d.id);
+    const saveText = c.winner === "diy"
+      ? `DIY ${formatMoney(c.diff)} arzon`
+      : `Tur ${formatMoney(Math.abs(c.diff))} arzon`;
+    return `
+      <article class="card">
+        <div class="card-media">
+          <img src="${getPlaceImg(d)}" alt="${d.name}" loading="lazy" onerror="this.onerror=null;this.src='${getFallbackImg(d)}'" />
+          <div class="card-top-badges">
+            <span class="pill-dark">${d.scope === "uz" ? "🇺🇿 O'zbekiston" : "🌍 " + d.country}</span>
+            <button class="fav-btn ${isFav ? "active" : ""}" onclick="toggleFav(${d.id})" title="Saqlash">${isFav ? "❤️" : "🤍"}</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-title">
+            <div>
+              <h3>${d.name}</h3>
+              <div class="card-sub">${d.country} • ${d.region} • ${c.days} kun, ${c.ppl} kishi</div>
+            </div>
+            <span class="badge ${c.winner === "diy" ? "" : "badge-gold"}">${saveText}</span>
+          </div>
+          <p style="margin:0;font-size:13px;color:var(--muted)">${d.desc}</p>
+          <div class="compare-box">
+            <div class="price-col ${c.winner === "diy" ? "win" : ""}">
+              <small>🧭 O'zingiz (DIY)</small>
+              <strong>${formatMoney(c.diyTotal)}</strong>
+            </div>
+            <div class="price-col ${c.winner === "tour" ? "win" : ""}">
+              <small>🧳 Tur-paket bilan</small>
+              <strong>${formatMoney(c.tourTotal)}</strong>
+            </div>
+          </div>
+          <div class="months-row">
+            <span>Qulay oylar:</span>
+            ${d.bestMonths.map(m => `<span class="m-tag">${MONTH_NAMES[m].slice(0,3)}</span>`).join("")}
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-primary btn-sm" onclick="openDetailModal(${d.id})">Batafsil & Chipta</button>
+            <button class="btn btn-sm" onclick="addToRoute(${d.id})">📍 Marshrutga</button>
+            <button class="btn btn-sm" onclick="focusSinglePlace(${d.id})" title="Xaritada ko'rish">🗺️</button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function openDetailModal(id) {
+  const d = DESTINATIONS.find(x => x.id === id);
+  if (!d) return;
+  const c = calculateCosts(d);
+  const fl = getFlightLinks(d);
+  $("mTitle").textContent = `${d.name} (${d.country})`;
+  $("mSub").textContent = `${d.region} • ${c.days} kun • ${c.ppl} sayohatchi • Koordinata: ${d.lat.toFixed(3)}, ${d.lng.toFixed(3)}`;
+
+  $("mBody").innerHTML = `
+    <p style="margin-top:0">${d.desc}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <span class="badge">Qulay oylar: ${d.bestMonths.map(m => MONTH_NAMES[m]).join(", ")}</span>
+      <span class="badge ${c.winner === "diy" ? "" : "badge-gold"}">
+        ${c.winner === "diy"
+          ? `✅ O'zingiz borsangiz ${formatMoney(c.diff)} tejaysiz`
+          : `✅ Tayyor tur-paket ${formatMoney(Math.abs(c.diff))} arzonroq`}
+      </span>
+    </div>
+
+    <table class="breakdown-table">
+      <thead><tr><th>Xarajat turi (${c.days} kun, ${c.ppl} kishi)</th><th>Shaxsiy sayohat (DIY)</th><th>Tur-paket tarkibi</th></tr></thead>
+      <tbody>
+        <tr><td>✈️ Aviachipta / Poyezd (${$("originCity").value} dan)</td><td><strong>${formatMoney(c.flightTotal)}</strong></td><td>Ichida (charter/blok)</td></tr>
+        <tr><td>🏨 Mehmonxona (${Math.ceil(c.ppl/2)} xona)</td><td><strong>${formatMoney(c.hotelTotal)}</strong></td><td>Ichida (transfer bilan)</td></tr>
+        <tr><td>🍽️ Ovqatlanish</td><td><strong>${formatMoney(c.foodTotal)}</strong></td><td>Nonushta / All-inclusive</td></tr>
+        <tr><td>🚕 Ichki transport va transfer</td><td><strong>${formatMoney(c.transportTotal)}</strong></td><td>Guruh transferi</td></tr>
+        <tr><td>🎟️ Ekskursiya va kirish chiptalari</td><td><strong>${formatMoney(c.activitiesTotal)}</strong></td><td>Qisman / qo'shimcha</td></tr>
+        <tr style="background:var(--surface-soft)"><td><strong>JAMI HISOB</strong></td><td><strong style="color:var(--teal);font-size:16px">${formatMoney(c.diyTotal)}</strong></td><td><strong style="color:var(--gold);font-size:16px">${formatMoney(c.tourTotal)}</strong></td></tr>
+      </tbody>
+    </table>
+
+    <h4 style="margin:14px 0 8px">✈️ Aviachipta / Poyezd chiptalarini tekshirish</h4>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <a class="btn btn-sm" href="${fl.aviasales}" target="_blank" rel="noopener">Aviasales</a>
+      <a class="btn btn-sm" href="${fl.google}" target="_blank" rel="noopener">Google Flights</a>
+      <a class="btn btn-sm" href="${fl.skyscanner}" target="_blank" rel="noopener">Skyscanner</a>
+      <a class="btn btn-sm" href="${fl.uzairways}" target="_blank" rel="noopener">${d.scope === "uz" ? "O'zbekiston Temir Yo'llari" : "Uzbekistan Airways"}</a>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line)">
+      <button class="btn btn-primary" onclick="openPaymentModal('${d.name} — Tur/Marshrut bron qilish', ${Math.min(c.diyTotal, c.tourTotal)})">💳 Bron / To'lov qilish (${formatMoney(Math.min(c.diyTotal, c.tourTotal))})</button>
+      <button class="btn" onclick="addToRoute(${d.id});closeModal('detailModal')">📍 Marshrutga qo'shish</button>
+      <a class="btn" href="https://www.google.com/maps/search/?api=1&query=${d.lat},${d.lng}" target="_blank" rel="noopener">🗺️ Google Maps'da ochish</a>
+    </div>
+  `;
+  $("detailModal").classList.add("open");
+}
+
+function closeModal(id) {
+  $(id).classList.remove("open");
+}
+
+function toggleFav(id) {
+  const idx = state.favorites.indexOf(id);
+  if (idx >= 0) state.favorites.splice(idx, 1);
+  else state.favorites.push(id);
+  localStorage.setItem("manzil_favs", JSON.stringify(state.favorites));
+  $("favCount").textContent = state.favorites.length;
+  renderCards();
+  syncCloudState();
+}
+
+// MAP & ROUTE
+function addToRoute(id) {
+  if (!state.route.includes(id)) {
+    state.route.push(id);
+    localStorage.setItem("manzil_route", JSON.stringify(state.route));
+    renderRouteList();
+    showToast("Manzil marshrutga qo'shildi!");
+    syncCloudState();
+  } else {
+    showToast("Bu manzil marshrutda bor.");
+  }
+}
+
+function removeFromRoute(id) {
+  state.route = state.route.filter(x => x !== id);
+  localStorage.setItem("manzil_route", JSON.stringify(state.route));
+  renderRouteList();
+  syncCloudState();
+}
+
+function clearRoute() {
+  state.route = [];
+  localStorage.setItem("manzil_route", "[]");
+  renderRouteList();
+}
+
+function renderRouteList() {
+  $("routeCount").textContent = state.route.length;
+  const items = state.route.map(id => DESTINATIONS.find(d => d.id === id)).filter(Boolean);
+  if (!items.length) {
+    $("routeList").innerHTML = `<div style="padding:18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:14px">Hozircha marshrut bo'sh. Yuqoridagi manzillardan <b>"📍 Marshrutga"</b> tugmasini bosing.</div>`;
+    return;
+  }
+  $("routeList").innerHTML = items.map((d, i) => {
+    const c = calculateCosts(d);
+    return `
+      <div class="route-item">
+        <div>
+          <strong>${i+1}. ${d.name}</strong>
+          <div style="font-size:12px;color:var(--muted)">${d.country} • DIY: ${formatMoney(c.diyTotal)}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="focusSinglePlace(${d.id})">Ko'rish</button>
+          <button class="btn btn-sm" onclick="removeFromRoute(${d.id})">✕</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function openGoogleDirections() {
+  const items = state.route.map(id => DESTINATIONS.find(d => d.id === id)).filter(Boolean);
+  if (!items.length) {
+    window.open("https://www.google.com/maps/@41.2995,69.2401,6z", "_blank");
+    return;
+  }
+  const coords = items.map(d => `${d.lat},${d.lng}`).join("/");
+  window.open(`https://www.google.com/maps/dir/${coords}`, "_blank");
+}
+
+function initGoogleMap() {
+  if (!window.google || !window.google.maps) {
+    $("mapStatus").innerHTML = `Google Maps API kaliti kiritilmagan yoki yuklanmadi — zaxira interaktiv xarita rejimi faol. <a href="https://www.google.com/maps" target="_blank" style="color:var(--teal);font-weight:700">Google Maps'ni ochish →</a>`;
+    $("googleMap").innerHTML = `<iframe title="Manzil Xarita" width="100%" height="100%" style="border:0;border-radius:16px" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=55.5%2C37.0%2C73.5%2C45.8&layer=mapnik"></iframe>`;
+    return;
+  }
+  mapInstance = new google.maps.Map($("googleMap"), {
+    center: { lat: 40.5, lng: 66.5 },
+    zoom: 5,
+    mapTypeControl: true
+  });
+  infoWindow = new google.maps.InfoWindow();
+  DESTINATIONS.forEach(d => {
+    const marker = new google.maps.Marker({
+      position: { lat: d.lat, lng: d.lng },
+      map: mapInstance,
+      title: d.name
+    });
+    marker.addListener("click", () => {
+      const c = calculateCosts(d);
+      infoWindow.setContent(`
+        <div style="font-family:Inter,sans-serif;max-width:220px">
+          <strong>${d.name}</strong> (${d.country})<br/>
+          <small>DIY: <b>${formatMoney(c.diyTotal)}</b> | Tur: <b>${formatMoney(c.tourTotal)}</b></small><br/>
+          <button onclick="openDetailModal(${d.id})" style="margin-top:6px;padding:4px 9px;background:#0f5c4d;color:#fff;border:none;border-radius:6px;cursor:pointer">Batafsil</button>
+        </div>
+      `);
+      infoWindow.open(mapInstance, marker);
+    });
+    mapMarkers.push({ id: d.id, marker });
+  });
+  $("mapStatus").textContent = `Google Maps faol: ${DESTINATIONS.length} ta manzil markerlari joylashtirildi.`;
+}
+
+function focusSinglePlace(id) {
+  const d = DESTINATIONS.find(x => x.id === id);
+  if (!d) return;
+  document.getElementById("mapSection").scrollIntoView({ behavior: "smooth" });
+  if (mapInstance) {
+    mapInstance.panTo({ lat: d.lat, lng: d.lng });
+    mapInstance.setZoom(10);
+    const m = mapMarkers.find(x => x.id === id);
+    if (m) google.maps.event.trigger(m.marker, "click");
+  } else {
+    $("googleMap").innerHTML = `<iframe title="${d.name}" width="100%" height="100%" style="border:0;border-radius:16px" src="https://www.openstreetmap.org/export/embed.html?bbox=${d.lng-0.4}%2C${d.lat-0.25}%2C${d.lng+0.4}%2C${d.lat+0.25}&layer=mapnik&marker=${d.lat}%2C${d.lng}"></iframe>`;
+  }
+}
+
+function focusMapScope(scope) {
+  if (mapInstance) {
+    if (scope === "uz") { mapInstance.setCenter({ lat: 41.2, lng: 64.6 }); mapInstance.setZoom(6); }
+    else { mapInstance.setCenter({ lat: 32.0, lng: 45.0 }); mapInstance.setZoom(2); }
+  }
+}
+
+// GUIDES
+function renderGuides() {
+  // Gid ismi va aloqasi faqat to'lovdan keyin ochiladi — bu yerda faqat anonim ma'lumot
+  const e = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  $("guideCountStat").textContent = state.guides.length + "+";
+  $("guidesGrid").innerHTML = state.guides.map(g => `
+    <div class="guide-card">
+      <div class="guide-head">
+        <div class="avatar">${g.gender === "female" ? "♀" : g.gender === "male" ? "♂" : "◎"}</div>
+        <div>
+          <strong>${e(g.city)} · ${e(g.alias || "")}</strong>
+          <div style="font-size:12.5px;color:var(--muted)">${g.gender === "female" ? "Ayol gid" : g.gender === "male" ? "Erkak gid" : "Gid"} • ${e(g.exp)} yil tajriba${g.verified ? " • ✓" : ""}</div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--muted)">${e(g.spec)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-top:auto">
+        <span class="badge">🗣️ ${e(g.langs)}</span>
+        <strong>${formatMoney(g.price)} / kun</strong>
+      </div>
+      <a class="btn btn-primary btn-sm" style="justify-content:center" href="/#hosts">Bron qilish</a>
+      <div style="font-size:11.5px;color:var(--muted)">🔒 Gid ismi va aloqasi to'lovdan keyin ochiladi</div>
+    </div>
+  `).join("");
+}
+
+function openGuideModal() { location.href = "/#hosts"; } // ariza bosh sahifadagi "Gid bo'lish" formasi orqali
+
+$("guideForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const payload = {
+    name: $("gName").value.trim(),
+    city: $("gCity").value.trim(),
+    langs: $("gLangs").value.trim(),
+    price: Number($("gPrice").value) || 50,
+    exp: Number($("gExp").value) || 2,
+    contact: $("gContact").value.trim(),
+    bio: $("gBio").value.trim()
+  };
+  try {
+    const res = await fetch("/api/guides/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.guide && data.guide.status === "approved") state.guides.unshift(data.guide);
+      showToast("Arizangiz qabul qilindi! Admin tasdiqlagach katalogga qo'shiladi.");
+    } else throw new Error();
+  } catch {
+    state.guides.unshift({ id: Date.now(), ...payload });
+    showToast("Arizangiz mahalliy katalogga qo'shildi!");
+  }
+  renderGuides();
+  e.target.reset();
+  closeModal("guideModal");
+});
+
+// AI CHAT
+function appendChat(role, text) {
+  const box = $("chatBox");
+  const div = document.createElement("div");
+  div.className = `msg ${role}`;
+  div.textContent = text;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendAiMessage(text) {
+  appendChat("user", text);
+  const thinking = document.createElement("div");
+  thinking.className = "msg ai";
+  thinking.textContent = "⏳ Hisoblanmoqda...";
+  $("chatBox").appendChild(thinking);
+
+  try {
+    const res = await fetch("/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: text,
+        context: {
+          origin: $("originCity").value,
+          days: $("tripDays").value,
+          travelers: $("travelersCount").value,
+          month: MONTH_NAMES[Number($("travelMonth").value)] || "Istalgan oy"
+        }
+      })
+    });
+    const data = await res.json();
+    thinking.textContent = data.reply || "Javob olindi.";
+  } catch {
+    const match = DESTINATIONS.find(d => text.toLowerCase().includes(d.name.toLowerCase()));
+    if (match) {
+      const c = calculateCosts(match);
+      thinking.textContent = `${match.name} (${match.country}) bo'yicha hisob (${c.days} kun, ${c.ppl} kishi):\n• O'zingiz (DIY): ${formatMoney(c.diyTotal)}\n• Tur-paket: ${formatMoney(c.tourTotal)}\n• Eng qulay oylar: ${match.bestMonths.map(m=>MONTH_NAMES[m]).join(", ")}\n• Tavsiya: ${c.winner === "diy" ? "O'zingiz borganingiz arzonroq!" : "Tur-paket qulayroq!"}`;
+    } else {
+      thinking.textContent = "Server ulanmagan rejimda ham 105 ta manzil narxini hisoblay olaman. Shahar yoki davlat nomini yozing (masalan: Istanbul, Samarqand, Dubay, Bali).";
+    }
+  }
+}
+
+$("chatForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const val = $("chatInput").value.trim();
+  if (!val) return;
+  $("chatInput").value = "";
+  sendAiMessage(val);
+});
+
+function askQuickAi() {
+  const m = MONTH_NAMES[Number($("travelMonth").value)] || "Aprel";
+  sendAiMessage(`${m} oyida ${$("travelersCount").value} kishi uchun ${$("tripDays").value} kunlik eng arzon 3 ta manzilni tavsiya qil.`);
+}
+
+// FEEDBACK
+$("feedbackForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const payload = {
+    type: $("fbType").value,
+    name: $("fbName").value.trim(),
+    contact: $("fbContact").value.trim(),
+    message: $("fbMessage").value.trim()
+  };
+  try {
+    await fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch {}
+  e.target.reset();
+  showToast("Murojaatingiz yuborildi! Tez orada javob beramiz.");
+});
+
+// AUTH & CLOUD SYNC
+function updateAuthButton() {
+  $("authBtn").textContent = state.user ? `👤 ${state.user.name}` : "👤 Kirish / Kabinet";
+}
+
+async function syncCloudState() {
+  if (!state.user) return;
+  try {
+    await fetch("/api/auth/sync", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ favorites: state.favorites, route: state.route })
+    });
+  } catch {}
+}
+
+$("authBtn").addEventListener("click", () => {
+  if (state.user) {
+    $("authModalTitle").textContent = `👤 ${state.user.name}`;
+    $("authModalBody").innerHTML = `
+      <p>Email: <strong>${state.user.email}</strong></p>
+      <p>Saqlangan manzillar: <strong>${state.favorites.length} ta</strong> • Marshrut nuqtalari: <strong>${state.route.length} ta</strong></p>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="syncCloudState();showToast('Bulutga saqlandi!')">☁️ Hozir sinxronlash</button>
+        <button class="btn" onclick="logoutUser()">Chiqish</button>
+      </div>
+    `;
+  } else {
+    $("authModalTitle").textContent = "👤 Kirish yoki Ro'yxatdan o'tish";
+    $("authModalBody").innerHTML = `
+      <form id="loginForm">
+        <div class="field"><label>Ism (ro'yxatdan o'tish uchun)</label><input id="uName" placeholder="Akhadkhon" /></div>
+        <div class="field"><label>Email</label><input id="uEmail" type="email" required placeholder="user@manzil.uz" /></div>
+        <div class="field"><label>Parol</label><input id="uPass" type="password" required placeholder="••••••••" /></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" type="submit" data-mode="login">Kirish</button>
+          <button class="btn" type="button" onclick="registerUser()">Ro'yxatdan o'tish</button>
+        </div>
+      </form>
+    `;
+    $("loginForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      await handleAuth("login");
+    });
+  }
+  $("authModal").classList.add("open");
+});
+
+async function registerUser() { await handleAuth("register"); }
+
+async function handleAuth(mode) {
+  const email = $("uEmail").value.trim();
+  const password = $("uPass").value;
+  const name = ($("uName")?.value || email.split("@")[0]).trim();
+  try {
+    const res = await fetch(`/api/auth/${mode}`, {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, favorites: state.favorites, route: state.route })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return showToast(data.error || "Xatolik yuz berdi");
+    state.user = data.user;
+    await loadMe();
+    updateAuthButton();
+    renderCards();
+    renderRouteList();
+    closeModal("authModal");
+    showToast(`Xush kelibsiz, ${state.user.name}!`);
+  } catch {
+    // Server bilan aloqa yo'q: hisob YARATILMAYDI va kirish berilmaydi
+    showToast("Serverga ulanib bo'lmadi. Internetni tekshirib, qayta urining.");
+  }
+}
+
+async function loadMe() {
+  try {
+    const r = await fetch("/api/auth/me", { credentials: "same-origin" });
+    if (!r.ok) return false;
+    const me = await r.json();
+    state.user = me.user;
+    if (me.data && Array.isArray(me.data.favorites) && me.data.favorites.length) state.favorites = me.data.favorites;
+    if (me.data && Array.isArray(me.data.route) && me.data.route.length) state.route = me.data.route;
+    return true;
+  } catch { return false; }
+}
+
+async function logoutUser() {
+  try { await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch {}
+  state.user = null;
+  updateAuthButton();
+  closeModal("authModal");
+  showToast("Tizimdan chiqdingiz");
+}
+
+// PAYMENT
+function openPaymentModal(title, amountUsd, guideId = "", city = "") {
+  const isGuide = !!guideId;
+  const minDate = new Date().toISOString().slice(0, 10);
+  $("paymentBody").innerHTML = `
+    <p style="margin-top:0">Xizmat: <strong id="payTitle"></strong></p>
+    <p>${isGuide ? "Narx kunlar va kishilar soniga qarab <b>serverda hisoblanadi</b>." : "To'lov summasi"}: <strong style="font-size:20px;color:var(--teal)">${isGuide ? "" : formatMoney(amountUsd)}</strong>
+       ${isGuide ? "" : '<span style="font-size:12px;color:var(--muted)">(taxminiy — operator tasdiqlashdan oldin tekshiradi)</span>'}</p>
+    <div class="grid-2">
+      <div class="field"><label>Ism</label><input id="payName" required value="${(state.user && state.user.name) || ""}" /></div>
+      <div class="field"><label>Telefon yoki Email</label><input id="payContact" required value="${(state.user && state.user.email) || ""}" placeholder="+998 90 123 45 67" /></div>
+      ${isGuide ? `<div class="field"><label>Sayohat sanasi</label><input id="payDate" type="date" min="${minDate}" required /></div>
+      <div class="field"><label>Kunlar</label><input id="payDays" type="number" min="1" max="60" value="1" /></div>` : ""}
+      <div class="field"><label>To'lov tizimi</label>
+        <select id="payProvider">
+          <option value="click">Click (UZS)</option>
+          <option value="payme">Payme (UZS)</option>
+          <option value="stripe">Visa / Mastercard (USD)</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="payBtn" style="width:100%;justify-content:center">To'lovga o'tish</button>
+    <div id="payReceipt" style="margin-top:12px"></div>
+  `;
+  $("payTitle").textContent = title;
+  $("payBtn").onclick = () => processPayment(title, amountUsd, guideId, city);
+  $("paymentModal").classList.add("open");
+}
+
+async function processPayment(title, amountUsd, guideId, city) {
+  const btn = $("payBtn");
+  const box = $("payReceipt");
+  const body = {
+    title, city, provider: $("payProvider").value,
+    customerName: $("payName").value.trim(), contact: $("payContact").value.trim(),
+    people: Number(($("travelersCount") && $("travelersCount").value) || 1) || 1
+  };
+  if (guideId) { body.guideId = guideId; body.travelDate = $("payDate").value; body.days = Number($("payDays").value) || 1; }
+  else { body.amountUsd = amountUsd; }
+  btn.disabled = true; btn.textContent = "Yuborilmoqda…";
+  const fail = msg => { box.innerHTML = `<div style="padding:12px;background:#fdecec;border:1px solid #f2b8b8;border-radius:12px;color:#8a1c1c"></div>`; box.firstChild.textContent = "❌ " + msg; btn.disabled = false; btn.textContent = "Qayta urinish"; };
+  try {
+    const res = await fetch("/api/payments/create", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return fail(data.error || "To'lovni boshlab bo'lmadi.");
+    if (data.checkoutUrl) { location.href = data.checkoutUrl; return; }
+    if (data.sandbox) {
+      box.innerHTML = `<div style="padding:12px;background:#fff7e0;border:1px solid #f0d48a;border-radius:12px">🧪 SINOV rejimi: buyurtma <b></b> yaratildi. Haqiqiy to'lov emas.<br><button class="btn btn-sm" id="sbxBtn" style="margin-top:8px">Sinov to'lovini tasdiqlash</button></div>`;
+      box.querySelector("b").textContent = data.code;
+      $("sbxBtn").onclick = async () => {
+        const r = await fetch("/api/payments/sandbox-confirm", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paymentId: data.paymentId }) });
+        const d = await r.json().catch(() => ({}));
+        showToast(r.ok ? "Sinov to'lovi tasdiqlandi (hisobotlarga kirmaydi)" : (d.error || "Xato"));
+      };
+      return;
+    }
+    box.innerHTML = `<div style="padding:12px;background:#e6f4f0;border-radius:12px;border:1px solid #b6ded2">Buyurtma <b></b> yaratildi, to'lov tasdig'i kutilmoqda.</div>`;
+    box.querySelector("b").textContent = data.code;
+  } catch { fail("Serverga ulanib bo'lmadi. Hech qanday to'lov amalga oshirilmadi."); }
+}
+
+// INIT & EVENTS
+async function initBackendData() {
+  try {
+    const h = await fetch("/api/health").then(r => r.json());
+    $("aiProviderBadge").textContent = "Server: ulangan ✅";
+  } catch {
+    $("aiProviderBadge").textContent = "AI mahalliy hisoblash rejimida (server.js ulansa OpenAI/Grok ishlaydi)";
+  }
+
+  try {
+    const dRes = await fetch("/api/destinations").then(r => r.json());
+    if (Array.isArray(dRes.destinations) && dRes.destinations.length) {
+      DESTINATIONS = dRes.destinations;
+      renderCards();
+    }
+  } catch {}
+
+  try {
+    const g = await fetch("/api/guides").then(r => r.json());
+    if (Array.isArray(g.guides) && g.guides.length) {
+      state.guides = g.guides;
+      renderGuides();
+    }
+  } catch {}
+
+  if (await loadMe()) { updateAuthButton(); renderCards(); renderRouteList(); }
+}
+
+["originCity","tripDays","travelersCount","travelMonth","comfortLevel","scopeFilter","regionFilter","sortSelect"].forEach(id => {
+  $(id).addEventListener("change", () => { renderCards(); renderRouteList(); });
+});
+$("searchInput").addEventListener("input", () => { state.visibleCount = 18; renderCards(); });
+$("currencySelect").value = state.currency;
+$("currencySelect").addEventListener("change", e => {
+  state.currency = e.target.value;
+  localStorage.setItem("manzil_curr", state.currency);
+  renderCards(); renderRouteList(); renderGuides();
+});
+$("favFilterBtn").addEventListener("click", () => {
+  state.onlyFavs = !state.onlyFavs;
+  $("favFilterBtn").classList.toggle("btn-primary", state.onlyFavs);
+  renderCards();
+});
+$("resetFiltersBtn").addEventListener("click", () => {
+  $("searchInput").value = "";
+  $("scopeFilter").value = "all";
+  $("regionFilter").value = "all";
+  $("travelMonth").value = "0";
+  $("sortSelect").value = "popular";
+  state.onlyFavs = false;
+  state.tag = "all";
+  document.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", c.dataset.tag === "all"));
+  renderCards();
+});
+$("tagChips").addEventListener("click", e => {
+  const btn = e.target.closest(".chip");
+  if (!btn) return;
+  state.tag = btn.dataset.tag;
+  document.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", c === btn));
+  renderCards();
+});
+$("loadMoreBtn").addEventListener("click", () => { state.visibleCount += 24; renderCards(); });
+
+
+document.querySelectorAll(".modal-backdrop").forEach(bg => {
+  bg.addEventListener("click", e => { if (e.target === bg) bg.classList.remove("open"); });
+});
+
+$("yearNow").textContent = new Date().getFullYear();
+$("favCount").textContent = state.favorites.length;
+renderCards();
+renderRouteList();
+renderGuides();
+initBackendData();
+
+if (GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY !== "YOUR_GOOGLE_MAPS_API_KEY") {
+  const s = document.createElement("script");
+  s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=initGoogleMap`;
+  s.async = true;
+  document.head.appendChild(s);
+} else {
+  initGoogleMap();
+}
+</script>
+</body>
+</html>

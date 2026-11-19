@@ -46,6 +46,19 @@ Belgilar: ✅ ishlaydi (sinovdan o'tdi) · ⚠️ qisman / shart bilan · ❌ ha
 | PostgreSQL + Prisma, React/TS | ❌ ataylab: SQLite bilan boshlandi (sxema oson ko'chadi). Katta yuk uchun PostgreSQL ga o'tish tavsiya |
 | Zaxira nusxa va tiklash | ❌ avtomatik yo'q. Render Disk snapshot yoki `sqlite3 .backup` cron tavsiya |
 
+## 3b. v3.1 (shu bosqich)
+| Talab | Holat |
+|---|---|
+| Admin panel telefonda | ✅ yon menyu → tortma, jadvallar kartochka ko'rinishida, 44px tugmalar |
+| Yangi editorial dizayn (1440 / 390) | ✅ `public/index.html`; eski vositalar (DIY kalkulyator, AI, viza) `public/planner.html` da yangi palitrada |
+| Haqiqiy suratlar | ✅ Unsplash (Unsplash License) — har biri joyga mosligi tekshirildi |
+| 12 til (uz ru en es ar hi zh ja ko ms fr de), arabcha RTL | ✅ interfeys; ⚠️ server xato matnlari va gid ma'lumotlari (shahar, mutaxassislik) hozircha o'zbekcha; tarjimalarni ona tilida so'zlashuvchi tekshirsin |
+| Gid jinsini tanlash (diniy afzallik) | ✅ filtr, bronda saqlanadi, mos kelmasa rad |
+| Gid kimligi faqat brondan keyin | ✅ ism va Telegram faqat to'lov tasdiqlangan bronda ("Sayohatlarim"); ommaviy API'da yo'q |
+| "Watch the film" | ⚠️ video yo'q — suratlardan slayd-film |
+| Jurnal maqolalari | ⚠️ faqat sarlavha va qisqa matn; to'liq maqolalar ❌ |
+| planner.html | ⚠️ ichki matnlari hali faqat o'zbekcha |
+
 ## 4. Xavfsizlik
 ✅ scrypt xesh, parol siyosati, lockout (5 xato/15 daq), rate limit, server tomonida narx hisoblash, parametrlangan SQL, HttpOnly/SameSite cookie, Origin tekshiruvi (CSRF), CSP va xavfsizlik sarlavhalari, path-traversal himoyasi, RBAC (har so'rovda), TOTP 2FA, sessiya xesh holda saqlanadi, parol almashganda sessiyalar bekor, audit zanjiri, CSV formula-injection himoyasi, XSS: admin panelda barcha qiymatlar escape.
 ⚠️ Rate limit va sessiyalar bitta jarayon uchun (ko'p serverga ulashda Redis kerak). HTTPS — Render/proksi darajasida. `unsafe-inline` CSP (bitta fayllik HTML tufayli).

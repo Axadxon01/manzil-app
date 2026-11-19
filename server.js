@@ -131,16 +131,24 @@ function failLogin(table, row) {
 
 // ---------- Ommaviy: sog'liq, katalog ----------
 route('GET', '/api/health', {}, () => ({ ok: true, version: VERSION, db: db.IN_MEMORY ? 'memory' : 'file', time: db.now(), payments: { stripe: !!STRIPE_SECRET_KEY, click: !!(CLICK_SERVICE_ID && CLICK_MERCHANT_ID), payme: !!PAYME_MERCHANT_ID, demo: DEMO_PAYMENTS } }));
-const guideView = g => ({ id: g.id, name: g.name, city: g.city, country: g.country, langs: g.langs, spec: g.spec, bio: g.bio, about: g.about, rate: g.rate, price: g.rate, exp: g.exp, tg: g.tg, group: g.grp, verified: !!g.verified, status: g.status, sample: !!g.is_sample,
-  rating: (db.get('SELECT AVG(rating) a, COUNT(*) n FROM reviews WHERE guide_id=?', g.id) || {}).a || null });
-route('GET', '/api/guides', {}, () => ({ ok: true, guides: db.all("SELECT * FROM guides WHERE status='approved' ORDER BY is_sample, name").map(guideView) }));
+const guideStats = id => db.get('SELECT AVG(rating) a, COUNT(*) n FROM reviews WHERE guide_id=?', id) || {};
+// Ommaviy ko'rinish: ism, Telegram va shaxsiy matn YO'Q. Gid kimligi faqat to'lov tasdiqlangan bron'da ochiladi.
+const guideView = g => { const st = guideStats(g.id); return { id: g.id, alias: core.guideAlias(g.id), city: g.city, country: g.country, langs: g.langs, spec: g.spec, rate: g.rate, price: g.rate, exp: g.exp, gender: g.gender || null, group: g.grp, verified: !!g.verified, rating: st.a ? Math.round(st.a * 10) / 10 : null, reviews: st.n || 0 }; };
+const adminGuideView = g => ({ ...guideView(g), name: g.name, tg: g.tg, bio: g.bio, about: g.about, status: g.status, sample: !!g.is_sample });
+route('GET', '/api/guides', {}, ({ query }) => {
+  const where = ["status='approved'"], p = [];
+  const gender = q(query, 'gender'); if (['male', 'female'].includes(gender)) { where.push('gender=?'); p.push(gender); }
+  const city = q(query, 'city'); if (city) { where.push('(city LIKE ? OR country LIKE ?)'); p.push(`%${city.replace(/[%_]/g, '')}%`, `%${city.replace(/[%_]/g, '')}%`); }
+  return { ok: true, guides: db.all(`SELECT * FROM guides WHERE ${where.join(' AND ')} ORDER BY verified DESC, rate`, ...p).map(guideView) };
+});
 route('POST', '/api/guides/apply', {}, ({ req, body }) => {
   rl(req, 'guide-apply', 5, 3600 * 1000);
   const g = { name: str(body.name, 80), city: str(body.city, 80), tg: str(body.tg, 64).replace(/^@/, ''), langs: str(body.langs, 120), spec: str(body.spec, 200), about: str(body.about, 1000) };
-  const rate = Number(body.rate);
+  const rate = Number(body.rate), gender = ['male', 'female'].includes(body.gender) ? body.gender : null;
+  if (!gender) throw new HttpError(400, 'Jinsingizni tanlang (sayohatchilar diniy/madaniy afzallik bo\'yicha gid tanlaydi).');
   if (g.name.length < 2 || g.city.length < 2 || !g.tg || !(rate >= 5 && rate <= 2000)) throw new HttpError(400, 'Ism, shahar, Telegram va kunlik narx (5–2000$) majburiy.');
   const id = db.uid('guide_');
-  db.run("INSERT INTO guides(id,name,city,country,langs,spec,bio,about,rate,exp,tg,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)", id, g.name, g.city, str(body.country, 60), g.langs, g.spec, g.spec, g.about, rate, Math.max(0, Math.min(60, parseInt(body.exp, 10) || 0)), g.tg, db.now(), db.now());
+  db.run("INSERT INTO guides(id,name,city,country,langs,spec,bio,about,rate,exp,tg,gender,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)", id, g.name, g.city, str(body.country, 60), g.langs, g.spec, g.spec, g.about, rate, Math.max(0, Math.min(60, parseInt(body.exp, 10) || 0)), g.tg, gender, db.now(), db.now());
   sec.audit({ type: 'guest', id: 'guest', label: g.tg }, 'guide.apply', 'guide', id, null, { name: g.name, city: g.city }, req);
   notifyTg(`🧭 Yangi gid arizasi: ${g.name} (${g.city}) @${g.tg}`);
   return { ok: true, id, status: 'pending' };
@@ -318,7 +326,7 @@ const notImpl = name => () => { throw new HttpError(501, `${name} merchant API h
 route('POST', '/api/payments/webhook/click', {}, notImpl('Click'));
 route('POST', '/api/payments/webhook/payme', {}, notImpl('Payme'));
 
-route('GET', '/api/my/bookings', { auth: 'user' }, ({ user }) => ({ ok: true, bookings: db.all('SELECT id FROM bookings WHERE user_id=? ORDER BY created_at DESC LIMIT 100', user.id).map(r => { const d = core.bookingDetail(r.id); return { ...d.booking, review: d.review, refunds: d.refunds.map(x => ({ amountUsd: x.amountUsd, status: x.status })) }; }) }));
+route('GET', '/api/my/bookings', { auth: 'user' }, ({ user }) => ({ ok: true, bookings: db.all('SELECT id FROM bookings WHERE user_id=? ORDER BY created_at DESC LIMIT 100', user.id).map(r => core.customerBookingView(r.id)) }));
 route('POST', '/api/my/bookings/:id/cancel', { auth: 'user' }, ({ user, params }) => ({ ok: true, ...core.cancelByCustomer(user, params.id) }));
 route('POST', '/api/my/bookings/:id/review', { auth: 'user' }, ({ user, params, body }) => ({ ok: true, id: core.addReview(user, params.id, body) }));
 
@@ -481,13 +489,14 @@ route('POST', '/api/admin/users/:id/status', A('users.write'), ({ req, staff, pa
   sec.audit(core.staffActor(staff), 'user.status', 'user', u.id, { status: u.status }, { status: st }, req); return { ok: true };
 });
 // Gidlar
-route('GET', '/api/admin/guides', A('guides.read'), () => ({ ok: true, guides: db.all('SELECT * FROM guides ORDER BY status, created_at DESC').map(g => ({ ...guideView(g), commissionRate: g.commission_rate, bookings: db.get("SELECT COUNT(*) n FROM bookings WHERE guide_id=? AND status IN ('confirmed','completed')", g.id).n })) }));
+route('GET', '/api/admin/guides', A('guides.read'), () => ({ ok: true, guides: db.all('SELECT * FROM guides ORDER BY status, created_at DESC').map(g => ({ ...adminGuideView(g), commissionRate: g.commission_rate, bookings: db.get("SELECT COUNT(*) n FROM bookings WHERE guide_id=? AND status IN ('confirmed','completed')", g.id).n })) }));
 route('POST', '/api/admin/guides/:id/status', A('guides.write'), ({ req, staff, params, body }) => {
   const g = db.get('SELECT * FROM guides WHERE id=?', params.id); if (!g) throw new HttpError(404, 'Topilmadi.');
   const st = str(body.status, 12) || g.status; if (!['pending', 'approved', 'rejected', 'suspended'].includes(st)) throw new HttpError(400, 'Holat noto\'g\'ri.');
   let cr = g.commission_rate; if (body.commissionRate !== undefined && body.commissionRate !== null && body.commissionRate !== '') { cr = Number(body.commissionRate); if (!(cr >= 0 && cr <= 0.5)) throw new HttpError(400, 'Komissiya 0–0.5 oralig\'ida.'); }
-  db.run('UPDATE guides SET status=?, verified=?, commission_rate=?, updated_at=? WHERE id=?', st, body.verified === undefined ? g.verified : (body.verified ? 1 : 0), cr, db.now(), g.id);
-  sec.audit(core.staffActor(staff), 'guide.update', 'guide', g.id, { status: g.status, verified: !!g.verified, commission: g.commission_rate }, { status: st, verified: body.verified, commission: cr }, req); return { ok: true };
+  const gender = ['male', 'female'].includes(body.gender) ? body.gender : g.gender;
+  db.run('UPDATE guides SET status=?, verified=?, commission_rate=?, gender=?, updated_at=? WHERE id=?', st, body.verified === undefined ? g.verified : (body.verified ? 1 : 0), cr, gender, db.now(), g.id);
+  sec.audit(core.staffActor(staff), 'guide.update', 'guide', g.id, { status: g.status, verified: !!g.verified, commission: g.commission_rate, gender: g.gender }, { status: st, verified: body.verified, commission: cr, gender }, req); return { ok: true };
 });
 // Manzillar
 const destBody = b => { const d = {}; for (const k of ['name', 'country', 'region', 'category', 'season', 'description', 'transport', 'accommodation', 'safety', 'hours']) if (b[k] !== undefined) d[k] = str(b[k], 600); for (const k of ['dailyBudgetUsd', 'lat', 'lng', 'entranceFeeUsd']) if (b[k] !== undefined && b[k] !== '') d[k] = Number(b[k]) || 0; if (!d.name) throw new HttpError(400, 'Manzil nomi kerak.'); return d; };

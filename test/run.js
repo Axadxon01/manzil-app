@@ -52,6 +52,26 @@ async function call(jar, method, p, body, headers = {}) {
     d0 = await call(boss, 'GET', '/api/admin/dashboard'); ok(d0.kpi.revenue.gmvUsd === 0, 'sandbox to\'lov daromadga KIRMADI');
     d0 = await call(boss, 'GET', '/api/admin/dashboard?sandbox=1'); ok(d0.kpi.revenue.gmvUsd > 0, 'sandbox belgisi bilan ko\'rinadi');
 
+    console.log('\n[Gid jinsi va anonimlik]');
+    const pub = await call(anon, 'GET', '/api/guides');
+    ok(pub.guides.every(x => !('name' in x) && !('tg' in x) && x.alias && x.gender), 'ommaviy gidlar ro\'yxatida ism/Telegram yo\'q, alias va jins bor');
+    const fem = await call(anon, 'GET', '/api/guides?gender=female');
+    ok(fem.guides.length > 0 && fem.guides.every(x => x.gender === 'female'), 'jins bo\'yicha filtr ishlaydi');
+    let my = await call(tourist, 'GET', '/api/my/bookings');
+    const paidB = my.bookings.find(b => b.code === real.code);
+    const adminG = (await call(boss, 'GET', '/api/admin/guides')).guides;
+    ok(paidB && paidB.guide && paidB.guide.revealed && paidB.guide.name === adminG.find(x => x.id === g.id).name, 'to\'langan bronda gid ismi ochiladi');
+    const male = guides.find(x => x.gender === 'male');
+    r = await call(tourist, 'POST', '/api/payments/create', { provider: 'click', guideId: male.id, genderPref: 'female', days: 1, travelDate: new Date(Date.now()+20*864e5).toISOString().slice(0,10), customerName: 'Ali', contact: '+998901112233' });
+    ok(r.s === 400, 'afzallikka mos kelmaydigan gid rad etiladi');
+    r = await call(tourist, 'POST', '/api/payments/create', { provider: 'click', guideId: male.id, genderPref: 'male', days: 1, travelDate: new Date(Date.now()+20*864e5).toISOString().slice(0,10), customerName: 'Ali', contact: '+998901112233' });
+    my = await call(tourist, 'GET', '/api/my/bookings');
+    const unpaid = my.bookings.find(b => b.code === r.code);
+    ok(unpaid && unpaid.guide && !unpaid.guide.revealed && !unpaid.guide.name && !JSON.stringify(unpaid).includes(adminG.find(x => x.id === male.id).name) , 'to\'lanmagan bronda gid ismi yashirin');
+    ok(unpaid.genderPref === 'male', 'afzallik bronda saqlanadi');
+    r = await call(anon, 'POST', '/api/guides/apply', { name: 'Test Gid', city: 'Dubay', tg: 'test_gid', rate: 50 }); ok(r.s === 400, 'gid arizasida jins majburiy');
+    r = await call(anon, 'POST', '/api/guides/apply', { name: 'Test Gid', city: 'Dubay', tg: 'test_gid', rate: 50, gender: 'female' }); ok(r.s === 200, 'gid arizasi jins bilan qabul qilinadi');
+
     // Haqiqiy (non-sandbox) oqim uchun: DEMO o'chirilgan ikkinchi server
     srv.kill();
   } catch (e) { fail++; console.log('XATO', e); }

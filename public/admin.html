@@ -53,8 +53,34 @@ td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}tr:hov
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
 .note{background:#fff8e6;border:1px solid #f0d48a;color:#6b4d00;border-radius:10px;padding:10px 12px;font-size:13px}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .note{background:#2a2410;color:#f1d98a;border-color:#5a4a14}}
-@media(max-width:1000px){.app{grid-template-columns:1fr}aside{position:static;height:auto}.g4{grid-template-columns:1fr 1fr}.g2,.g3{grid-template-columns:1fr}main{padding:14px}}
-@media(max-width:520px){.g4{grid-template-columns:1fr}}
+.mtop{display:none}
+.dbgrid{grid-template-columns:200px 1fr}
+@media(max-width:1000px){
+ .app{grid-template-columns:1fr}
+ .mtop{display:flex;position:sticky;top:0;z-index:40;align-items:center;justify-content:space-between;gap:10px;background:var(--navy);color:#fff;padding:10px 14px}
+ .mtop .logo{padding:0;font-size:16px}.mtop button{background:rgba(255,255,255,.12);border:0;color:#fff;border-radius:10px;min-width:44px;min-height:44px;font-size:20px;cursor:pointer}
+ aside{position:fixed;inset:0 auto 0 0;width:min(300px,86vw);height:100vh;z-index:60;transform:translateX(-105%);transition:transform .22s ease;box-shadow:0 0 40px rgba(0,0,0,.35)}
+ aside.open{transform:none}aside .logo{display:none}
+ .scrim{position:fixed;inset:0;background:rgba(8,14,34,.5);z-index:55;display:none}.scrim.on{display:block}
+ nav a{min-height:44px}
+ .g4{grid-template-columns:1fr 1fr}.g2,.g3,.dbgrid{grid-template-columns:1fr}
+ main{padding:14px}
+ h1{font-size:19px}.top{margin-bottom:10px}.top .row{width:100%}.top .row>*{flex:1 1 auto}
+ .kpi .val{font-size:22px}
+ .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}.tabs button{white-space:nowrap;min-height:44px}
+ .tw table,.tw tbody,.tw tr,.tw td{display:block;width:100%}.tw thead{display:none}
+ .tw tr{border:1px solid var(--line);border-radius:10px;margin-bottom:10px;padding:6px 12px;background:var(--card)}
+ .tw tr:hover td{background:none}
+ .tw td{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border:0;padding:7px 0;text-align:end;max-width:none!important}
+ .tw td::before{content:attr(data-l);color:var(--mut);font-size:12px;text-align:start;flex:0 0 38%}
+ .tw td[data-l=""]::before{display:none}.tw td[data-l=""]{justify-content:flex-end}
+ .tw td[colspan]{justify-content:center}
+ .modal{padding:0;place-items:end stretch}.modal>div{max-height:92vh;border-radius:16px 16px 0 0;padding:16px}
+ .btn{min-height:40px}.btn.s{min-height:36px}
+ input,select,textarea{font-size:16px}
+ .toast{left:12px;right:12px;bottom:12px;max-width:none}
+}
+@media(max-width:520px){.g4{grid-template-columns:1fr 1fr;gap:10px}.kpi{padding:12px}.kpi .val{font-size:20px}.kpi .d{font-size:11px}.card{padding:12px}}
 </style>
 </head>
 <body>
@@ -108,9 +134,11 @@ const NAV=[['Asosiy',[['dashboard','📊','Boshqaruv paneli','dashboard'],['book
 ['Tizim',[['db','🗄️','Ma\'lumotlar bazasi','db.view'],['audit','🛡️','Audit jurnali','audit.read'],['settings','⚙️','Sozlamalar','settings.write']]]];
 const navOk=p=>p==='staff.performance.any'?(can('staff.performance')||can('staff.performance.self')):can(p);
 function shell(){
-  $('#root').innerHTML=`<div class="app"><aside><div class="logo"><i>M</i><div>Manzil<small>Admin Portal</small></div></div><nav>${NAV.map(([t,items])=>{const v=items.filter(i=>navOk(i[3]));return v.length?`<div class="sec">${t}</div>`+v.map(i=>`<a data-p="${i[0]}" class="${S.page===i[0]?'on':''}">${i[1]} ${i[2]}</a>`).join(''):''}).join('')}</nav>
+  $('#root').innerHTML=`<div class="mtop"><div class="logo"><i>M</i><div>Manzil Admin</div></div><button id="mnav" aria-label="Menyu" aria-expanded="false">☰</button></div><div class="scrim" id="scrim"></div><div class="app"><aside id="side"><div class="logo"><i>M</i><div>Manzil<small>Admin Portal</small></div></div><nav>${NAV.map(([t,items])=>{const v=items.filter(i=>navOk(i[3]));return v.length?`<div class="sec">${t}</div>`+v.map(i=>`<a data-p="${i[0]}" class="${S.page===i[0]?'on':''}">${i[1]} ${i[2]}</a>`).join(''):''}).join('')}</nav>
   <div class="who"><b>${esc(S.me.name)}</b>${esc(S.me.roleLabel)}<div style="margin-top:8px" class="row"><button class="btn s" id="b2fa">${S.me.totpEnabled?'2FA yoqilgan ✓':'2FA yoqish'}</button><button class="btn s" id="blo">Chiqish</button></div></div></aside><main id="main"></main></div>`;
-  document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{S.page=a.dataset.p;location.hash=S.page;shell();show()});
+  document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{S.page=a.dataset.p;location.hash=S.page;shell();show();window.scrollTo(0,0)});
+  const side=$('#side'),scrim=$('#scrim'),mb=$('#mnav');const tog=o=>{side.classList.toggle('open',o);scrim.classList.toggle('on',o);mb.setAttribute('aria-expanded',o)};
+  mb.onclick=()=>tog(!side.classList.contains('open'));scrim.onclick=()=>tog(false);
   $('#blo').onclick=guard(async()=>{await api('/staff/logout',{body:{}});S.me=null;renderLogin()});
   $('#b2fa').onclick=guard(setup2fa);
 }
@@ -124,6 +152,9 @@ function modal(html){closeModal();const m=document.createElement('div');m.classN
 function closeModal(){const m=$('#modal');if(m)m.remove()}
 const head=(t,s,extra='')=>`<div class="top"><div><h1>${t}</h1><div class="sub">${s||''}</div></div><div class="row">${extra}</div></div>`;
 const table=(cols,rows,empty='Ma\'lumot yo\'q')=>`<div class="tw"><table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.join(''):`<tr><td colspan="${cols.length}" class="muted">${empty}</td></tr>`}</tbody></table></div>`;
+// Telefonda jadvallar kartochkaga aylanadi: har bir katakka ustun nomi yoziladi
+function labelTables(root){root.querySelectorAll('table').forEach(tb=>{const hs=[...tb.querySelectorAll('thead th')].map(th=>th.textContent.trim());tb.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{if(!td.hasAttribute('data-l'))td.setAttribute('data-l',hs[i]||'')}))})}
+new MutationObserver(()=>{const m=document.getElementById('main');if(m)labelTables(m);const md=document.getElementById('modal');if(md)labelTables(md)}).observe(document.getElementById('root').parentNode,{childList:true,subtree:true});
 async function show(){
   const m=$('#main');m.innerHTML='<div class="muted">Yuklanmoqda…</div>';
   try{await (PAGES[S.page]||PAGES.dashboard)(m)}catch(e){m.innerHTML=`<div class="note">${esc(e.message)}</div>`}
@@ -184,7 +215,7 @@ PAGES.bookings=async m=>{
 window.openBooking=guard(async id=>{
   const d=await api('/admin/bookings/'+id),b=d.booking;
   const st=await (can('staff.read')?api('/admin/staff'):Promise.resolve({staff:[]}));
-  modal(`<h3>${esc(b.code)} ${statusPill(b.status)}</h3><div class="grid g2"><div><b>${esc(b.title)}</b><div class="muted">${esc(b.customer.name)} · ${esc(b.customer.contact)}</div><div>Sana: ${b.travelDate||'—'} · ${b.days} kun · ${b.people} kishi</div></div><div><div>Summa: <b>${fmt(b.amountUsd)}</b> (${Number(b.amountUzs).toLocaleString()} so'm)</div><div>Komissiya: ${fmt(b.commissionUsd)} · Hamkor ulushi: ${fmt(b.payoutUsd)}</div><div>Narx manbai: ${b.priceSource==='server'?'<span class="pill ok">server (tasdiqlangan)</span>':'<span class="pill warn">mijoz yuborgan (tekshirilsin)</span>'}</div></div></div>
+  modal(`<h3>${esc(b.code)} ${statusPill(b.status)}</h3><div class="grid g2"><div><b>${esc(b.title)}</b><div class="muted">${esc(b.customer.name)} · ${esc(b.customer.contact)}</div><div>Sana: ${b.travelDate||'—'} · ${b.days} kun · ${b.people} kishi</div>${b.genderPref?`<div>Gid afzalligi: <b>${b.genderPref==='female'?'Ayol':'Erkak'}</b></div>`:''}${b.guide?`<div>Gid: <b>${esc(b.guide.name)}</b></div>`:''}</div><div><div>Summa: <b>${fmt(b.amountUsd)}</b> (${Number(b.amountUzs).toLocaleString()} so'm)</div><div>Komissiya: ${fmt(b.commissionUsd)} · Hamkor ulushi: ${fmt(b.payoutUsd)}</div><div>Narx manbai: ${b.priceSource==='server'?'<span class="pill ok">server (tasdiqlangan)</span>':'<span class="pill warn">mijoz yuborgan (tekshirilsin)</span>'}</div></div></div>
   <h3 style="margin-top:14px">To'lovlar</h3>${table(['ID','Usul','Holat','Summa','Qaytarilgan',''],d.payments.map(p=>`<tr><td class="mono">${esc(p.id)}</td><td>${esc(p.provider)}${p.sandbox?' (sinov)':''}</td><td>${statusPill(p.status)}</td><td>${fmt(p.amountUsd)}</td><td>${fmt(p.refundedUsd)}</td><td>${p.status==='pending'&&can('payments.confirm')?`<button class="btn s" onclick="manualConfirm('${p.id}','${p.provider}')">Qo'lda tasdiqlash</button>`:''}${['paid','partially_refunded'].includes(p.status)&&can('refunds.request')?`<button class="btn s" onclick="askRefund('${p.id}',${p.amountUsd-p.refundedUsd})">Qaytarish so'rovi</button>`:''}</td></tr>`))}
   ${d.refunds.length?`<h3 style="margin-top:14px">Qaytarishlar</h3>${table(['Summa','Sabab','Holat'],d.refunds.map(r=>`<tr><td>${fmt(r.amountUsd)}</td><td>${esc(r.reason)}</td><td>${statusPill(r.status)}</td></tr>`))}`:''}
   ${can('bookings.write')?`<h3 style="margin-top:14px">Amallar</h3><div class="row"><select id="asg"><option value="">Xodim biriktirish…</option>${st.staff.filter(s=>s.active).map(s=>`<option value="${s.id}" ${b.staff&&b.staff.id===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select><button class="btn s" id="asgb">Biriktirish</button></div>
@@ -238,8 +269,8 @@ window.stRole=guard(async(id,role)=>{await api(`/admin/staff/${id}/update`,{body
 window.stToggle=guard(async(id,a)=>{await api(`/admin/staff/${id}/update`,{body:{active:!!a}});show()});
 window.stReset=guard(async id=>{if(!confirm('Parolni tiklashni tasdiqlaysizmi? Xodimning barcha sessiyalari tugatiladi.'))return;const r=await api(`/admin/staff/${id}/reset-password`,{body:{}});modal(`<h3>Yangi bir martalik parol</h3><div class="note"><div class="mono" style="font-size:16px;user-select:all">${esc(r.oneTimePassword)}</div></div>`)});
 
-PAGES.guides=async m=>{const d=await api('/admin/guides');m.innerHTML=head('Gidlar','Arizalar, tasdiqlash va to\'xtatish')+`<div class="card">${table(['Gid','Shahar','Narx/kun','Holat','Tasdiq','Band qilishlar','Komissiya',''],d.guides.map(g=>`<tr><td><b>${esc(g.name)}</b>${g.sample?' <span class="pill">namuna</span>':''}<div class="muted small">@${esc(g.tg||'')}</div></td><td>${esc(g.city)}</td><td>${fmt(g.rate)}</td><td>${statusPill(g.status==='suspended'?'suspended':g.status)}</td><td>${g.verified?'✓':'—'}</td><td>${g.bookings}</td><td>${g.commissionRate==null?'standart':Math.round(g.commissionRate*100)+'%'}</td><td>${can('guides.write')?`${g.status!=='approved'?`<button class="btn s p" onclick="gSet('${g.id}','approved',1)">Tasdiqlash</button> `:''}${g.status==='approved'?`<button class="btn s" onclick="gSet('${g.id}','suspended')">To'xtatish</button> `:''}${g.status==='pending'?`<button class="btn s" onclick="gSet('${g.id}','rejected')">Rad</button>`:''}`:''}</td></tr>`))}</div>`};
-window.gSet=guard(async(id,status,verified)=>{await api(`/admin/guides/${id}/status`,{body:{status,verified}});show()});
+PAGES.guides=async m=>{const d=await api('/admin/guides');const gl={male:'Erkak',female:'Ayol'};m.innerHTML=head('Gidlar','Arizalar, tasdiqlash va to\'xtatish. Mijozlar gid ismini faqat to\'lovdan keyin ko\'radi')+`<div class="card">${table(['Gid','Shahar','Jinsi','Narx/kun','Holat','Tasdiq','Band qilishlar','Komissiya',''],d.guides.map(g=>`<tr><td><b>${esc(g.name)}</b>${g.sample?' <span class="pill">namuna</span>':''}<div class="muted small">@${esc(g.tg||'')} · ${esc(g.alias)}</div></td><td>${esc(g.city)}</td><td>${can('guides.write')?`<select onchange="gSet('${g.id}',undefined,undefined,this.value)"><option value="">—</option>${['male','female'].map(x=>`<option value="${x}" ${g.gender===x?'selected':''}>${gl[x]}</option>`).join('')}</select>`:esc(gl[g.gender]||'—')}</td><td>${fmt(g.rate)}</td><td>${statusPill(g.status==='suspended'?'suspended':g.status)}</td><td>${g.verified?'✓':'—'}</td><td>${g.bookings}</td><td>${g.commissionRate==null?'standart':Math.round(g.commissionRate*100)+'%'}</td><td>${can('guides.write')?`${g.status!=='approved'?`<button class="btn s p" onclick="gSet('${g.id}','approved',1)">Tasdiqlash</button> `:''}${g.status==='approved'?`<button class="btn s" onclick="gSet('${g.id}','suspended')">To'xtatish</button> `:''}${g.status==='pending'?`<button class="btn s" onclick="gSet('${g.id}','rejected')">Rad</button>`:''}`:''}</td></tr>`))}</div>`};
+window.gSet=guard(async(id,status,verified,gender)=>{await api(`/admin/guides/${id}/status`,{body:{status,verified,gender:gender||undefined}});toast('Saqlandi');show()});
 PAGES.destinations=async m=>{const d=await api('/admin/destinations');m.innerHTML=head('Manzillar','Narx holati: tasdiqlangan / taxminiy / mavjud emas','<button class="btn p" id="nd">+ Manzil</button>')+`<div class="card">${table(['Nomi','Mamlakat','Kunlik byudjet','Narx holati','Holat',''],d.destinations.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.country||'')}</td><td>${x.dailyBudgetUsd?fmt0(x.dailyBudgetUsd):'—'}</td><td><select onchange="dPs('${x.id}',this.value)">${['verified','estimated','unavailable'].map(k=>`<option value="${k}" ${k===x.priceStatus?'selected':''}>${{verified:'Tasdiqlangan',estimated:'Taxminiy',unavailable:'Mavjud emas'}[k]}</option>`).join('')}</select></td><td>${x.archived?statusPill('suspended'):statusPill('active')}</td><td><button class="btn s" onclick="dArc('${x.id}',${x.archived?0:1})">${x.archived?'Tiklash':'Arxivlash'}</button></td></tr>`),'Hali manzil qo\'shilmagan (sayt o\'z ichki ro\'yxatidan foydalanadi)')}</div>`;
   $('#nd').onclick=()=>{modal(`<h3>Yangi manzil</h3><div class="grid g2"><input id="dn" placeholder="Nomi"><input id="dc" placeholder="Mamlakat"><input id="db" type="number" placeholder="Kunlik byudjet USD"><select id="dp"><option value="estimated">Taxminiy</option><option value="verified">Tasdiqlangan</option><option value="unavailable">Mavjud emas</option></select></div><textarea id="dd" placeholder="Tavsif, eng yaxshi mavsum, xavfsizlik…" rows="3" style="margin-top:8px"></textarea><button class="btn p" id="dok" style="margin-top:8px">Saqlash</button>`);$('#dok').onclick=guard(async()=>{await api('/admin/destinations',{body:{name:$('#dn').value,country:$('#dc').value,dailyBudgetUsd:$('#db').value,priceStatus:$('#dp').value,description:$('#dd').value}});closeModal();show()})}};
 window.dPs=guard(async(id,v)=>{await api(`/admin/destinations/${id}/update`,{body:{priceStatus:v}});toast('Saqlandi')});window.dArc=guard(async(id,a)=>{await api(`/admin/destinations/${id}/update`,{body:{archived:!!a}});show()});
@@ -250,7 +281,7 @@ window.fbH=guard(async id=>{await api(`/admin/feedback/${id}/handle`,{body:{stat
 
 PAGES.db=async m=>{
   const d=await api('/admin/db');const t=S.cache.dbt||'users';const off=S.cache.dbo||0;const r=await api(`/admin/db/${t}?limit=25&offset=${off}`);
-  m.innerHTML=head('Ma\'lumotlar bazasi',`${esc(d.engine)} · ${esc(d.location)}`)+`<div class="note" style="margin-bottom:14px">🔒 ${esc(d.note)} Jadvalni ko'rish ham audit jurnaliga yoziladi.</div><div class="grid" style="grid-template-columns:200px 1fr"><div class="card" style="padding:8px">${d.tables.map(x=>`<a style="display:flex;justify-content:space-between;padding:7px 10px;border-radius:8px;cursor:pointer;${x.name===t?'background:var(--brand);color:#fff':''}" data-t="${x.name}"><span>${x.name}</span><span class="small">${x.rows}</span></a>`).join('')}</div>
+  m.innerHTML=head('Ma\'lumotlar bazasi',`${esc(d.engine)} · ${esc(d.location)}`)+`<div class="note" style="margin-bottom:14px">🔒 ${esc(d.note)} Jadvalni ko'rish ham audit jurnaliga yoziladi.</div><div class="grid dbgrid"><div class="card" style="padding:8px">${d.tables.map(x=>`<a style="display:flex;justify-content:space-between;padding:7px 10px;border-radius:8px;cursor:pointer;${x.name===t?'background:var(--brand);color:#fff':''}" data-t="${x.name}"><span>${x.name}</span><span class="small">${x.rows}</span></a>`).join('')}</div>
   <div class="card"><h3>${esc(t)} <span class="muted small">(${r.total} qator${r.masked.length?` · yashirin ustunlar: ${r.masked.join(', ')}`:''})</span></h3><div class="tw"><table class="small"><thead><tr>${r.columns.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${r.rows.map(row=>`<tr>${r.columns.map(c=>`<td class="${r.masked.includes(c)?'pill':''}" style="max-width:260px;word-break:break-word">${row[c]==null?'<span class="muted">NULL</span>':esc(row[c])}</td>`).join('')}</tr>`).join('')||'<tr><td class="muted">Bo\'sh</td></tr>'}</tbody></table></div>
   <div class="row" style="margin-top:10px"><button class="btn s" id="pv" ${off?'':'disabled'}>← Oldingi</button><button class="btn s" id="nx" ${off+25<r.total?'':'disabled'}>Keyingi →</button></div></div></div>`;
   m.querySelectorAll('[data-t]').forEach(a=>a.onclick=()=>{S.cache.dbt=a.dataset.t;S.cache.dbo=0;show()});$('#pv').onclick=()=>{S.cache.dbo=Math.max(0,off-25);show()};$('#nx').onclick=()=>{S.cache.dbo=off+25;show()};
