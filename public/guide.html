@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#FFFDF9">
+<title>Manzil — gidlar platformasi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FFFDF9;--paper-2:#F3EEE5;--paper-3:#E9E2D6;--ink:#1C1917;--ink-2:#45403B;--mute:#6F6A64;
+  --green:#3F5A35;--green-2:#2F4628;--green-tint:#E8EEE2;--saffron:#C99A3C;--saffron-tint:#FBF1DC;--red:#A8412A;--terra:#C45C26;
+  --line:rgba(28,25,23,.13);--line-2:rgba(28,25,23,.07);
+  --serif:"Fraunces",Georgia,"Times New Roman",serif;--sans:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --tabh:64px;--rail:232px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:inherit}
+img{display:block;max-width:100%}
+:focus-visible{outline:3px solid var(--green);outline-offset:2px;border-radius:6px}
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
+h1{font-size:26px;line-height:1.2}
+h2{font-size:20px;line-height:1.3}
+h3{font-size:17px}
+p{margin:0}
+.mute{color:var(--mute)}
+.small{font-size:15px}
+.num{font-variant-numeric:tabular-nums lining-nums}
+
+/* Tugmalar: kamida 48px, yorliq aniq nima bo'lishini aytadi */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 20px;border-radius:12px;border:1px solid var(--line);background:var(--paper);font-weight:500;font-size:16px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn:hover{border-color:var(--ink-2)}
+.btn.primary{background:var(--green);border-color:var(--green);color:#fff}.btn.primary:hover{background:var(--green-2)}
+.btn.danger{color:var(--red);border-color:rgba(168,65,42,.35)}.btn.danger:hover{border-color:var(--red)}
+.btn.block{width:100%}
+.btn[disabled]{opacity:.55;cursor:default}
+.btn svg{width:18px;height:18px;flex:none}
+.link{background:none;border:0;padding:6px 0;cursor:pointer;color:var(--green);font-weight:500;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px}
+.msg{font-size:15px;min-height:0}
+.msg.err{color:var(--red)}.msg.ok{color:var(--green)}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:15px;color:var(--ink-2);font-weight:500}
+.inp{width:100%;min-height:50px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:17px;color:var(--ink)}
+.inp:focus{border-color:var(--green);outline:none;box-shadow:0 0 0 3px rgba(63,90,53,.18)}
+textarea.inp{min-height:110px;resize:vertical}
+
+/* ---------- Kirish ---------- */
+.auth{min-height:100dvh;display:grid;grid-template-rows:1fr auto;padding:28px 20px calc(20px + env(safe-area-inset-bottom))}
+.auth-in{width:100%;max-width:420px;margin:auto;display:flex;flex-direction:column;gap:22px}
+.wordmark{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-size:26px;font-weight:450;letter-spacing:-.02em}
+.wordmark i{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--ink);position:relative;flex:none}
+.wordmark i::after{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:var(--terra);left:50%;top:5px;transform:translateX(-50%)}
+.wordmark small{font-family:var(--sans);font-size:15px;font-weight:500;color:var(--green);letter-spacing:0;margin-inline-start:2px}
+.auth form{display:flex;flex-direction:column;gap:16px}
+.pw{position:relative}.pw .inp{padding-inline-end:104px}
+.pw button{position:absolute;inset-block:5px;inset-inline-end:5px;border:0;background:var(--paper-2);border-radius:9px;padding:0 12px;font-size:14px;cursor:pointer}
+.code{font-size:30px;letter-spacing:.32em;text-align:center;font-weight:600;padding-inline:0}
+.check{display:flex;gap:10px;align-items:center;font-size:16px;cursor:pointer}
+.check input{width:22px;height:22px;accent-color:var(--green)}
+.hint{font-size:15px;color:var(--mute);border-top:1px solid var(--line);padding-top:18px}
+.langs{display:flex;gap:4px;justify-content:center}
+.langs button{min-height:40px;min-width:48px;border:1px solid transparent;background:none;border-radius:10px;cursor:pointer;color:var(--mute);font-weight:500}
+.langs button[aria-pressed=true]{border-color:var(--line);color:var(--ink);background:var(--paper-2)}
+
+/* ---------- Karkas ---------- */
+.shell{min-height:100dvh}
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;height:58px;padding:0 18px;background:rgba(255,253,249,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--line-2)}
+.topbar .wordmark{font-size:22px}.topbar .wordmark i{width:26px;height:26px}.topbar .wordmark i::after{top:4px;width:6px;height:6px}
+.topbar .sp{flex:1}
+.topbar select{min-height:38px;border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:0 10px;font-size:15px}
+.tabs{position:fixed;inset:auto 0 0 0;z-index:30;display:grid;grid-template-columns:repeat(4,1fr);height:calc(var(--tabh) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--paper);border-top:1px solid var(--line)}
+.tabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:0;background:none;color:var(--mute);font-size:12.5px;font-weight:500;cursor:pointer;position:relative}
+.tabs button svg{width:24px;height:24px}
+.tabs button[aria-current=page]{color:var(--green)}
+.tabs button[aria-current=page]::before{content:"";position:absolute;top:0;left:28%;right:28%;height:3px;border-radius:0 0 3px 3px;background:var(--green)}
+.tabs .badge{position:absolute;top:8px;margin-inline-start:22px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--saffron);color:var(--ink);font-size:11px;font-weight:600;display:grid;place-items:center}
+main.view{padding:22px 18px calc(var(--tabh) + 36px + env(safe-area-inset-bottom));max-width:860px;margin:0 auto}
+@media (min-width:960px){
+  .shell{display:grid;grid-template-columns:var(--rail) 1fr}
+  .topbar{grid-column:1/-1}
+  .tabs{position:sticky;top:58px;height:calc(100dvh - 58px);display:flex;flex-direction:column;gap:2px;padding:18px 12px;border-top:0;border-inline-end:1px solid var(--line-2);background:var(--paper)}
+  .tabs button{flex-direction:row;justify-content:flex-start;gap:12px;min-height:48px;padding:0 14px;border-radius:12px;font-size:16px}
+  .tabs button[aria-current=page]{background:var(--green-tint)}
+  .tabs button[aria-current=page]::before{display:none}
+  .tabs .badge{position:static;margin-inline-start:auto}
+  main.view{padding:32px 40px 60px;max-width:900px;margin:0}
+  main.view.wide{max-width:none;padding:0}
+}
+
+/* ---------- Bosh sahifa ---------- */
+.hello{display:flex;flex-direction:column;gap:4px;margin-bottom:22px}
+.meet{display:grid;grid-template-columns:auto 1fr;gap:18px;padding:18px;border:1px solid var(--line);border-radius:16px;background:#fff}
+/* Uzildi-taqvim varag'i: yaqin uchrashuv sanasi bir qarashda ko'rinadi */
+.leaf{width:96px;border-radius:12px;background:var(--paper-2);overflow:hidden;text-align:center;align-self:start}
+.leaf b{display:block;height:8px;background:var(--green)}
+.leaf .d{font-family:var(--serif);font-variation-settings:"opsz" 48;font-weight:460;font-size:56px;line-height:1;padding-top:10px;font-variant-numeric:lining-nums}
+.leaf .m{font-size:15px;font-weight:600;padding-top:4px}
+.leaf .w{font-size:13px;color:var(--mute);padding:2px 0 10px}
+.leaf.sm{width:64px;border-radius:10px}.leaf.sm b{height:5px}.leaf.sm .d{font-size:34px;padding-top:6px}.leaf.sm .m{font-size:13px;padding-top:2px}.leaf.sm .w{display:none}.leaf.sm .m{padding-bottom:8px}
+.meet .who{display:flex;flex-direction:column;gap:6px;min-width:0}
+.meet .place{font-size:22px;font-weight:600;line-height:1.25}
+.facts{display:flex;flex-wrap:wrap;gap:4px 16px;color:var(--ink-2);font-size:16px}
+.person{margin-top:6px;padding-top:12px;border-top:1px solid var(--line-2);display:flex;flex-direction:column;gap:10px}
+.person .nm{font-weight:600}
+.acts{display:flex;flex-wrap:wrap;gap:8px}
+.acts .btn{min-height:44px;padding:0 14px;font-size:15px}
+.acts.contact{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));max-width:420px}
+.acts.contact .btn{padding:0 8px;font-size:14.5px;gap:6px}
+.acts.contact .btn svg{width:16px;height:16px}
+.meet .needack{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--saffron-tint);border-radius:12px;padding:12px 14px}
+.lockline{color:var(--mute);font-size:15px}
+.money{display:grid;grid-template-columns:repeat(3,1fr);margin:26px 0 8px;border-block:1px solid var(--line)}
+.money div{padding:14px 4px;display:flex;flex-direction:column;gap:2px}
+.money div+div{border-inline-start:1px solid var(--line-2);padding-inline-start:14px}
+.money b{font-size:22px;font-weight:600}
+.money span{font-size:14px;color:var(--mute)}
+.sec{margin-top:30px;display:flex;flex-direction:column;gap:12px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.empty{padding:26px 18px;border:1px dashed var(--line);border-radius:14px;color:var(--ink-2);display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.review{padding:12px 0;border-bottom:1px solid var(--line-2)}
+.stars{color:var(--saffron);letter-spacing:2px}
+
+/* ---------- Turlar ---------- */
+.seg{display:inline-grid;grid-auto-flow:column;gap:4px;padding:4px;background:var(--paper-2);border-radius:12px;margin:16px 0 6px}
+.seg button{min-height:42px;padding:0 16px;border:0;border-radius:9px;background:none;cursor:pointer;font-weight:500;color:var(--ink-2)}
+.seg button[aria-pressed=true]{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(28,25,23,.12)}
+.list{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:16px 0;border-bottom:1px solid var(--line-2)}
+.row .main{display:flex;flex-direction:column;gap:6px;min-width:0}
+.row .t1{display:flex;justify-content:space-between;gap:6px 10px;align-items:baseline;flex-wrap:wrap}
+.row .t1 b{font-size:18px}
+.st{display:inline-block;font-size:13.5px;font-weight:500;padding:3px 10px;border-radius:999px;background:var(--paper-2);color:var(--ink-2);white-space:nowrap}
+.st.ok{background:var(--green-tint);color:var(--green-2)}.st.wait{background:var(--saffron-tint);color:#6B4E12}.st.bad{background:#F6E3DE;color:var(--red)}
+
+/* ---------- Manzillar: 30% ro'yxat / 70% batafsil ---------- */
+.places{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,7fr);height:calc(100dvh - 58px)}
+.plist{display:flex;flex-direction:column;border-inline-end:1px solid var(--line);min-height:0;background:var(--paper)}
+.ptools{padding:16px 16px 10px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line-2)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.chips button{flex:none;min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--paper);cursor:pointer;font-size:14px;color:var(--ink-2)}
+.chips button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.pcount{font-size:14px;color:var(--mute)}
+.pitems{overflow-y:auto;flex:1;min-height:0}
+.pitem{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:center;width:100%;padding:10px 16px;border:0;border-bottom:1px solid var(--line-2);background:none;text-align:start;cursor:pointer}
+.pitem:hover{background:var(--paper-2)}
+.pitem[aria-current=true]{background:var(--green-tint);box-shadow:inset 3px 0 0 var(--green)}
+.pitem img{width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--paper-3)}
+.pitem b{display:block;font-size:16px;line-height:1.3;color:var(--ink)}
+.pitem .sub{display:block;font-size:14px;color:var(--mute)}
+.pitem .mine{display:block;font-size:14px;color:var(--green);font-weight:600}
+.pdetail{overflow-y:auto;min-height:0;background:#fff}
+.pd-hero{position:relative;aspect-ratio:21/9;background:var(--paper-3)}
+.pd-hero img{width:100%;height:100%;object-fit:cover}
+.pd-credit{font-size:12.5px;color:var(--mute);padding:6px 28px 0}
+.pd-credit a{color:inherit}
+.pd-body{padding:18px 28px 48px;display:flex;flex-direction:column;gap:26px;max-width:880px}
+.pd-name{font-family:var(--serif);font-weight:380;font-size:clamp(34px,4vw,50px);line-height:1.04;letter-spacing:-.02em}
+.pd-sub{color:var(--ink-2);margin-top:8px;font-size:17px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.tags span{font-size:14px;padding:4px 10px;border-radius:999px;background:var(--green-tint);color:var(--green-2)}
+.meta2{display:flex;flex-wrap:wrap;gap:4px 14px}
+.months{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
+.months span{text-align:center;font-size:13px;padding:8px 0;border-radius:8px;background:var(--paper-2);color:var(--mute)}
+.months span.on{background:var(--green);color:#fff;font-weight:600}
+.costs{width:100%;border-collapse:collapse;font-size:16px}
+.costs td{padding:10px 0;border-bottom:1px solid var(--line-2)}
+.costs td:last-child{text-align:end;font-variant-numeric:tabular-nums;font-weight:500}
+.costs tr.total td{font-weight:600;border-bottom:0;padding-top:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.kv{display:flex;flex-direction:column;gap:10px}
+.kv div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line-2);padding-bottom:10px}
+.kv div span:first-child{color:var(--mute)}
+.pk{padding:12px 0;border-bottom:1px solid var(--line-2);display:flex;justify-content:space-between;gap:12px}
+.back{display:none}
+@media (max-width:959px){
+  .places{display:block;height:auto}
+  .plist{border:0}
+  .ptools{position:sticky;top:58px;z-index:5;background:var(--paper)}
+  .pitems{overflow:visible}
+  .pdetail{position:fixed;inset:0 0 calc(var(--tabh) + env(safe-area-inset-bottom)) 0;z-index:25;transform:translateX(100%);transition:transform .25s ease;visibility:hidden}
+  .pdetail.open{transform:none;visibility:visible}
+  .back{display:flex;position:sticky;top:0;z-index:3;align-items:center;gap:8px;width:100%;height:54px;padding:0 14px;border:0;border-bottom:1px solid var(--line-2);background:rgba(255,255,255,.96);font-weight:500;font-size:16px;cursor:pointer}
+  .pd-hero{aspect-ratio:16/10}
+  .pd-body{padding:16px 18px 32px}.pd-credit{padding-inline:18px}
+  .two{grid-template-columns:1fr}
+  .months{grid-template-columns:repeat(6,1fr)}
+  main.view.wide{padding:0 0 calc(var(--tabh) + env(safe-area-inset-bottom))}
+}
+
+/* ---------- Profil ---------- */
+.prof{display:flex;flex-direction:column;gap:30px}
+.prof form{display:flex;flex-direction:column;gap:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:520px){.grid2{grid-template-columns:1fr}.money b{font-size:19px}.meet{grid-template-columns:1fr}.meet .leaf{display:flex;align-items:baseline;gap:10px;width:auto;padding:0 16px 0 0;text-align:start;justify-self:start}.meet .leaf b{display:none}.meet .leaf .d{font-size:46px;padding:8px 0 8px 16px}.meet .leaf .m,.meet .leaf .w{padding:0;font-size:16px}}
+.safety{display:flex;flex-direction:column;gap:10px}
+.safety .acts .btn{min-height:48px}
+.toast{position:fixed;left:50%;bottom:calc(var(--tabh) + 18px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:12px;font-size:15px;max-width:min(92vw,480px);box-shadow:0 8px 24px rgba(28,25,23,.25)}
+.toast.err{background:var(--red)}
+.skel{background:linear-gradient(90deg,var(--paper-2),var(--paper-3),var(--paper-2));background-size:200% 100%;animation:sk 1.2s linear infinite;border-radius:12px;min-height:120px}
+@keyframes sk{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="root"><div class="auth"><div class="auth-in"><div class="skel"></div></div></div></div>
+<script>
+'use strict';
+/* Manzil gid platformasi. Kirish: login + parol (Telegram botdan) → yangi qurilmada botga kelgan 6 xonali kod. */
+const T = {
+uz: {
+  for_guides: 'gidlar uchun', sign_in: 'Kirish', login: 'Login', password: 'Parol', show: "Ko'rsatish", hide: 'Yashirish', next: 'Davom etish',
+  forgot: 'Parolni unutdim', forgot_need: 'Avval loginni yozing.', forgot_sent: "Agar login to'g'ri bo'lsa, Telegram botga xabar yubordik. Undagi «Yangi parol» tugmasini bosing.",
+  hint: "Login va parolni Manzil Telegram boti yuboradi. Hali olmagan bo'lsangiz, botga /gid deb yozing{bot}.",
+  code_h: "Telegram'dagi kodni kiriting", code_p: 'Manzil botiga 6 xonali kod yubordik. Kod 5 daqiqa amal qiladi.', code: 'Kod', remember: 'Bu qurilmani 30 kun eslab qol', enter: 'Kirish', resend: 'Kodni qayta yuborish', back: 'Orqaga', resent: 'Yangi kod yuborildi.',
+  t_home: 'Bosh sahifa', t_tours: 'Turlar', t_places: 'Manzillar', t_profile: 'Profil',
+  hello: 'Salom, {name}', hello_sub: 'Yaqin turlaringiz va mijozlar shu yerda.', next_meet: 'Keyingi tur', days_n: '{n} kun', people_n: '{n} kishi', share: 'Ulushingiz {n}',
+  call: "Qo'ng'iroq", email: 'Email', accept: 'Qabul qilaman', accepted: 'Qabul qildingiz', accept_q: 'Turni qabul qilasizmi? Mijoz va admin buni ko\'radi.', accepted_t: '{code}: qabul qilindi.',
+  contact_hidden: "Mijoz aloqasi to'lov tasdiqlangach ochiladi.", no_upcoming: "Hozircha yaqin tur yo'q. Yangi bron to'langanda Telegram'ga xabar keladi.", see_places: "Manzillarni ko'rish",
+  earned: 'Ishlangan', held: 'Kutilmoqda', paid_out: "To'langan", money_note: "Ulushingiz tur yakunlangach to'lanadi.", to_accept: 'Qabul qilish kutilmoqda', reviews: 'Mijozlar baholari', no_reviews: "Hali baho yo'q.",
+  upcoming: 'Kelgusi', past: "O'tgan", no_tours: "Bu ro'yxat bo'sh.", st_pending: 'Admin tasdig\'i kutilmoqda', st_confirmed: 'Tasdiqlangan', st_completed: 'Yakunlangan', st_cancelled: 'Bekor qilingan', pref_female: 'ayol gid so\'ralgan', pref_male: 'erkak gid so\'ralgan',
+  search: 'Manzil yoki davlat', all: 'Hammasi', places_n: '{n} ta manzil', mine: 'Sizning manzilingiz', best: 'Eng yaxshi vaqt', cost: 'Kunlik xarajat, 1 kishi (taxminan)',
+  c_hotel: 'Mehmonxona (ikki kishilik xonaning yarmi)', c_food: 'Ovqat', c_transport: 'Mahalliy transport', c_act: 'Kirish chiptalari va faoliyat', c_total: 'Jami kuniga', facts: "Ma'lumot", f_tour5: '5 kunlik tur (taxminan)', f_flight: 'Aviachipta, Toshkentdan (taxminan)',
+  f_lang: 'Mahalliy til', f_country: 'Davlat', f_guides: 'Manzil gidlari', f_guides_v: '{n} ta ({f} ayol, {m} erkak)', open_map: 'Xaritada ochish', open_site: 'Saytdagi sahifa', packages: 'Shu yerdagi turlar', sample: 'namuna', per_person: '1 kishi', none_pk: "Hozircha tur yo'q.",
+  pick: "Chapdan manzilni tanlang.", back_list: "Ro'yxatga qaytish", photo: 'Surat',
+  profile: 'Profil', spec: 'Mutaxassislik', langs: 'Tillar', about: "O'zingiz haqingizda", rate: 'Kunlik narx, USD', save: 'Saqlash', saved: 'Saqlandi.', ui_lang: 'Platforma tili',
+  account: 'Hisob', tg_ok: "Telegram ulangan", security: 'Xavfsizlik', sec_p: "Parol faqat Telegram bot orqali keladi. Yangi qurilmadan kirishda botga kod yuboriladi.", devices: 'Eslab qolingan qurilmalar: {n}',
+  new_pw: "Yangi parol Telegram'ga", new_pw_q: "Yangi parol Telegram'ga yuboriladi va barcha qurilmalardan chiqasiz. Davom etasizmi?", new_pw_ok: "Yangi parol Telegram'ga yuborildi. U bilan qayta kiring.",
+  logout_all: 'Barcha qurilmalardan chiqish', logout_all_q: 'Barcha qurilmalardan chiqasizmi?', logout: 'Chiqish', err: 'Xatolik yuz berdi. Qayta urinib ko\'ring.', net: "Serverga ulanib bo'lmadi. Internetni tekshiring.",
+  r_uzbekistan: "O'zbekiston", r_central_asia: 'Markaziy Osiyo va Kavkaz', r_middle_east: 'Yaqin Sharq', r_europe: 'Yevropa', r_asia: 'Osiyo', r_americas: 'Amerika', r_africa_oceania: 'Afrika va Okeaniya',
+  tag_history: 'Tarix', tag_nature: 'Tabiat', tag_beach: 'Dengiz', tag_city: 'Shahar', 'tag_visa-free': 'Vizasiz', 'tag_diy-win': "O'zingiz reja qilsangiz arzon",
+  pk_classic: 'Klassik {p}', pk_slow: 'Shoshilmasdan: {p}', pk_food: '{p}: taom va hunarmandchilik', pk_nature: '{p} tabiati', pk_history: '{p} tarixi', pk_family: '{p} oila bilan'
+},
+ru: {
+  for_guides: 'для гидов', sign_in: 'Вход', login: 'Логин', password: 'Пароль', show: 'Показать', hide: 'Скрыть', next: 'Продолжить',
+  forgot: 'Забыл пароль', forgot_need: 'Сначала введите логин.', forgot_sent: 'Если логин верный, мы отправили сообщение в Telegram-бот. Нажмите в нём «Новый пароль».',
+  hint: 'Логин и пароль присылает Telegram-бот Manzil. Если ещё не получили, напишите боту /gid{bot}.',
+  code_h: 'Введите код из Telegram', code_p: 'Мы отправили 6-значный код в бот Manzil. Код действует 5 минут.', code: 'Код', remember: 'Запомнить это устройство на 30 дней', enter: 'Войти', resend: 'Отправить код ещё раз', back: 'Назад', resent: 'Новый код отправлен.',
+  t_home: 'Главная', t_tours: 'Туры', t_places: 'Направления', t_profile: 'Профиль',
+  hello: 'Здравствуйте, {name}', hello_sub: 'Ваши ближайшие туры и клиенты — здесь.', next_meet: 'Следующий тур', days_n: '{n} дн.', people_n: '{n} чел.', share: 'Ваша доля {n}',
+  call: 'Позвонить', email: 'Email', accept: 'Принимаю', accepted: 'Вы приняли', accept_q: 'Принять тур? Клиент и администратор это увидят.', accepted_t: '{code}: принято.',
+  contact_hidden: 'Контакт клиента откроется после подтверждения оплаты.', no_upcoming: 'Ближайших туров пока нет. Когда новая бронь будет оплачена, придёт сообщение в Telegram.', see_places: 'Посмотреть направления',
+  earned: 'Заработано', held: 'Ожидает', paid_out: 'Выплачено', money_note: 'Ваша доля выплачивается после завершения тура.', to_accept: 'Ждут вашего принятия', reviews: 'Оценки клиентов', no_reviews: 'Оценок пока нет.',
+  upcoming: 'Предстоящие', past: 'Прошедшие', no_tours: 'Список пуст.', st_pending: 'Ждёт подтверждения админа', st_confirmed: 'Подтверждён', st_completed: 'Завершён', st_cancelled: 'Отменён', pref_female: 'просили гида-женщину', pref_male: 'просили гида-мужчину',
+  search: 'Направление или страна', all: 'Все', places_n: '{n} направлений', mine: 'Ваше направление', best: 'Лучшее время', cost: 'Расходы в день на 1 человека (примерно)',
+  c_hotel: 'Отель (половина двухместного номера)', c_food: 'Еда', c_transport: 'Местный транспорт', c_act: 'Билеты и активности', c_total: 'Итого в день', facts: 'Сведения', f_tour5: 'Тур на 5 дней (примерно)', f_flight: 'Авиабилет из Ташкента (примерно)',
+  f_lang: 'Местный язык', f_country: 'Страна', f_guides: 'Гиды Manzil', f_guides_v: '{n} ({f} жен., {m} муж.)', open_map: 'Открыть на карте', open_site: 'Страница на сайте', packages: 'Туры здесь', sample: 'пример', per_person: '1 чел.', none_pk: 'Туров пока нет.',
+  pick: 'Выберите направление слева.', back_list: 'Назад к списку', photo: 'Фото',
+  profile: 'Профиль', spec: 'Специализация', langs: 'Языки', about: 'О себе', rate: 'Цена в день, USD', save: 'Сохранить', saved: 'Сохранено.', ui_lang: 'Язык платформы',
+  account: 'Аккаунт', tg_ok: 'Telegram подключён', security: 'Безопасность', sec_p: 'Пароль приходит только через Telegram-бот. При входе с нового устройства бот присылает код.', devices: 'Запомненные устройства: {n}',
+  new_pw: 'Новый пароль в Telegram', new_pw_q: 'Новый пароль будет отправлен в Telegram, вы выйдете со всех устройств. Продолжить?', new_pw_ok: 'Новый пароль отправлен в Telegram. Войдите с ним снова.',
+  logout_all: 'Выйти со всех устройств', logout_all_q: 'Выйти со всех устройств?', logout: 'Выйти', err: 'Произошла ошибка. Попробуйте ещё раз.', net: 'Нет связи с сервером. Проверьте интернет.',
+  r_uzbekistan: 'Узбекистан', r_central_asia: 'Центральная Азия и Кавказ', r_middle_east: 'Ближний Восток', r_europe: 'Европа', r_asia: 'Азия', r_americas: 'Америка', r_africa_oceania: 'Африка и Океания',
+  tag_history: 'История', tag_nature: 'Природа', tag_beach: 'Море', tag_city: 'Город', 'tag_visa-free': 'Без визы', 'tag_diy-win': 'Выгодно самостоятельно',
+  pk_classic: 'Классический {p}', pk_slow: 'Неспешно: {p}', pk_food: '{p}: еда и ремёсла', pk_nature: 'Природа: {p}', pk_history: 'История: {p}', pk_family: '{p} всей семьёй'
+},
+en: {
+  for_guides: 'for guides', sign_in: 'Sign in', login: 'Login', password: 'Password', show: 'Show', hide: 'Hide', next: 'Continue',
+  forgot: 'I forgot my password', forgot_need: 'Type your login first.', forgot_sent: 'If the login is right, we sent a message to the Telegram bot. Tap “New password” in it.',
+  hint: "Your login and password come from the Manzil Telegram bot. If you don't have them yet, send /gid to the bot{bot}.",
+  code_h: 'Enter the code from Telegram', code_p: 'We sent a 6-digit code to the Manzil bot. It is valid for 5 minutes.', code: 'Code', remember: 'Remember this device for 30 days', enter: 'Sign in', resend: 'Send the code again', back: 'Back', resent: 'A new code was sent.',
+  t_home: 'Home', t_tours: 'Tours', t_places: 'Destinations', t_profile: 'Profile',
+  hello: 'Hello, {name}', hello_sub: 'Your next tours and travellers are here.', next_meet: 'Next tour', days_n: '{n} days', people_n: '{n} people', share: 'Your share {n}',
+  call: 'Call', email: 'Email', accept: 'I accept', accepted: 'You accepted', accept_q: 'Accept this tour? The traveller and the admin will see it.', accepted_t: '{code}: accepted.',
+  contact_hidden: 'The traveller’s contact appears once the payment is confirmed.', no_upcoming: 'No upcoming tours yet. When a new booking is paid, Telegram will notify you.', see_places: 'Browse destinations',
+  earned: 'Earned', held: 'On hold', paid_out: 'Paid out', money_note: 'Your share is paid after the tour is completed.', to_accept: 'Waiting for you to accept', reviews: 'Traveller ratings', no_reviews: 'No ratings yet.',
+  upcoming: 'Upcoming', past: 'Past', no_tours: 'This list is empty.', st_pending: 'Waiting for admin confirmation', st_confirmed: 'Confirmed', st_completed: 'Completed', st_cancelled: 'Cancelled', pref_female: 'asked for a female guide', pref_male: 'asked for a male guide',
+  search: 'Place or country', all: 'All', places_n: '{n} destinations', mine: 'Your destination', best: 'Best time to go', cost: 'Daily cost per person (estimate)',
+  c_hotel: 'Hotel (half a double room)', c_food: 'Food', c_transport: 'Local transport', c_act: 'Tickets and activities', c_total: 'Total per day', facts: 'Facts', f_tour5: '5-day tour (estimate)', f_flight: 'Flight from Tashkent (estimate)',
+  f_lang: 'Local language', f_country: 'Country', f_guides: 'Manzil guides', f_guides_v: '{n} ({f} female, {m} male)', open_map: 'Open the map', open_site: 'Page on the site', packages: 'Tours here', sample: 'sample', per_person: 'per person', none_pk: 'No tours yet.',
+  pick: 'Pick a destination on the left.', back_list: 'Back to the list', photo: 'Photo',
+  profile: 'Profile', spec: 'Specialisation', langs: 'Languages', about: 'About you', rate: 'Daily rate, USD', save: 'Save', saved: 'Saved.', ui_lang: 'Platform language',
+  account: 'Account', tg_ok: 'Telegram connected', security: 'Security', sec_p: 'Your password only ever comes through the Telegram bot. Signing in on a new device sends a code to the bot.', devices: 'Remembered devices: {n}',
+  new_pw: 'New password to Telegram', new_pw_q: 'A new password will be sent to Telegram and you will be signed out everywhere. Continue?', new_pw_ok: 'A new password was sent to Telegram. Sign in with it.',
+  logout_all: 'Sign out of all devices', logout_all_q: 'Sign out of all devices?', logout: 'Sign out', err: 'Something went wrong. Please try again.', net: 'Can’t reach the server. Check your connection.',
+  r_uzbekistan: 'Uzbekistan', r_central_asia: 'Central Asia & Caucasus', r_middle_east: 'Middle East', r_europe: 'Europe', r_asia: 'Asia', r_americas: 'Americas', r_africa_oceania: 'Africa & Oceania',
+  tag_history: 'History', tag_nature: 'Nature', tag_beach: 'Sea', tag_city: 'City', 'tag_visa-free': 'Visa-free', 'tag_diy-win': 'Cheaper on your own',
+  pk_classic: 'Classic {p}', pk_slow: 'Slow {p}', pk_food: '{p}: food & crafts', pk_nature: '{p} outdoors', pk_history: '{p} through history', pk_family: '{p} with family'
+}};
+const REGIONS = ['uzbekistan', 'central_asia', 'middle_east', 'europe', 'asia', 'americas', 'africa_oceania'];
+let LANG = (() => { try { const l = localStorage.getItem('mz_gp_lang'); if (T[l]) return l; } catch (_) {} const n = (navigator.language || 'uz').slice(0, 2); return T[n] ? n : 'uz'; })();
+const t = (k, v) => { let s = (T[LANG] && T[LANG][k]) || T.uz[k] || k; if (v) for (const x in v) s = s.split('{' + x + '}').join(v[x]); return s; };
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const money = n => { const x = Number(n || 0); return '$' + x.toLocaleString('en-US', Number.isInteger(x) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+const S = { me: null, bookings: [], tab: 'home', cat: null, catMap: {}, region: '', q: '', sel: null, tourSeg: 'up', info: null, pending: null };
+
+async function api(path, body, opts = {}) {
+  let r;
+  try { r = await fetch('/api' + path, { method: body !== undefined ? 'POST' : 'GET', credentials: 'same-origin', headers: body !== undefined ? { 'Content-Type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : undefined }); }
+  catch (_) { const e = new Error(t('net')); e.status = 0; throw e; }
+  let d = {}; try { d = await r.json(); } catch (_) {}
+  if (!r.ok) { const e = new Error(d.error || t('err')); e.status = r.status; e.data = d; if (r.status === 401 && S.me && !opts.quiet) { S.me = null; renderLogin(); } throw e; }
+  return d;
+}
+function toast(m, err) { const el = document.createElement('div'); el.className = 'toast' + (err ? ' err' : ''); el.setAttribute('role', 'status'); el.textContent = m; document.body.appendChild(el); setTimeout(() => el.remove(), err ? 6000 : 3200); }
+function setLang(l) { LANG = l; try { localStorage.setItem('mz_gp_lang', l); } catch (_) {} document.documentElement.lang = l; }
+const langButtons = () => `<div class="langs" role="group" aria-label="Language">${['uz', 'ru', 'en'].map(l => `<button type="button" data-lang="${l}" aria-pressed="${l === LANG}">${{ uz: "O'zbek", ru: 'Русский', en: 'English' }[l]}</button>`).join('')}</div>`;
+const wordmark = () => `<div class="wordmark"><i aria-hidden="true"></i>Manzil<small>${esc(t('for_guides'))}</small></div>`;
+
+/* ---------- Kirish ---------- */
+function renderLogin(note) {
+  S.pending = null;
+  const bot = S.info && S.info.bot ? ` (<a href="https://t.me/${esc(S.info.bot)}" target="_blank" rel="noopener">@${esc(S.info.bot)}</a>)` : '';
+  $('#root').innerHTML = `<div class="auth"><div class="auth-in">${wordmark()}<h1>${esc(t('sign_in'))}</h1>
+    <form id="f1" novalidate>
+      <label class="f">${esc(t('login'))}<input class="inp" name="login" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
+      <label class="f">${esc(t('password'))}<span class="pw"><input class="inp" name="password" type="password" autocomplete="current-password" required><button type="button" id="eye" aria-pressed="false">${esc(t('show'))}</button></span></label>
+      <p class="msg ${note ? 'ok' : ''}" id="m1" role="alert">${note ? esc(note) : ''}</p>
+      <button class="btn primary block" id="go1">${esc(t('next'))}</button>
+    </form>
+    <button class="link" type="button" id="forgot" style="align-self:flex-start">${esc(t('forgot'))}</button>
+    <p class="hint">${esc(t('hint', { bot: '\u0000' })).replace('\u0000', bot)}</p></div>${langButtons()}</div>`;
+  $$('[data-lang]').forEach(b => b.onclick = () => { setLang(b.dataset.lang); renderLogin(); });
+  const f = $('#f1');
+  $('#eye').onclick = e => { const show = f.password.type === 'password'; f.password.type = show ? 'text' : 'password'; e.target.textContent = t(show ? 'hide' : 'show'); e.target.setAttribute('aria-pressed', show); };
+  f.onsubmit = async e => {
+    e.preventDefault(); const m = $('#m1'); m.className = 'msg'; m.textContent = '';
+    const login = f.login.value.trim(), password = f.password.value;
+    if (!login || !password) { m.className = 'msg err'; m.textContent = t('err'); return (login ? f.password : f.login).focus(); }
+    $('#go1').disabled = true;
+    try {
+      const r = await api('/gp/login', { login, password, lang: LANG });
+      if (r.need2fa) { S.pending = { login, password, challenge: r.challenge }; return renderCode(); }
+      return boot();
+    } catch (ex) { m.className = 'msg err'; m.textContent = ex.message; $('#go1').disabled = false; }
+  };
+  $('#forgot').onclick = async () => {
+    const m = $('#m1'), login = f.login.value.trim();
+    if (!login) { m.className = 'msg err'; m.textContent = t('forgot_need'); return f.login.focus(); }
+    try { await api('/gp/forgot', { login }); m.className = 'msg ok'; m.textContent = t('forgot_sent'); } catch (ex) { m.className = 'msg err'; m.textContent = ex.message; }
+  };
+  f.login.focus();
+}
+function renderCode() {
+  $('#root').innerHTML = `<div class="auth"><div class="auth-in">${wordmark()}<h1>${esc(t('code_h'))}</h1><p class="mute">${esc(t('code_p'))}</p>
+    <form id="f2" novalidate>
+      <label class="f">${esc(t('code'))}<input class="inp code num" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required></label>
+      <label class="check"><input type="checkbox" name="remember" checked>${esc(t('remember'))}</label>
+      <p class="msg" id="m2" role="alert"></p>
+      <button class="btn primary block" id="go2">${esc(t('enter'))}</button>
+    </form>
+    <div style="display:flex;gap:22px;flex-wrap:wrap"><button class="link" type="button" id="resend">${esc(t('resend'))}</button><button class="link" type="button" id="bk">${esc(t('back'))}</button></div></div>${langButtons()}</div>`;
+  $$('[data-lang]').forEach(b => b.onclick = () => { setLang(b.dataset.lang); renderCode(); });
+  const f = $('#f2'), m = $('#m2');
+  f.code.oninput = () => { f.code.value = f.code.value.replace(/\D/g, '').slice(0, 6); if (f.code.value.length === 6) f.requestSubmit(); };
+  f.onsubmit = async e => {
+    e.preventDefault(); if (f.code.value.length !== 6) return f.code.focus();
+    $('#go2').disabled = true; m.className = 'msg'; m.textContent = '';
+    try { await api('/gp/login/verify', { challenge: S.pending.challenge, code: f.code.value, remember: f.remember.checked }); S.pending = null; boot(); }
+    catch (ex) { m.className = 'msg err'; m.textContent = ex.message; $('#go2').disabled = false; f.code.select(); }
+  };
+  $('#resend').onclick = async () => {
+    try { const r = await api('/gp/login', { login: S.pending.login, password: S.pending.password, lang: LANG }); if (!r.need2fa) return boot(); S.pending.challenge = r.challenge; m.className = 'msg ok'; m.textContent = t('resent'); f.code.value = ''; f.code.focus(); }
+    catch (ex) { m.className = 'msg err'; m.textContent = ex.message; }
+  };
+  $('#bk').onclick = () => renderLogin();
+  f.code.focus();
+}
+
+/* ---------- Karkas ---------- */
+const ICON = {
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>',
+  tours: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg>',
+  places: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg>',
+  profile: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>',
+  send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 3 10.5l7 2.5 2.5 7z"/><path d="m10 13 4-4"/></svg>',
+  back: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>'
+};
+function shell() {
+  const n = S.me.stats.toAccept;
+  $('#root').innerHTML = `<div class="shell"><header class="topbar">${wordmark()}<span class="sp"></span>
+      <label class="sr" for="lsel">${esc(t('ui_lang'))}</label><select id="lsel">${['uz', 'ru', 'en'].map(l => `<option value="${l}" ${l === LANG ? 'selected' : ''}>${l.toUpperCase()}</option>`).join('')}</select></header>
+    <nav class="tabs" aria-label="Menu">${['home', 'tours', 'places', 'profile'].map(k => `<button type="button" data-tab="${k}" ${S.tab === k ? 'aria-current="page"' : ''}>${ICON[k]}<span>${esc(t('t_' + k))}</span>${k === 'tours' && n ? `<span class="badge" aria-label="${esc(t('to_accept'))}">${n}</span>` : ''}</button>`).join('')}</nav>
+    <main class="view" id="view"></main></div>`;
+  $$('[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
+  $('#lsel').onchange = e => { setLang(e.target.value); api('/gp/profile', { lang: LANG }).catch(() => {}); shell(); show(); };
+}
+function go(tab, sub) { S.tab = tab; history.replaceState(null, '', '#' + tab + (sub ? '/' + sub : '')); $$('[data-tab]').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')); show(); window.scrollTo(0, 0); }
+function show() { const v = $('#view'); v.classList.toggle('wide', S.tab === 'places'); ({ home: viewHome, tours: viewTours, places: viewPlaces, profile: viewProfile }[S.tab] || viewHome)(v); }
+
+/* ---------- Yordamchilar ---------- */
+const parseDay = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12)) : null; };
+const fmtD = (d, o) => { try { return new Intl.DateTimeFormat(LANG, { timeZone: 'UTC', ...o }).format(d); } catch (_) { return d.toISOString().slice(0, 10); } };
+// Brauzerlarda o'zbekcha sana ma'lumotlari ko'pincha yo'q ("M12", "Fri") — shuning uchun o'zimiz yozamiz
+const UZ_M = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
+const UZ_MS = ['yan', 'fev', 'mar', 'apr', 'may', 'iyn', 'iyl', 'avg', 'sen', 'okt', 'noy', 'dek'];
+const UZ_W = ['yakshanba', 'dushanba', 'seshanba', 'chorshanba', 'payshanba', 'juma', 'shanba'];
+const monthShort = i => LANG === 'uz' ? UZ_MS[i] : fmtD(new Date(Date.UTC(2026, i, 15)), { month: 'short' }).replace('.', '');
+const weekdayOf = d => LANG === 'uz' ? UZ_W[d.getUTCDay()] : fmtD(d, { weekday: 'short' });
+const longDate = d => LANG === 'uz' ? `${d.getUTCDate()}-${UZ_M[d.getUTCMonth()]}, ${UZ_W[d.getUTCDay()]}` : fmtD(d, { day: 'numeric', month: 'long', weekday: 'long' });
+function leaf(dateStr, small) {
+  const d = parseDay(dateStr);
+  if (!d) return `<div class="leaf ${small ? 'sm' : ''}" aria-hidden="true"><b></b><div class="d">—</div><div class="m">&nbsp;</div></div>`;
+  return `<div class="leaf ${small ? 'sm' : ''}" role="img" aria-label="${esc(longDate(d))}"><b></b><div class="d">${d.getUTCDate()}</div><div class="m">${esc(monthShort(d.getUTCMonth()))}</div><div class="w">${esc(weekdayOf(d))}</div></div>`;
+}
+const dest = slug => S.catMap[slug];
+const dname = d => d ? (d.names[LANG] || d.names.en) : '';
+const placeOf = b => (dest(b.place) ? dname(dest(b.place)) : (b.place || b.title || ''));
+function contactActs(c) {
+  const s = String(c || '').trim(), ph = s.replace(/[^\d+]/g, ''), acts = [];
+  if (/^\+?\d{9,15}$/.test(ph)) { acts.push(`<a class="btn" href="tel:${esc(ph)}">${ICON.phone}${esc(t('call'))}</a>`); acts.push(`<a class="btn" href="https://t.me/${esc(ph.startsWith('+') ? ph : '+' + ph)}" target="_blank" rel="noopener">${ICON.send}Telegram</a>`); acts.push(`<a class="btn" href="https://wa.me/${esc(ph.replace('+', ''))}" target="_blank" rel="noopener">WhatsApp</a>`); }
+  else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) acts.push(`<a class="btn" href="mailto:${esc(s)}">${ICON.send}${esc(t('email'))}</a>`);
+  else if (/^@?[A-Za-z0-9_]{5,32}$/.test(s)) acts.push(`<a class="btn" href="https://t.me/${esc(s.replace('@', ''))}" target="_blank" rel="noopener">${ICON.send}Telegram</a>`);
+  return acts.join('');
+}
+const stChip = b => `<span class="st ${b.status === 'confirmed' || b.status === 'completed' ? 'ok' : b.status === 'cancelled' ? 'bad' : 'wait'}">${esc(t('st_' + b.status))}</span>`;
+const isUpcoming = b => ['pending', 'confirmed'].includes(b.status);
+async function ack(b, btn) {
+  if (!confirm(t('accept_q'))) return;
+  btn.disabled = true;
+  try { await api(`/gp/bookings/${encodeURIComponent(b.id)}/ack`, {}); toast(t('accepted_t', { code: b.code })); await refresh(); show(); }
+  catch (ex) { btn.disabled = false; toast(ex.message, true); }
+}
+async function refresh() { const [me, bk] = await Promise.all([api('/gp/me'), api('/gp/bookings')]); S.me = me; S.bookings = bk.bookings; const n = me.stats.toAccept, tb = $('[data-tab=tours]'); if (tb) { const old = tb.querySelector('.badge'); if (old) old.remove(); if (n) tb.insertAdjacentHTML('beforeend', `<span class="badge">${n}</span>`); } }
+async function ensureCatalog() { if (S.cat) return; const r = await api('/catalog'); S.cat = r.destinations; S.catMap = Object.fromEntries(r.destinations.map(d => [d.slug, d])); }
+
+/* ---------- Bosh sahifa ---------- */
+function meetBlock(b) {
+  const pref = b.genderPref ? `<span>${esc(t('pref_' + b.genderPref))}</span>` : '';
+  return `<article class="meet" aria-label="${esc(t('next_meet'))}">${leaf(b.travelDate)}
+    <div class="who"><span class="mute small">${esc(t('next_meet'))}</span><div class="place">${esc(placeOf(b))}</div>
+      <div class="facts"><span>${esc(t('days_n', { n: b.days }))}</span><span>${esc(t('people_n', { n: b.people }))}</span><span class="num">${esc(t('share', { n: money(b.payoutUsd) }))}</span>${pref}</div>
+      ${b.customer ? `<div class="person"><span class="nm">${esc(b.customer.name || '')}</span><span class="meta2 mute small num"><span>${esc(b.customer.contact || '')}</span><span>${esc(b.code)}</span></span><div class="acts contact">${contactActs(b.customer.contact)}</div></div>` : `<p class="lockline">${esc(t('contact_hidden'))}</p>`}
+    </div>
+    ${b.canAck ? `<div class="needack"><span>${esc(t('accept_q'))}</span><button class="btn primary" type="button" data-ack="${esc(b.id)}">${esc(t('accept'))}</button></div>` : ''}</article>`;
+}
+function viewHome(v) {
+  const me = S.me, g = me.guide, up = S.bookings.filter(b => isUpcoming(b) && b.customer).sort((a, b) => String(a.travelDate).localeCompare(String(b.travelDate)));
+  const next = up[0], waiting = S.bookings.filter(b => b.canAck && (!next || b.id !== next.id)), e = me.earnings;
+  v.innerHTML = `<div class="hello"><h1>${esc(t('hello', { name: String(g.name || '').split(/\s+/)[0] }))}</h1><p class="mute">${esc(t('hello_sub'))}</p></div>
+    ${next ? meetBlock(next) : `<div class="empty"><p>${esc(t('no_upcoming'))}</p><button class="btn" type="button" id="toPlaces">${esc(t('see_places'))}</button></div>`}
+    <div class="money num" role="group" aria-label="${esc(t('earned'))}"><div><b>${money(e.earnedUsd)}</b><span>${esc(t('earned'))}</span></div><div><b>${money(e.heldUsd)}</b><span>${esc(t('held'))}</span></div><div><b>${money(e.paidOutUsd)}</b><span>${esc(t('paid_out'))}</span></div></div>
+    <p class="mute small">${esc(t('money_note'))}</p>
+    ${waiting.length ? `<section class="sec"><div class="sec-h"><h2>${esc(t('to_accept'))}</h2></div><div class="list">${waiting.map(rowHtml).join('')}</div></section>` : ''}
+    <section class="sec"><div class="sec-h"><h2>${esc(t('reviews'))}</h2>${me.stats.rating ? `<span class="num"><span class="stars" aria-hidden="true">★</span> ${me.stats.rating} (${me.stats.reviews})</span>` : ''}</div>
+      ${me.reviews.length ? me.reviews.slice(0, 3).map(r => `<div class="review"><span class="stars" aria-label="${r.rating}/5">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span>${r.comment ? `<p>${esc(r.comment)}</p>` : ''}</div>`).join('') : `<p class="mute">${esc(t('no_reviews'))}</p>`}</section>`;
+  wireRows(v);
+  const tp = $('#toPlaces', v); if (tp) tp.onclick = () => go('places');
+}
+
+/* ---------- Turlar ---------- */
+function rowHtml(b) {
+  return `<div class="row">${leaf(b.travelDate, true)}<div class="main">
+    <div class="t1"><b>${esc(placeOf(b))}</b>${stChip(b)}</div>
+    <div class="facts small"><span>${esc(t('days_n', { n: b.days }))}</span><span>${esc(t('people_n', { n: b.people }))}</span><span class="num">${esc(t('share', { n: money(b.payoutUsd) }))}</span><span class="mute num">${esc(b.code)}</span></div>
+    ${b.customer ? `<div class="small"><b>${esc(b.customer.name || '')}</b> <span class="mute num">${esc(b.customer.contact || '')}</span></div>${isUpcoming(b) ? `<div class="acts contact">${contactActs(b.customer.contact)}</div>` : ''}` : `<p class="lockline">${esc(t('contact_hidden'))}</p>`}
+    ${b.canAck ? `<div><button class="btn primary" type="button" data-ack="${esc(b.id)}">${esc(t('accept'))}</button></div>` : b.acknowledged && isUpcoming(b) ? `<p class="small" style="color:var(--green)">✓ ${esc(t('accepted'))}</p>` : ''}
+  </div></div>`;
+}
+function wireRows(v) { $$('[data-ack]', v).forEach(btn => btn.onclick = () => ack(S.bookings.find(b => b.id === btn.dataset.ack), btn)); }
+function viewTours(v) {
+  const up = S.bookings.filter(isUpcoming).sort((a, b) => String(a.travelDate).localeCompare(String(b.travelDate))), past = S.bookings.filter(b => !isUpcoming(b));
+  const list = S.tourSeg === 'up' ? up : past;
+  v.innerHTML = `<h1>${esc(t('t_tours'))}</h1>
+    <div class="seg" role="group"><button type="button" data-seg="up" aria-pressed="${S.tourSeg === 'up'}">${esc(t('upcoming'))} (${up.length})</button><button type="button" data-seg="past" aria-pressed="${S.tourSeg === 'past'}">${esc(t('past'))} (${past.length})</button></div>
+    <div class="list">${list.length ? list.map(rowHtml).join('') : `<div class="empty" style="margin-top:10px"><p>${esc(t('no_tours'))}</p></div>`}</div>`;
+  $$('[data-seg]', v).forEach(b => b.onclick = () => { S.tourSeg = b.dataset.seg; viewTours(v); });
+  wireRows(v);
+}
+
+/* ---------- Manzillar: 30/70 ---------- */
+const norm = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ'‘’ʻʼ`]/g, '');
+const countryOf = d => { if (!d) return ''; if (LANG === 'uz' && d.uzCountry) return d.uzCountry; try { return new Intl.DisplayNames([LANG], { type: 'region' }).of(d.country); } catch (_) { return d.country || ''; } };
+const UZ_LANG = { uz: "o'zbek", kk: 'qozoq', ky: "qirg'iz", tg: 'tojik', tk: 'turkman', tr: 'turk', ar: 'arab', ka: 'gruzin', az: 'ozarbayjon', fr: 'fransuz', it: 'italyan', es: 'ispan', en: 'ingliz', cs: 'chex', de: 'nemis', hu: 'venger', nl: 'niderland', el: 'grek', pt: 'portugal', pl: 'polyak', sv: 'shved', no: 'norveg', is: 'island', hr: 'xorvat', sr: 'serb', ru: 'rus', ms: 'malay', th: 'tay', id: 'indonez', ko: 'koreys', ja: 'yapon', zh: 'xitoy', vi: 'vyetnam', hi: 'hind', dv: 'divehi', si: 'singal', ne: 'nepal', sw: 'suaxili' };
+const langName = code => { if (!code) return ''; if (LANG === 'uz') return UZ_LANG[code] || code; try { return new Intl.DisplayNames([LANG], { type: 'language' }).of(code); } catch (_) { return code; } };
+function filtered() {
+  const q = norm(S.q);
+  return S.cat.filter(d => (!S.region || d.region === S.region) && (!q || Object.values(d.names).some(n => norm(n).includes(q)) || norm(countryOf(d)).includes(q) || d.slug.includes(q)))
+    .sort((a, b) => (b.slug === S.me.guide.dest) - (a.slug === S.me.guide.dest) || dname(a).localeCompare(dname(b), LANG));
+}
+async function viewPlaces(v) {
+  v.innerHTML = `<div class="places"><div class="plist"><div class="ptools">
+      <label class="sr" for="pq">${esc(t('search'))}</label><input class="inp" id="pq" type="search" placeholder="${esc(t('search'))}" value="${esc(S.q)}" autocomplete="off">
+      <div class="chips" role="group">${['', ...REGIONS].map(r => `<button type="button" data-rg="${r}" aria-pressed="${S.region === r}">${esc(r ? t('r_' + r) : t('all'))}</button>`).join('')}</div>
+      <span class="pcount" id="pcount" aria-live="polite"></span></div><div class="pitems" id="pitems"><div class="skel" style="margin:16px"></div></div></div>
+    <section class="pdetail" id="pdetail" aria-live="polite"></section></div>`;
+  try { await ensureCatalog(); } catch (ex) { $('#pitems', v).innerHTML = `<p class="msg err" style="padding:16px">${esc(ex.message)}</p>`; return; }
+  const sub = (location.hash.split('/')[1] || '');
+  if (!S.sel) S.sel = dest(sub) ? sub : (dest(S.me.guide.dest) ? S.me.guide.dest : null);
+  const draw = () => {
+    const list = filtered();
+    $('#pcount', v).textContent = t('places_n', { n: list.length });
+    $('#pitems', v).innerHTML = list.map(d => `<button type="button" class="pitem" data-slug="${esc(d.slug)}" ${d.slug === S.sel ? 'aria-current="true"' : ''}><img alt="" loading="lazy" src="${esc(d.img)}"><span class="txt"><b>${esc(dname(d))}</b><span class="sub">${esc(countryOf(d))}</span>${d.slug === S.me.guide.dest ? `<span class="mine">${esc(t('mine'))}</span>` : ''}</span></button>`).join('');
+    $$('.pitem', v).forEach(b => b.onclick = () => openPlace(b.dataset.slug, true));
+  };
+  $('#pq', v).oninput = e => { S.q = e.target.value; draw(); };
+  $$('[data-rg]', v).forEach(b => b.onclick = () => { S.region = b.dataset.rg; $$('[data-rg]', v).forEach(x => x.setAttribute('aria-pressed', x === b)); draw(); });
+  draw();
+  if (S.sel) openPlace(S.sel, false); else $('#pdetail', v).innerHTML = `<div class="pd-body"><p class="mute">${esc(t('pick'))}</p></div>`;
+}
+async function openPlace(slug, user) {
+  S.sel = slug; history.replaceState(null, '', '#places/' + slug);
+  $$('.pitem').forEach(b => b.dataset.slug === slug ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current'));
+  const box = $('#pdetail'); if (!box) return;
+  const d0 = dest(slug);
+  box.innerHTML = `<button class="back" type="button" id="pback">${ICON.back}${esc(t('back_list'))}</button><div class="pd-hero">${d0 && d0.img ? `<img alt="${esc(dname(d0))}" src="${esc(d0.img)}">` : ''}</div><div class="pd-body"><div class="pd-name">${esc(dname(d0))}</div><div class="skel"></div></div>`;
+  const mobile = matchMedia('(max-width:959px)').matches;
+  if (mobile && user) { box.classList.add('open'); box.scrollTop = 0; }
+  $('#pback').onclick = () => { box.classList.remove('open'); };
+  let r; try { r = await api('/catalog/' + encodeURIComponent(slug)); } catch (ex) { box.querySelector('.pd-body').innerHTML = `<p class="msg err">${esc(ex.message)}</p>`; return; }
+  if (S.sel !== slug) return;
+  const d = r.destination, c = d.cost || {}, half = Math.round(c.hotel / 2), day = half + c.food + c.transport + c.activities;
+  const months = Array.from({ length: 12 }, (_, i) => `<span class="${(d.months || []).includes(i + 1) ? 'on' : ''}">${esc(monthShort(i))}</span>`).join('');
+  const hosts = r.hosts || [], f = hosts.filter(h => h.gender === 'female').length, m = hosts.filter(h => h.gender === 'male').length;
+  const pkTitle = p => p.title || t('pk_' + p.kind, { p: dname(d) });
+  const site = `/${LANG}/destinations/${encodeURIComponent(d.slug)}`, map = `https://www.openstreetmap.org/?mlat=${d.lat}&mlon=${d.lng}#map=12/${d.lat}/${d.lng}`;
+  const credit = d.credit && d.credit.artist ? `<p class="pd-credit">${esc(t('photo'))}: ${d.credit.source ? `<a href="${esc(d.credit.source)}" target="_blank" rel="noopener">${esc(String(d.credit.artist).slice(0, 90))}</a>` : esc(String(d.credit.artist).slice(0, 90))}${d.credit.license ? ', ' + esc(d.credit.license) : ''}</p>` : '';
+  box.innerHTML = `<button class="back" type="button" id="pback">${ICON.back}${esc(t('back_list'))}</button>
+    <div class="pd-hero">${d.imgLarge || d.img ? `<img alt="${esc(dname(d))}" src="${esc(d.imgLarge || d.img)}">` : ''}</div>${credit}
+    <div class="pd-body">
+      <header><h2 class="pd-name">${esc(dname(d))}</h2><p class="pd-sub">${esc(countryOf(d))}${t('r_' + d.region) !== countryOf(d) ? ', ' + esc(t('r_' + d.region)) : ''}</p>
+        ${(d.tags || []).filter(x => T.uz['tag_' + x]).length ? `<div class="tags">${d.tags.filter(x => T.uz['tag_' + x]).map(x => `<span>${esc(t('tag_' + x))}</span>`).join('')}</div>` : ''}
+        ${d.descUz ? `<p style="margin-top:14px;max-width:68ch">${esc(d.descUz)}</p>` : ''}</header>
+      <section><h3 style="margin-bottom:10px">${esc(t('best'))}</h3><div class="months">${months}</div></section>
+      <div class="two">
+        <section><h3 style="margin-bottom:6px">${esc(t('cost'))}</h3><table class="costs num"><tbody>
+          <tr><td>${esc(t('c_hotel'))}</td><td>${money(half)}</td></tr><tr><td>${esc(t('c_food'))}</td><td>${money(c.food)}</td></tr>
+          <tr><td>${esc(t('c_transport'))}</td><td>${money(c.transport)}</td></tr><tr><td>${esc(t('c_act'))}</td><td>${money(c.activities)}</td></tr>
+          <tr class="total"><td>${esc(t('c_total'))}</td><td>${money(day)}</td></tr></tbody></table></section>
+        <section class="kv"><h3>${esc(t('facts'))}</h3>
+          <div><span>${esc(t('f_country'))}</span><span>${esc(countryOf(d))}</span></div>
+          <div><span>${esc(t('f_lang'))}</span><span>${esc(langName(d.localLang))}</span></div>
+          ${c.tour5d ? `<div><span>${esc(t('f_tour5'))}</span><span class="num">${money(c.tour5d)}</span></div>` : ''}
+          ${c.flight ? `<div><span>${esc(t('f_flight'))}</span><span class="num">${money(c.flight)}</span></div>` : ''}
+          <div><span>${esc(t('f_guides'))}</span><span>${esc(t('f_guides_v', { n: hosts.length, f, m }))}</span></div>
+          <p class="acts" style="margin-top:4px"><a class="btn" href="${esc(map)}" target="_blank" rel="noopener">${esc(t('open_map'))}</a><a class="btn" href="${esc(site)}" target="_blank" rel="noopener">${esc(t('open_site'))}</a></p></section>
+      </div>
+      <section><h3 style="margin-bottom:4px">${esc(t('packages'))}</h3>${(r.packages || []).length ? r.packages.map(p => `<div class="pk"><span>${esc(pkTitle(p))}${p.sample ? ` <span class="mute">(${esc(t('sample'))})</span>` : ''}<br><span class="mute small">${esc(t('days_n', { n: p.days }))}</span></span><b class="num">${money(p.priceUsd)} <span class="mute small" style="font-weight:400">${esc(t('per_person'))}</span></b></div>`).join('') : `<p class="mute">${esc(t('none_pk'))}</p>`}</section>
+    </div>`;
+  $('#pback').onclick = () => { box.classList.remove('open'); };
+}
+
+/* ---------- Profil ---------- */
+function viewProfile(v) {
+  const g = S.me.guide;
+  const specText = g.spec && !String(g.spec).startsWith('@') ? g.spec : '';
+  v.innerHTML = `<div class="prof"><div><h1>${esc(g.name)}</h1><p class="mute">${esc(g.city || '')}${g.country ? ', ' + esc(g.country) : ''}</p></div>
+    <section class="kv"><h2>${esc(t('account'))}</h2>
+      <div><span>${esc(t('login'))}</span><b class="num">${esc(g.login)}</b></div>
+      <div><span>Telegram</span><span>${g.telegramLinked ? '✓ ' + esc(t('tg_ok')) : '—'}${g.tg ? ' (@' + esc(g.tg) + ')' : ''}</span></div></section>
+    <form id="pf" novalidate><h2>${esc(t('profile'))}</h2>
+      <label class="f">${esc(t('spec'))}<input class="inp" name="spec" maxlength="200" value="${esc(specText)}"></label>
+      <div class="grid2"><label class="f">${esc(t('langs'))}<input class="inp" name="langs" maxlength="120" value="${esc(g.langs || '')}"></label><label class="f">${esc(t('rate'))}<input class="inp num" name="rate" type="number" min="5" max="2000" inputmode="decimal" value="${esc(g.rate)}"></label></div>
+      <label class="f">${esc(t('about'))}<textarea class="inp" name="about" maxlength="1000">${esc(g.about || '')}</textarea></label>
+      <p class="msg" id="pm" role="status"></p><div><button class="btn primary">${esc(t('save'))}</button></div></form>
+    <section class="safety"><h2>${esc(t('security'))}</h2><p class="mute">${esc(t('sec_p'))}</p><p class="small">${esc(t('devices', { n: S.me.devices }))}</p>
+      <div class="acts"><button class="btn" type="button" id="npw">${esc(t('new_pw'))}</button><button class="btn danger" type="button" id="lall">${esc(t('logout_all'))}</button><button class="btn" type="button" id="lo">${esc(t('logout'))}</button></div></section></div>`;
+  const f = $('#pf', v);
+  f.onsubmit = async e => {
+    e.preventDefault(); const pm = $('#pm', v);
+    try { await api('/gp/profile', { spec: f.spec.value, langs: f.langs.value, rate: f.rate.value, about: f.about.value, lang: LANG }); pm.className = 'msg ok'; pm.textContent = t('saved'); await refresh(); }
+    catch (ex) { pm.className = 'msg err'; pm.textContent = ex.message; }
+  };
+  $('#npw', v).onclick = async () => { if (!confirm(t('new_pw_q'))) return; try { await api('/gp/password', {}); S.me = null; renderLogin(t('new_pw_ok')); } catch (ex) { toast(ex.message, true); } };
+  $('#lall', v).onclick = async () => { if (!confirm(t('logout_all_q'))) return; try { await api('/gp/logout-all', {}); } catch (_) {} S.me = null; renderLogin(); };
+  $('#lo', v).onclick = async () => { try { await api('/gp/logout', {}); } catch (_) {} S.me = null; renderLogin(); };
+}
+
+/* ---------- Ishga tushirish ---------- */
+async function boot() {
+  try {
+    if (!S.info) S.info = await api('/gp/info').catch(() => null);
+    const [me, bk] = await Promise.all([api('/gp/me', undefined, { quiet: true }), api('/gp/bookings', undefined, { quiet: true })]);
+    S.me = me; S.bookings = bk.bookings;
+    let saved = null; try { saved = localStorage.getItem('mz_gp_lang'); } catch (_) {}
+    if (!saved && T[me.guide.lang]) setLang(me.guide.lang);
+    const h = location.hash.slice(1).split('/')[0]; S.tab = ['home', 'tours', 'places', 'profile'].includes(h) ? h : 'home';
+    await ensureCatalog().catch(() => {});
+    document.documentElement.lang = LANG; shell(); show();
+  } catch (ex) { if (ex.status === 401 || ex.status === 403) renderLogin(); else $('#root').innerHTML = `<div class="auth"><div class="auth-in">${wordmark()}<p class="msg err">${esc(ex.message)}</p><button class="btn" onclick="location.reload()">↻</button></div></div>`; }
+}
+document.documentElement.lang = LANG;
+boot();
+</script>
+</body>
+</html>

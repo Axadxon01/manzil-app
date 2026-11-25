@@ -34,7 +34,7 @@ Belgilar: ✅ ishlaydi (sinovdan o'tdi) · ⚠️ qisman / shart bilan · ❌ ha
 | verified/estimated/unavailable narx belgisi | ⚠️ backend va admin'da bor; saytning barcha kartochkalarida to'liq ko'rsatilmagan |
 | Shaxsiy sayohat rejalashtiruvchi (kunma-kun) | ❌ |
 | Gid marketplace: ariza, tasdiqlash, to'xtatish, band qilish | ✅ |
-| Gid shaxsiy kabineti (o'z buyurtmalari, bandlik) | ✅ v3.2 |
+| Gid shaxsiy kabineti (o'z buyurtmalari, bandlik) | ✅ v3.2 · v3.3: alohida `/guide` platformasi |
 | Tur operatorlar (hamkor akkaunt, paketlar) | ✅ v3.2: ariza, tasdiq, paketlar, bronlar |
 | Mijoz: buyurtmalar tarixi, bekor qilish, baho | ✅ v3.2: saytda va Telegram botda |
 | Admin: dashboard, buyurtmalar, to'lovlar, qaytarish, foydalanuvchilar, gidlar, manzillar, fikr, sozlamalar, audit | ✅ |
@@ -44,7 +44,7 @@ Belgilar: ✅ ishlaydi (sinovdan o'tdi) · ⚠️ qisman / shart bilan · ❌ ha
 | Aviachipta qidiruv, Google Maps, e-pochta xabarlari | ❌ (Phase 5) |
 | Telegram: admin bildirishnomalari | ✅ · bot buyruqlari (/guides, /visa…) ❌ **v3 ga ko'chirilmagan** (eski server.js da bor, JSON-bazaga bog'liq edi) |
 | PostgreSQL + Prisma, React/TS | ❌ ataylab: SQLite bilan boshlandi (sxema oson ko'chadi). Katta yuk uchun PostgreSQL ga o'tish tavsiya |
-| Zaxira nusxa va tiklash | ❌ avtomatik yo'q. Render Disk snapshot yoki `sqlite3 .backup` cron tavsiya |
+| Zaxira nusxa va tiklash | ✅ v3.2: kunlik zaxira (diskda). ⚠️ disk faqat pullik rejada |
 
 ## 3b. v3.1 (shu bosqich)
 | Talab | Holat |
@@ -58,6 +58,16 @@ Belgilar: ✅ ishlaydi (sinovdan o'tdi) · ⚠️ qisman / shart bilan · ❌ ha
 | "Watch the film" | ⚠️ video yo'q — suratlardan slayd-film |
 | Jurnal maqolalari | ⚠️ faqat sarlavha va qisqa matn; to'liq maqolalar ❌ |
 | planner.html | ⚠️ ichki matnlari hali faqat o'zbekcha |
+
+## 3c. v3.3 (shu bosqich)
+| Talab | Holat |
+|---|---|
+| Tasdiqlangan gidlar uchun alohida, sodda sub-platforma | ✅ `/guide`: bosh sahifa, turlar (qabul qilish), manzillar, profil; telefon va kompyuter |
+| Kirish xavfsizligini oshirish | ✅ Telegram orqali 2-bosqich kod (yangi qurilma), "Bu men emasman", qurilmani eslab qolish (30 kun), lockout, rate limit, sessiyani bekor qilish, audit |
+| Login/parol har bir gidga bot orqali alohida | ✅ faqat gidning o'z Telegram chatiga; 30 daqiqadan keyin xabar o'chiriladi; admin parolni ko'rmaydi |
+| Bank hisobiga o'tkazma cheki/kvitansiyasini AI tekshirishi | ✅ AI faqat o'qiydi, qoidalar serverda, yakuniy tasdiq — moliya xodimi. ⚠️ AI kaliti (`GEMINI_API_KEY`) va bank rekvizitlari kiritilishi kerak; AI soxta chekni 100% aniqlay olmaydi — pul hisobga tushganini bank ko'chirmasida ko'rish shart |
+| Manzillar: 30% ro'yxat / 70% batafsil | ✅ gid platformasida; telefonda batafsil to'liq ekranda |
+| Free rejada ma'lumot saqlanishi | ❌ Render Free'da baza uxlash/deploy paytida o'chadi (gid hisoblari va cheklar ham). Starter + 1 GB disk kerak |
 
 ## 4. Xavfsizlik
 ✅ scrypt xesh, parol siyosati, lockout (5 xato/15 daq), rate limit, server tomonida narx hisoblash, parametrlangan SQL, HttpOnly/SameSite cookie, Origin tekshiruvi (CSRF), CSP va xavfsizlik sarlavhalari, path-traversal himoyasi, RBAC (har so'rovda), TOTP 2FA, sessiya xesh holda saqlanadi, parol almashganda sessiyalar bekor, audit zanjiri, CSV formula-injection himoyasi, XSS: admin panelda barcha qiymatlar escape.

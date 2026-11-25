@@ -88,6 +88,7 @@ async function call(jar, method, p, body, headers = {}) {
 
   await realFlow();
   await v32Flow();
+  await v33Flow();
   console.log(`\nNatija: ${pass} o'tdi, ${fail} muvaffaqiyatsiz`);
   process.exit(fail ? 1 : 0);
 })();
@@ -374,4 +375,224 @@ async function v32Flow() {
     h = await c(anon, 'GET', '/en/destinations/nowhere', undefined, {}, true); ok(h.s === 404, 'noma\'lum manzil → 404');
     h = await c(anon, 'GET', '/planner.html', undefined, {}, true); ok(h.s === 301, 'eski planner.html → 301');
   } catch (e) { fail++; console.log('XATO', e); } finally { srv.kill(); mock.close(); }
+}
+
+
+// ---- v3.3: gid platformasi (login/parol bot orqali, 2 bosqichli kirish), bank o'tkazmasi, chekni AI bilan tekshirish ----
+async function v33Flow() {
+  const http = require('http');
+  console.log('\n[Chek tahlili: summa, niqoblangan karta, sana]');
+  const R = require('../lib/receipts')._test;
+  ok(R.parseAmount('1 250 000,00') === 1250000 && R.parseAmount('1,250,000.50') === 1250000.5 && R.parseAmount('250.000') === 250000 && R.parseAmount("1'250'000 so'm") === 1250000 && R.parseAmount(99.5) === 99.5 && R.parseAmount('abc') === null, 'summa formatlari to\'g\'ri o\'qiladi');
+  ok(R.normCurrency("so'm") === 'UZS' && R.normCurrency('СУМ') === 'UZS' && R.normCurrency('$') === 'USD' && R.normCurrency('UZS') === 'UZS', 'valyuta nomlari');
+  ok(R.maskMatches('8600 12** **** 9012', '8600 1234 5678 9012') === true && R.maskMatches('**** 1111', '8600123456789012') === false && R.maskMatches('20208000900123456001', '20208000900123456001') === true && R.maskMatches('AKHADKHON', '8600123456789012') === null, 'niqoblangan karta va hisob raqami solishtiriladi');
+  const w = R.parseWhen('25.11.2026 14:32'); ok(w && !w.dateOnly && new Date(w.t).toISOString() === '2026-11-25T09:32:00.000Z', 'chek sanasi Toshkent vaqti bo\'yicha o\'qiladi');
+  ok(R.normTxn('TXN-77 88/99') === 'TXN778899' && R.normTxn('12') === null, 'tranzaksiya raqami normallashtiriladi');
+
+  const P4 = PORT + 1300, B4 = `http://localhost:${P4}`, TGP = PORT + 1350, AIP = PORT + 1360;
+  const sent = [], deleted = []; let msgId = 500;
+  const jpg = tag => Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]), Buffer.from('fake-receipt-' + tag)]);
+  const JPEG = jpg('a'), JPEG2 = jpg('b'), JPEG3 = jpg('c'), JPEG4 = jpg('d'), JPEG_TG = jpg('telegram');
+  const tg = http.createServer((q, s) => {
+    if (q.method === 'GET' && q.url.includes('/file/bot')) { s.setHeader('Content-Type', 'image/jpeg'); return s.end(JPEG_TG); }
+    let d = ''; q.on('data', c => d += c); q.on('end', () => {
+      const m = q.url.split('/').pop(); let body = {}; try { body = JSON.parse(d); } catch (_) {}
+      let result = true;
+      if (m === 'getMe') result = { id: 1, username: 'manzil_test_bot' };
+      if (m === 'sendMessage') { sent.push({ ...body, message_id: ++msgId }); result = { message_id: msgId }; }
+      if (m === 'deleteMessage') deleted.push(body);
+      if (m === 'getFile') result = { file_id: body.file_id, file_path: 'photos/receipt.jpg', file_size: JPEG_TG.length };
+      s.setHeader('Content-Type', 'application/json'); s.end(JSON.stringify({ ok: true, result }));
+    });
+  });
+  let aiNext = null; const aiReqs = [];
+  const ai = http.createServer((q, s) => { let d = ''; q.on('data', c => d += c); q.on('end', () => {
+    aiReqs.push({ url: q.url, key: q.headers['x-goog-api-key'], body: d }); s.setHeader('Content-Type', 'application/json');
+    if (aiNext === 'ERR') { s.statusCode = 500; return s.end(JSON.stringify({ error: { message: 'boom' } })); }
+    s.end(JSON.stringify({ candidates: [{ content: { parts: [{ text: '```json\n' + JSON.stringify(aiNext) + '\n```' }] } }] }));
+  }); });
+  await new Promise(r => tg.listen(TGP, r)); await new Promise(r => ai.listen(AIP, r));
+  const ENV = { TELEGRAM_BOT_TOKEN: '1:TEST', TELEGRAM_API_BASE: `http://localhost:${TGP}`, TELEGRAM_WEBHOOK_SECRET: 'wh33', PUBLIC_URL: B4, GEMINI_API_KEY: 'gem-test', GEMINI_API_BASE: `http://localhost:${AIP}`,
+    OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '', GUIDE_CREDS_TTL_MS: '1200', BOT_AUTODELETE_TICK_MS: '300', BOT_REMINDERS: 'false' };
+  const srv = spawn(process.execPath, ['server.js'], { cwd: path.join(__dirname, '..'), env: { ...process.env, PORT: P4, DB_PATH: ':memory:', DEMO_PAYMENTS: 'false', ADMIN_EMAIL: ADMIN.email, ADMIN_PASSWORD: ADMIN.password, ...ENV }, stdio: 'ignore' });
+  await new Promise(r => setTimeout(r, 3000));
+  let ip = '10.0.0.1';
+  const c = async (jar, method, p, body, headers = {}) => {
+    const isBuf = Buffer.isBuffer(body);
+    const r = await fetch(B4 + p, { method, redirect: 'manual', headers: { ...(body !== undefined ? { 'Content-Type': isBuf ? 'image/jpeg' : 'application/json' } : {}), ...(jar ? { Cookie: jar.h } : {}), 'True-Client-IP': ip, ...headers }, body: isBuf ? body : body !== undefined ? JSON.stringify(body) : undefined });
+    if (jar) jar.set(r); const t = await r.text(); let j; try { j = JSON.parse(t); } catch (_) { j = { raw: t }; } return { s: r.status, ...j, _h: r.headers };
+  };
+  const W = { 'X-Telegram-Bot-Api-Secret-Token': 'wh33' };
+  const say = (chat, text, from = {}, extra = {}) => c(null, 'POST', '/api/telegram/webhook', { update_id: Date.now(), message: { message_id: 1, date: 1, text, chat: { id: chat, type: 'private' }, from: { id: chat, first_name: 'X', language_code: 'uz', ...from }, ...extra } }, W);
+  const tap = (chat, data) => c(null, 'POST', '/api/telegram/webhook', { update_id: Date.now(), callback_query: { id: 'cq' + Math.random(), data, from: { id: chat }, message: { message_id: 7, chat: { id: chat, type: 'private' } } } }, W);
+  const wait = (ms = 400) => new Promise(r => setTimeout(r, ms));
+  const lastTo = (chat, re, from = 0) => sent.slice(from).filter(m => String(m.chat_id) === String(chat) && (!re || re.test(m.text))).pop();
+  const until = async (fn, ms = 5000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { const v = await fn(); if (v) return v; await wait(150); } return null; };
+  const credsOf = m => ({ login: ((m && m.text.match(/Login: <code>([^<]+)<\/code>/)) || [])[1], pass: ((m && m.text.match(/Parol: <code>([^<]+)<\/code>/)) || [])[1] });
+  const codeOf = m => ((m && m.text.match(/<code>(\d{6})<\/code>/)) || [])[1];
+  const dayN = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+  try {
+    const boss = new Jar(), g1 = new Jar(), g1b = new Jar(), tour = new Jar(), anon = new Jar();
+    await c(boss, 'POST', '/api/staff/login', ADMIN);
+    await c(boss, 'POST', '/api/staff/password', { current: ADMIN.password, password: ADMIN2 });
+    await c(boss, 'POST', '/api/staff/login', { email: ADMIN.email, password: ADMIN2 });
+
+    console.log('\n[Gid platformasi: login va parol faqat bot orqali]');
+    let h = await fetch(B4 + '/guide'); ok(h.status === 200 && /text\/html/.test(h.headers.get('content-type')) && (await h.text()).includes('Manzil'), '/guide sahifasi ochiladi');
+    await say(801, '/start', { username: 'Dilnoza_Gid' }); await wait();
+    let r = await c(anon, 'POST', '/api/guides/apply', { name: 'Dilnoza Karimova', city: 'Samarqand', dest: 'samarkand', tg: 'dilnoza_gid', rate: 45, gender: 'female', langs: 'uz,ru,en' });
+    const gid1 = r.id;
+    ok(!sent.some(m => String(m.chat_id) === '801' && /Login:/.test(m.text)), 'tasdiqlanmagan gidga kirish ma\'lumotlari yuborilmaydi');
+    r = await c(boss, 'POST', `/api/admin/guides/${gid1}/status`, { status: 'approved', verified: true });
+    ok(r.s === 200 && r.access && r.access.exists && !!r.access.login, `tasdiqlanganda gid hisobi yaratildi (login: ${r.access && r.access.login})`);
+    const cred = await until(() => lastTo(801, /Login: <code>/));
+    ok(!!cred && cred.parse_mode === 'HTML', 'login va parol gidning o\'z Telegram chatiga keldi (arizadagi username bo\'yicha)');
+    const C1 = credsOf(cred);
+    ok(/^[a-z]{3,12}\d{3}$/.test(C1.login || '') && /^[A-Za-z2-9]{4}-[A-Za-z2-9]{4}-[A-Za-z2-9]{4}$/.test(C1.pass || ''), `login o'qishga oson (${C1.login}), parol kuchli (12 belgi)`);
+    const adm = await c(boss, 'GET', '/api/admin/guides');
+    ok(adm.guides.find(x => x.id === gid1).access.linked && !JSON.stringify(adm).includes(C1.pass), 'admin panelda parol ko\'rinmaydi (faqat holat)');
+    const dbv = await c(boss, 'GET', '/api/admin/db/guide_accounts'); ok(dbv.s === 200 && !JSON.stringify(dbv).includes(C1.pass) && JSON.stringify(dbv).includes('scrypt xesh'), 'bazada faqat parol xeshi (yashirin)');
+    ok(!!(await until(() => deleted.some(d => String(d.chat_id) === '801' && d.message_id === cred.message_id), 6000)), 'parol xabari belgilangan vaqtdan keyin botdan o\'chirildi');
+
+    console.log('\n[Gid platformasi: 2 bosqichli kirish va "Bu men emasman"]');
+    ip = '10.0.1.1';
+    r = await c(g1, 'POST', '/api/gp/login', { login: C1.login, password: 'wrong-pass-1' }); ok(r.s === 401, 'noto\'g\'ri parol → 401');
+    r = await c(g1, 'POST', '/api/gp/login', { login: C1.login.toUpperCase(), password: C1.pass }); ok(r.s === 200 && r.need2fa && !!r.challenge, 'to\'g\'ri parol → Telegram kodi so\'raladi');
+    const codeMsg = await until(() => lastTo(801, /<code>\d{6}<\/code>/));
+    ok(!!codeOf(codeMsg) && JSON.stringify(codeMsg.reply_markup).includes('gx:' + r.challenge), 'kod botga keldi ("Bu men emasman" tugmasi bilan)');
+    let v = await c(g1, 'POST', '/api/gp/login/verify', { challenge: r.challenge, code: '000000' }); ok(v.s === 400, 'noto\'g\'ri kod → 400');
+    v = await c(g1, 'POST', '/api/gp/login/verify', { challenge: r.challenge, code: codeOf(codeMsg), remember: true }); ok(v.s === 200 && !!g1.c.mz_guide && !!g1.c.mz_gdev, 'to\'g\'ri kod → kirildi (sessiya + ishonchli qurilma)');
+    ok(/SameSite=Strict/i.test(v._h.getSetCookie().join(';')) && /HttpOnly/i.test(v._h.getSetCookie().join(';')), 'gid cookie HttpOnly, SameSite=Strict');
+    v = await c(g1, 'POST', '/api/gp/login/verify', { challenge: r.challenge, code: codeOf(codeMsg) }); ok(v.s === 400, 'kod ikkinchi marta ishlamaydi');
+    ok(!!(await until(() => deleted.some(d => d.message_id === codeMsg.message_id))), 'ishlatilgan kod xabari chatdan o\'chirildi');
+    ok(!!(await until(() => lastTo(801, /kirildi/))), 'yangi qurilmadan kirish haqida botga xabar keldi');
+    let me = await c(g1, 'GET', '/api/gp/me'); ok(me.s === 200 && me.guide.login === C1.login && me.guide.name === 'Dilnoza Karimova', 'gid platformasi: /api/gp/me');
+    r = await c(anon, 'GET', '/api/gp/me'); ok(r.s === 401, 'kirishsiz → 401');
+    await c(g1, 'POST', '/api/gp/logout', {});
+    r = await c(g1, 'POST', '/api/gp/login', { login: C1.login, password: C1.pass }); ok(r.s === 200 && !r.need2fa, 'eslab qolingan qurilmada kod so\'ralmaydi');
+    ip = '10.0.1.2';
+    r = await c(g1b, 'POST', '/api/gp/login', { login: C1.login, password: C1.pass }); ok(r.s === 200 && r.need2fa, 'boshqa qurilmada yana kod so\'raladi');
+    let from = sent.length;
+    await tap(801, 'gx:' + r.challenge); await wait(900);
+    r = await c(g1, 'GET', '/api/gp/me'); ok(r.s === 401, '"Bu men emasman" → barcha sessiyalar yopildi');
+    const cred2 = await until(() => lastTo(801, /Login: <code>/, from));
+    const C2 = credsOf(cred2); ok(!!C2.pass && C2.pass !== C1.pass, 'parol avtomatik almashtirildi, yangisi botga keldi');
+    ip = '10.0.1.3';
+    r = await c(g1b, 'POST', '/api/gp/login', { login: C1.login, password: C1.pass }); ok(r.s === 401, 'eski parol endi ishlamaydi');
+    from = sent.length;
+    r = await c(g1, 'POST', '/api/gp/login', { login: C1.login, password: C2.pass }); ok(r.s === 200 && r.need2fa, 'yangi parol ishlaydi; ishonchli qurilmalar ham bekor (kod so\'raladi)');
+    v = await c(g1, 'POST', '/api/gp/login/verify', { challenge: r.challenge, code: codeOf(await until(() => lastTo(801, /<code>\d{6}<\/code>/, from))) }); ok(v.s === 200, 'yangi parol + kod bilan kirildi');
+    ip = '10.0.1.4'; from = sent.length;
+    r = await c(anon, 'POST', '/api/gp/forgot', { login: C1.login }); const r2 = await c(anon, 'POST', '/api/gp/forgot', { login: 'nobody000' });
+    ok(r.s === 200 && r2.s === 200, '"Parolni unutdim": mavjud va mavjud bo\'lmagan login uchun bir xil javob');
+    const fm = await until(() => sent.slice(from).find(m => String(m.chat_id) === '801' && JSON.stringify(m.reply_markup || {}).includes('"gp"')));
+    me = await c(g1, 'GET', '/api/gp/me');
+    ok(!!fm && !sent.slice(from).some(m => /Login: <code>/.test(m.text)) && me.s === 200, '"Parolni unutdim" parolni darhol almashtirmaydi (botda tasdiqlash tugmasi) — begona odam gidni chiqarib yubora olmaydi');
+    await say(801, '/gid'); ok(!!(await until(() => lastTo(801, /gid menyusi/))), 'botda /gid — gid menyusi');
+    await say(899, '/gid', { username: 'random_user' }); ok(!!(await until(() => lastTo(899, /ulanmagan/))), 'gid bo\'lmagan foydalanuvchiga /gid hech narsa bermaydi');
+
+    console.log('\n[Gid platformasi: admin havolasi, bloklash, to\'xtatish]');
+    r = await c(anon, 'POST', '/api/guides/apply', { name: 'Bobur Aliyev', city: 'Buxoro', dest: 'bukhara', tg: 'bobur_real', rate: 40, gender: 'male' });
+    const gid2 = r.id;
+    await c(boss, 'POST', `/api/admin/guides/${gid2}/status`, { status: 'approved' });
+    r = await c(boss, 'POST', `/api/admin/guides/${gid2}/access/link`, {});
+    ok(r.s === 200 && /^https:\/\/t\.me\/manzil_test_bot\?start=g_[A-Za-z0-9_-]{20,}$/.test(r.url || ''), 'admin bir martalik Telegram havolasini oldi');
+    const tok = r.url.split('start=')[1];
+    await say(802, '/start ' + tok, { username: 'boshqa_nom' });
+    const C3 = credsOf(await until(() => lastTo(802, /Login: <code>/))); ok(!!C3.pass, 'havola orqali ulangan gidga login va parol keldi');
+    await say(803, '/start ' + tok); ok(!!(await until(() => lastTo(803, /eskirgan/))), 'havola ikkinchi marta ishlamaydi');
+    await c(boss, 'POST', `/api/admin/guides/${gid2}/access/block`, { blocked: true });
+    ip = '10.0.4.1'; r = await c(anon, 'POST', '/api/gp/login', { login: C3.login, password: C3.pass }); ok(r.s === 403, 'bloklangan gid kira olmaydi');
+    await c(boss, 'POST', `/api/admin/guides/${gid2}/access/block`, { blocked: false });
+    r = await c(anon, 'POST', '/api/gp/login', { login: C3.login, password: C3.pass }); ok(r.s === 200 && r.need2fa, 'blokdan chiqarilgach kira oladi');
+    for (let i = 0; i < 5; i++) { ip = '10.0.5.' + i; await c(anon, 'POST', '/api/gp/login', { login: C3.login, password: 'bad-pass-' + i }); }
+    ip = '10.0.5.9'; r = await c(anon, 'POST', '/api/gp/login', { login: C3.login, password: C3.pass }); ok(r.s === 423, '5 marta xato parol → hisob bloklandi (IP almashtirish yordam bermaydi)');
+    ok(!!(await until(() => lastTo(802, /5 marta/))), 'gidga bloklash haqida ogohlantirish keldi');
+    const sample = (await c(boss, 'GET', '/api/admin/guides')).guides.find(x => x.sample);
+    r = await c(boss, 'POST', `/api/admin/guides/${sample.id}/access/link`, {}); ok(r.s === 409, 'namunaviy gidga kirish berilmaydi');
+
+    console.log('\n[Bank o\'tkazmasi va chekni AI bilan tekshirish]');
+    ip = '10.0.6.1';
+    r = await c(anon, 'GET', '/api/payments/methods'); ok(r.methods && r.methods.bank === false, 'rekvizitlar kiritilmaguncha bank o\'tkazmasi o\'chiq');
+    await c(tour, 'POST', '/api/auth/register', { name: 'Ali Valiyev', email: 'ali33@test.uz', password: 'Tourist-pass-33' });
+    r = await c(tour, 'POST', '/api/payments/create', { provider: 'bank', guideId: gid1, days: 2, people: 2, travelDate: dayN(30), customerName: 'Ali', contact: '+998901112233' }); ok(r.s === 503, 'rekvizitsiz bank buyurtmasi rad etildi');
+    r = await c(boss, 'POST', '/api/admin/settings', { bank_account: '2020800090012345600' }); ok(r.s === 400, '19 xonali hisob raqami rad etildi');
+    r = await c(boss, 'POST', '/api/admin/settings', { bank_recipient: 'MANZIL TRAVEL MCHJ', bank_name: 'Kapitalbank', bank_account: '2020 8000 9001 2345 6001', bank_mfo: '01088', bank_inn: '305123456', bank_card: '8600123456789012', bank_card_holder: 'AKHADKHON M' });
+    ok(r.s === 200, 'bank rekvizitlari saqlandi');
+    r = await c(anon, 'GET', '/api/payments/methods'); ok(r.methods.bank === true, 'bank o\'tkazmasi yoqildi');
+    r = await c(tour, 'POST', '/api/me/telegram-link', {}); await say(901, '/start ' + r.url.split('start=')[1]); await wait();
+    const bk1 = await c(tour, 'POST', '/api/payments/create', { provider: 'bank', guideId: gid1, days: 2, people: 2, travelDate: dayN(30), customerName: 'Ali Valiyev', contact: '+998901112233' });
+    ok(bk1.s === 200 && bk1.bankTransfer && bk1.bankTransfer.amountUzs === bk1.amountUzs && bk1.bankTransfer.purpose.includes(bk1.code) && bk1.bankTransfer.bank.account === '20208000900123456001', 'bron: rekvizitlar, so\'mdagi summa va to\'lov maqsadi (bron kodi)');
+    r = await c(tour, 'POST', `/api/my/bookings/${bk1.bookingId}/receipt`, Buffer.from('hello, this is not an image')); ok(r.s === 415, 'rasm/PDF bo\'lmagan fayl rad etildi (turi baytlardan aniqlanadi)');
+    r = await c(tour, 'POST', `/api/my/bookings/${bk1.bookingId}/receipt`, Buffer.concat([JPEG, Buffer.alloc(Math.round(6.2 * 1024 * 1024))])); ok(r.s === 413, '6 MB dan katta fayl rad etildi');
+    r = await c(anon, 'POST', `/api/my/bookings/${bk1.bookingId}/receipt`, JPEG); ok(r.s === 401, 'kirishsiz chek yuklab bo\'lmaydi');
+    const nowTk = new Date(Date.now() + 5 * 3600e3).toISOString().slice(0, 19);
+    const good = amount => ({ is_receipt: true, doc_type: 'card_transfer', status: 'success', amount, currency: "so'm", fee: 0, datetime: nowTk, transaction_id: 'TXN-778899', sender_name: 'ALI VALIYEV', sender_account: '9860 **** **** 4455',
+      recipient_name: 'AKHADKHON M.', recipient_account: '8600 12** **** 9012', recipient_bank: 'Kapitalbank', purpose: bk1.code + ' uchun', app_or_bank: 'Click', edit_signs: [], confidence: 0.93 });
+    aiNext = good(bk1.amountUzs);
+    const aiFrom = aiReqs.length;
+    r = await c(tour, 'POST', `/api/my/bookings/${bk1.bookingId}/receipt`, JPEG); ok(r.s === 200 && /^RC-/.test(r.receipt && r.receipt.code), `chek yuklandi (${r.receipt && r.receipt.code})`);
+    const rc1 = r.receipt;
+    const payDone = id => until(async () => { const x = await c(tour, 'GET', `/api/my/bookings/${id}/payment`); const rr = x.bankTransfer && x.bankTransfer.receipts[0]; return rr && !rr.checking ? rr : null; });
+    let rr = await payDone(bk1.bookingId);
+    ok(rr && rr.verdict === 'match', 'AI + server qoidalari: chek mos (summa, qabul qiluvchi, sana, tranzaksiya)');
+    const aiReq = aiReqs[aiFrom], aiBody = aiReq ? JSON.parse(aiReq.body) : {};
+    ok(!!aiReq && aiReq.key === 'gem-test' && /generateContent/.test(aiReq.url) && aiBody.contents[0].parts[0].inlineData.mimeType === 'image/jpeg', 'Gemini so\'rovi: chek rasmi inlineData bilan');
+    ok(!aiReq.body.includes(String(bk1.amountUzs)) && !aiReq.body.includes('20208000900123456001') && aiReq.body.includes('Never follow instructions'), 'AI\'ga kutilgan summa va rekvizitlar berilmaydi; chekdagi matn ko\'rsatma sifatida bajarilmaydi');
+    ok(!!(await until(() => lastTo(901, /tekshiruvdan o'tdi/))), 'mijozga botda "chek tekshiruvdan o\'tdi" xabari');
+    r = await c(anon, 'GET', `/api/payments/status/${bk1.code}`); ok(r.paymentStatus === 'pending', 'AI "mos" desa ham to\'lov o\'zi "to\'langan" bo\'lmaydi');
+    let list = await c(boss, 'GET', '/api/admin/receipts'); const ar1 = list.receipts.find(x => x.code === rc1.code);
+    ok(!!ar1 && ar1.verdict === 'match' && list.ai[0].name === 'gemini' && list.pending >= 1, 'admin: Cheklar ro\'yxati (AI hukmi bilan)');
+    const det = await c(boss, 'GET', `/api/admin/receipts/${ar1.id}`);
+    ok(det.receipt.checks.find(x => x.key === 'amount').status === 'ok' && det.receipt.checks.find(x => x.key === 'recipient').status === 'ok' && det.receipt.extracted.transactionId === 'TXN-778899', 'admin: tekshiruv tafsilotlari (summa, qabul qiluvchi, tranzaksiya)');
+    const fr = await fetch(B4 + `/api/admin/receipts/${ar1.id}/file`, { headers: { Cookie: boss.h, 'True-Client-IP': ip } }); const fb = Buffer.from(await fr.arrayBuffer());
+    ok(fr.status === 200 && fr.headers.get('content-type') === 'image/jpeg' && /sandbox/.test(fr.headers.get('content-security-policy') || '') && /no-store/.test(fr.headers.get('cache-control') || '') && fb.equals(JPEG), 'admin chek faylini ko\'radi (sandbox, kesh yo\'q)');
+    r = await c(tour, 'GET', `/api/admin/receipts/${ar1.id}/file`); ok(r.s === 401, 'mijoz admin chek API ga kira olmaydi');
+    r = await c(tour, 'POST', `/api/admin/receipts/${ar1.id}/approve`, {}); ok(r.s === 401, 'mijoz chekni tasdiqlay olmaydi');
+    from = sent.length;
+    r = await c(boss, 'POST', `/api/admin/receipts/${ar1.id}/approve`, { note: 'Kapitalbank ko\'chirmasida ko\'rildi' }); ok(r.s === 200, 'moliya xodimi pul tushganini ko\'rib tasdiqladi');
+    r = await c(anon, 'GET', `/api/payments/status/${bk1.code}`); ok(r.paymentStatus === 'paid' && r.bookingStatus === 'pending', 'to\'lov "to\'langan", bron xodim tasdig\'ini kutmoqda');
+    r = await c(boss, 'POST', `/api/admin/receipts/${ar1.id}/approve`, {}); ok(r.s === 409, 'chekni ikki marta tasdiqlab bo\'lmaydi');
+    const tour1 = await until(() => lastTo(801, /Yangi tur/, from));
+    ok(!!tour1 && tour1.text.includes('Ali Valiyev') && JSON.stringify(tour1.reply_markup).includes('ga:' + bk1.bookingId), 'gidga botda yangi tur haqida xabar ("Qabul qilaman" tugmasi bilan)');
+    let gb = await c(g1, 'GET', '/api/gp/bookings'); const gbk = gb.bookings.find(x => x.code === bk1.code);
+    ok(!!gbk && gbk.customer && gbk.customer.contact === '+998901112233' && gbk.canAck, 'gid platformasida to\'langan bron va mijoz aloqasi');
+    await tap(801, 'ga:' + bk1.bookingId); await wait();
+    gb = await c(g1, 'GET', '/api/gp/bookings'); const adB = await c(boss, 'GET', '/api/admin/bookings/' + bk1.bookingId);
+    ok(gb.bookings.find(x => x.code === bk1.code).acknowledged && !!adB.booking.guideAckAt, 'gid botdagi tugma bilan turni qabul qildi (adminda ko\'rinadi)');
+    me = await c(g1, 'GET', '/api/gp/me'); ok(me.earnings && me.earnings.heldUsd > 0 && me.stats.upcoming === 1, 'gid daromadi: tur yakunlanguncha ushlab turiladi');
+
+    const bk2 = await c(tour, 'POST', '/api/payments/create', { provider: 'bank', guideId: gid1, days: 1, people: 1, travelDate: dayN(40), customerName: 'Ali Valiyev', contact: '+998901112233' });
+    from = sent.length;
+    r = await c(tour, 'POST', `/api/my/bookings/${bk2.bookingId}/receipt`, JPEG); rr = await payDone(bk2.bookingId);
+    ok(rr && rr.verdict === 'mismatch' && rr.problems.includes('duplicate') && rr.problems.includes('txn'), 'boshqa bron cheki (fayl va tranzaksiya raqami) qayta ishlatilsa → mos emas');
+    ok(!!(await until(() => lastTo(901, /muammo topildi/, from))), 'mijozga muammo sababi bilan xabar');
+    list = await c(boss, 'GET', '/api/admin/receipts'); const ar2 = list.receipts.find(x => x.code === rr.code);
+    r = await c(boss, 'POST', `/api/admin/receipts/${ar2.id}/approve`, {}); ok(r.s === 409 && r.needOverride, '"mos emas" chekni oddiy tasdiqlab bo\'lmaydi (izohli "baribir tasdiqlash" kerak)');
+    r = await c(boss, 'POST', `/api/admin/receipts/${ar2.id}/reject`, { reason: 'Bu chek boshqa bron uchun ishlatilgan' }); ok(r.s === 200, 'chek rad etildi');
+    ok(!!(await until(() => lastTo(901, /rad etildi/))), 'mijozga rad etish sababi botda keldi');
+    aiNext = { ...good(1000), transaction_id: 'TXN-1001' };
+    await c(tour, 'POST', `/api/my/bookings/${bk2.bookingId}/receipt`, JPEG2); rr = await payDone(bk2.bookingId);
+    ok(rr && rr.verdict === 'mismatch' && rr.problems.includes('amount'), 'summa kam → mos emas (sabab: summa)');
+    aiNext = { ...good(bk2.amountUzs), transaction_id: 'TXN-1002', recipient_account: '8600 **** **** 1111', recipient_name: 'BOSHQA ODAM' };
+    await c(tour, 'POST', `/api/my/bookings/${bk2.bookingId}/receipt`, JPEG3); rr = await payDone(bk2.bookingId);
+    ok(rr && rr.verdict === 'mismatch' && rr.problems.includes('recipient'), 'pul boshqa kartaga o\'tkazilgan → mos emas (sabab: qabul qiluvchi)');
+    aiNext = 'ERR';
+    await c(tour, 'POST', `/api/my/bookings/${bk2.bookingId}/receipt`, JPEG4); rr = await payDone(bk2.bookingId);
+    list = await c(boss, 'GET', '/api/admin/receipts'); const ar4 = await c(boss, 'GET', '/api/admin/receipts/' + list.receipts.find(x => x.code === rr.code).id);
+    ok(rr.verdict === 'review' && ar4.receipt.aiStatus === 'failed' && /gemini 500/.test(ar4.receipt.aiError), 'AI ishlamasa → "qo\'lda tekshirish kerak" (to\'lov o\'zi tasdiqlanmaydi)');
+
+    const bk3 = await c(tour, 'POST', '/api/payments/create', { provider: 'bank', guideId: gid1, days: 1, people: 1, travelDate: dayN(50), customerName: 'Ali Valiyev', contact: '+998901112233' });
+    aiNext = { ...good(bk3.amountUzs), transaction_id: 'TXN-3003', recipient_account: '20208000900123456001', recipient_name: 'MANZIL TRAVEL MCHJ', purpose: bk3.code };
+    await tap(901, 'rc:' + bk3.bookingId); ok(!!(await until(() => lastTo(901, /chekini yuboring/))), 'botda "Chek yuborish" — fayl so\'raladi');
+    await say(901, '', {}, { photo: [{ file_id: 'small', file_size: 10 }, { file_id: 'big', file_size: 40 }] });
+    ok(!!(await until(() => lastTo(901, /Chek qabul qilindi/))), 'botga yuborilgan rasm chek sifatida qabul qilindi');
+    rr = await payDone(bk3.bookingId); ok(rr && rr.verdict === 'match', 'bot orqali yuborilgan chek ham tekshirildi (hisob raqami bo\'yicha mos)');
+    from = sent.length; await say(901, '/trips');
+    const tripMsg = await until(() => sent.slice(from).filter(m => String(m.chat_id) === '901' && /Bank o'tkazmasi/.test(m.text)).pop());
+    ok(!!tripMsg && tripMsg.text.includes('20208000900123456001') && tripMsg.text.includes(bk2.code), 'botdagi "Sayohatlarim"da rekvizitlar va to\'lov maqsadi');
+    r = await c(boss, 'GET', '/api/admin/audit/verify'); ok(r.ok && r.checked > 10, 'audit zanjiri butun');
+    await c(boss, 'POST', `/api/admin/guides/${gid1}/status`, { status: 'suspended' });
+    r = await c(g1, 'GET', '/api/gp/me'); ok(r.s === 401, 'to\'xtatilgan gid darhol platformadan chiqadi');
+  } catch (e) { fail++; console.log('XATO', e); } finally { srv.kill(); tg.close(); ai.close(); }
 }

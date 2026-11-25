@@ -192,6 +192,21 @@ textarea.inp{padding:12px 14px;min-height:90px;resize:vertical}
 .sum{display:flex;justify-content:space-between;align-items:baseline;padding:16px 0;border-block:1px solid var(--line)}
 .sum b{font-family:var(--serif);font-size:30px;font-weight:400}
 .msg{padding:14px 16px;border-radius:8px;font-size:14px;background:rgba(107,127,90,.1);color:#3d4b31}
+/* Bank o'tkazmasi: summa, rekvizitlar (nusxalash), chek yuklash */
+.bt-amt{display:flex;flex-direction:column;gap:2px;padding:18px 20px;border-radius:10px;background:var(--sand)}
+.bt-amt span{font-size:14px;color:var(--ink-2)}
+.bt-amt b{font-family:var(--serif);font-weight:420;font-size:clamp(30px,6vw,40px);line-height:1.1;letter-spacing:-.01em;font-variant-numeric:lining-nums tabular-nums}
+.bt-amt small{font-size:14px;color:var(--mute)}
+.req{margin:0;display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.req div{display:grid;grid-template-columns:minmax(120px,38%) 1fr;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.req dt{font-size:14px;color:var(--mute)}
+.req dd{margin:0;display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:500;word-break:break-word;font-variant-numeric:tabular-nums}
+.req .cp{flex:none;min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);cursor:pointer;font-size:13px}
+.req .cp:hover{border-color:var(--ink)}
+.up{display:flex;flex-direction:column;align-items:flex-start;gap:8px;cursor:pointer}
+.up small{font-size:13px;color:var(--mute)}
+.msg ul{margin:8px 0 0;padding-inline-start:20px}
+.msg.err{background:rgba(180,64,42,.08);color:#8a2f1d}
 .msg.err{background:rgba(196,92,38,.09);color:var(--terra-d)}
 .hostline{display:flex;gap:14px;align-items:center;padding:12px;border-radius:8px;background:var(--sand)}
 .hostline img{width:64px;height:64px;border-radius:6px;object-fit:cover}
@@ -298,7 +313,8 @@ dialog.wide{width:min(1000px,calc(100% - 32px))}
   .cta .inner{grid-template-columns:1fr;gap:28px}
   .cta .row{flex-direction:column;align-items:stretch}.cta .row .btn{width:100%;min-height:56px}
   footer .top{flex-direction:column}
-  dialog{width:100%;max-width:100%;margin:auto 0 0;border-radius:16px 16px 0 0;max-height:92svh}
+  dialog,dialog.wide{width:100%;max-width:100%;margin:auto 0 0;border-radius:16px 16px 0 0;max-height:92svh}
+  .req div{grid-template-columns:1fr;gap:4px}.req dt{font-size:13px}
   .dlg{padding:24px 20px calc(24px + env(safe-area-inset-bottom))}
   .grid2{grid-template-columns:1fr 1fr}
   .mob{display:block}.desk{display:none}
@@ -505,6 +521,7 @@ dialog.wide{width:min(1000px,calc(100% - 32px))}
         <button type="button" id="applyBtn2" data-i18n="become_host"></button>
         <button type="button" id="opBtn2" data-i18n="become_operator"></button>
         <a href="#" id="legalLink" data-i18n="foot_legal"></a>
+        <a href="/guide" data-i18n="gp_link"></a>
       </div>
     </div>
     <div class="bot">
@@ -529,6 +546,7 @@ dialog.wide{width:min(1000px,calc(100% - 32px))}
 
 <script src="/i18n.js"></script>
 <script src="/i18n-ext.js"></script>
+<script src="/i18n-pay.js"></script>
 <script src="/articles.js"></script>
 <script>
 'use strict';
@@ -794,11 +812,18 @@ function openReset(email) {
 }
 
 /* ---------- Booking (real hosts & packages) ---------- */
-const providerSelect = () => `<label class="lbl">${esc(t('bk_pay'))}<select class="inp" name="provider"><option value="click">Click</option><option value="payme">Payme</option><option value="stripe">${esc(t('bk_card'))}</option></select></label>`;
+let PM = null;
+const loadPM = () => PM ? Promise.resolve(PM) : api('/payments/methods').then(r => (PM = r.methods || {})).catch(() => (PM = {}));
+const providerSelect = () => {
+  const m = PM || {}, opts = [['click', 'Click', m.click || m.demo], ['payme', 'Payme', m.payme || m.demo], ['stripe', t('bk_card'), m.stripe || m.demo], ['bank', t('pm_bank'), m.bank]];
+  const first = (opts.find(o => o[2]) || opts[0])[0];
+  return `<label class="lbl">${esc(t('bk_pay'))}<select class="inp" name="provider">${opts.map(([v, l, on]) => `<option value="${v}" ${on ? '' : 'disabled'} ${v === first ? 'selected' : ''}>${esc(l)}${on ? '' : ' (' + esc(t('pm_soon')) + ')'}</option>`).join('')}</select></label>`;
+};
 async function submitOrder(d, body, box, btn) {
   btn.disabled = true; box.innerHTML = '';
   try {
     const r = await api('/payments/create', { ...body, lang: LANG });
+    if (r.bankTransfer) { showBank(d, { id: r.bookingId, code: r.code }, r.bankTransfer); d.scrollTop = 0; return; }
     if (r.checkoutUrl) { location.href = r.checkoutUrl; return; }
     if (r.sandbox) {
       box.innerHTML = `<div class="msg">${esc(t('bk_sandbox', { code: r.code }))}<br><button class="btn btn-line btn-sm" type="button" id="sbx" style="margin-top:10px">${esc(t('bk_confirm_sbx'))}</button></div>`;
@@ -812,7 +837,8 @@ async function submitOrder(d, body, box, btn) {
   }
 }
 function openBooking(h) {
-  needLogin(() => {
+  needLogin(async () => {
+    await loadPM();
     const min = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     const d = openDlg('dlgBook', `<form class="dlg" id="bkForm" novalidate>${head('bkH', t('bk_title'))}
       <div class="hostline"><img alt="" src="${esc(hostImg(h))}"><div><b class="serif" style="font-size:20px">${esc(hostPlace(h))}</b><div style="font-size:13px;color:var(--mute)">${esc(t('host'))} ${esc(h.alias)}${h.gender ? ' · ' + gIcon(h.gender) + ' ' + esc(gLabel(h.gender)) : ''} · ${money(h.rate)} ${esc(t('per_day'))}</div></div></div>
@@ -830,7 +856,8 @@ function openBooking(h) {
   }, t('bk_need_login'));
 }
 function openPackageBooking(p) {
-  needLogin(() => {
+  needLogin(async () => {
+    await loadPM();
     const min = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     const d = openDlg('dlgBook', `<form class="dlg" id="pkForm" novalidate>${head('bkH', pkgTitle(p))}
       <p style="margin:0;color:var(--mute)">${esc(t('pk_days', { n: p.days }))}${p.operator ? ' · ' + esc(t('tr_operator')) + ': ' + esc(p.operator) : ''}</p>
@@ -847,6 +874,75 @@ function openPackageBooking(p) {
     f.onsubmit = e => { e.preventDefault(); if (!f.travelDate.value) return f.travelDate.focus();
       submitOrder(d, { packageId: p.id, travelDate: f.travelDate.value, people: +f.people.value, provider: f.provider.value, customerName: f.customerName.value.trim(), contact: f.contact.value.trim() }, $('#pkMsg', d), $('#pkSubmit', d)); };
   }, t('bk_need_login'));
+}
+
+/* ---------- Bank o'tkazmasi: rekvizitlar va chek ---------- */
+const som = n => Math.round(Number(n) || 0).toLocaleString('ru-RU').replace(/\u00a0/g, ' ');
+const usd2 = n => '$' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+function receiptLine(rc) {
+  if (!rc) return '';
+  if (rc.status === 'approved') return msg(t('bt_paid'));
+  if (rc.status === 'rejected') return msg(t('bt_rejected', { reason: rc.rejectReason || '—' }), 1);
+  if (rc.checking) return `<div class="msg" aria-busy="true">${esc(t('bt_checking'))}</div>`;
+  if (rc.verdict === 'mismatch') return `<div class="msg err">${esc(t('bt_bad'))}<ul>${[...new Set(rc.problems || [])].map(k => `<li>${esc(t('bt_p_' + k))}</li>`).join('')}</ul></div>`;
+  return msg(t(rc.verdict === 'match' ? 'bt_ok' : 'bt_review'));
+}
+function showBank(d, booking, bt) {
+  const b = bt.bank || {};
+  const rows = [['bt_recipient', b.recipient || b.cardHolder], ['bt_bank', b.bankName], ['bt_account', b.account, 2], ['bt_mfo', b.mfo], ['bt_inn', b.inn], ['bt_card', b.card, 2], ['bt_holder', b.card && b.recipient ? b.cardHolder : ''], ['bt_purpose', bt.purpose, 1]].filter(r => r[1]);
+  const last = (bt.receipts || [])[0];
+  d.innerHTML = `<div class="dlg">${head('bkH', t('bt_title'))}
+    <div class="bt-amt"><span>${esc(t('bt_amount'))}</span><b>${som(bt.amountUzs)} ${esc(t('bt_uzs'))}</b><small>≈ ${usd2(bt.amountUsd)} · ${esc(booking.code)}</small></div>
+    ${bt.paymentStatus === 'pending' ? `<p style="margin:0;color:var(--ink-2)">${esc(t('bt_note'))}</p>
+    <dl class="req">${rows.map(([k, v, cp]) => `<div><dt>${esc(t(k))}</dt><dd><span>${esc(v)}</span>${cp ? `<button type="button" class="cp" data-copy="${esc(cp === 2 ? String(v).replace(/\s+/g, '') : v)}">${esc(t('bt_copy'))}</button>` : ''}</dd></div>`).join('')}</dl>` : ''}
+    <div id="btSt" role="status" aria-live="polite">${receiptLine(last)}</div>
+    ${bt.canUpload ? `<label class="up"><input type="file" id="btFile" accept="image/jpeg,image/png,image/webp,application/pdf" class="sr-only" style="position:absolute;opacity:0;width:1px;height:1px"><span class="btn ${last && last.verdict !== 'mismatch' && last.status !== 'rejected' ? 'btn-line' : 'btn-primary'}" role="button" tabindex="0">${esc(t(last ? 'bt_again' : 'bt_upload'))}</span><small>${esc(t('bt_upload_hint'))}</small></label>` : ''}
+    ${bt.canUpload && ME && ME.telegram && ME.telegram.linked ? `<p style="margin:0;font-size:13px;color:var(--mute)">${esc(t('bt_tg'))}</p>` : ''}</div>`;
+  if (!d.open) d.showModal();
+  $$('[data-close]', d).forEach(x => x.onclick = () => d.close());
+  $$('[data-copy]', d).forEach(x => x.onclick = async () => { try { await navigator.clipboard.writeText(x.dataset.copy); x.textContent = t('bt_copied'); setTimeout(() => { x.textContent = t('bt_copy'); }, 1600); } catch (_) {} });
+  const f = $('#btFile', d), lbl = f && f.nextElementSibling;
+  if (lbl) lbl.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); f.click(); } };
+  if (f) f.onchange = () => uploadReceipt(d, booking, f.files[0]);
+  if (last && last.checking) pollReceipt(d, booking);
+}
+// Katta rasmni yuborishdan oldin kichraytiramiz (matn o'qiladigan darajada): tezroq yuklanadi
+async function shrink(file) {
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 1.5e6 || !window.createImageBitmap) return file;
+  try {
+    const bmp = await createImageBitmap(file), k = Math.min(1, 2200 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const out = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.86));
+    return out && out.size < file.size ? out : file;
+  } catch (_) { return file; }
+}
+async function uploadReceipt(d, booking, file) {
+  if (!file) return;
+  const st = $('#btSt', d);
+  st.innerHTML = `<div class="msg" aria-busy="true">${esc(t('bt_uploading'))}</div>`; st.scrollIntoView({ block: 'nearest' });
+  try {
+    const blob = await shrink(file);
+    if (blob.size > 6 * 1024 * 1024) throw new Error(t('bt_e_big'));
+    const r = await fetch(`/api/my/bookings/${encodeURIComponent(booking.id)}/receipt`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': blob.type || 'application/octet-stream' }, body: blob });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(errText(j.error || t('err_generic')));
+    st.innerHTML = `<div class="msg" aria-busy="true">${esc(t('bt_checking'))}</div>`;
+    pollReceipt(d, booking, 0, true);
+  } catch (ex) { st.innerHTML = msg(ex.message, 1); }
+}
+async function pollReceipt(d, booking, n = 0, follow = false) {
+  if (!d.open) return;
+  try {
+    const r = await api(`/my/bookings/${encodeURIComponent(booking.id)}/payment`);
+    const last = r.bankTransfer && r.bankTransfer.receipts[0];
+    if (last && last.checking && n < 40) return setTimeout(() => pollReceipt(d, booking, n + 1, follow), 1500);
+    if (r.bankTransfer) { showBank(d, booking, r.bankTransfer); const s = $('#btSt', d); if (s && follow) s.scrollIntoView({ block: 'nearest' }); } // natija ko'rinib tursin
+  } catch (_) {}
+}
+async function openBank(id) {
+  const r = await api(`/my/bookings/${encodeURIComponent(id)}/payment`);
+  if (r.bankTransfer) { const d = $('#dlgBook'); showBank(d, { id, code: r.code }, r.bankTransfer); d.scrollTop = 0; }
 }
 
 /* ---------- Request (sample offers, trips, support) ---------- */
@@ -877,7 +973,7 @@ async function openTrips() {
   $('#trTop', d).innerHTML = `<div class="note" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${esc(t('tr_tg_hint'))}</span>${tg && tg.linked ? `<b>${esc(t('tr_tg_connected'))}</b>` : (tg && tg.enabled ? `<button class="btn btn-ink btn-sm" type="button" id="tgLink">${esc(t('tr_tg_connect'))}</button>` : '')}</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">${roles.guide ? `<button class="btn btn-line btn-sm" type="button" id="cabG">${esc(t('cab_guide'))}</button>` : ''}${roles.operator ? `<button class="btn btn-line btn-sm" type="button" id="cabO">${esc(t('cab_operator'))}</button>` : ''}</div>`;
   const tl = $('#tgLink', d); if (tl) tl.onclick = async () => { try { const r = await api('/me/telegram-link', {}); window.open(r.url, '_blank', 'noopener'); } catch (ex) { $('#trTop', d).insertAdjacentHTML('beforeend', msg(ex.message, 1)); } };
-  const cg = $('#cabG', d); if (cg) cg.onclick = () => { d.close(); openGuideCabinet(); };
+  const cg = $('#cabG', d); if (cg) cg.onclick = () => { location.href = '/guide'; };
   const co = $('#cabO', d); if (co) co.onclick = () => { d.close(); openOperator(); };
   try {
     const { bookings } = await api('/my/bookings');
@@ -888,12 +984,15 @@ async function openTrips() {
         ? `<div class="reveal"><b>${esc(t('tr_guide'))}:</b> ${esc(b.guide.name)}${b.guide.telegram ? ` · <a href="https://t.me/${esc(String(b.guide.telegram).replace(/[^A-Za-z0-9_]/g, ''))}" target="_blank" rel="noopener">Telegram @${esc(String(b.guide.telegram).replace(/[^A-Za-z0-9_]/g, ''))}</a>` : ''}</div>`
         : `<div class="reveal" style="color:var(--mute)">🔒 ${esc(t('tr_guide_hidden'))}</div>`;
       if (b.operator) g += `<div class="reveal"><b>${esc(t('tr_operator'))}:</b> ${esc(b.operator.company)}${b.operator.phone ? ' · ' + esc(b.operator.phone) : ''}</div>`;
+      const bt = b.bankTransfer && b.bankTransfer.paymentStatus === 'pending' ? b.bankTransfer : null;
+      if (bt) g += `<div class="reveal"><b>${esc(t('bt_wait_pay'))}:</b> ${som(bt.amountUzs)} ${esc(t('bt_uzs'))}${bt.receipts[0] ? receiptLine(bt.receipts[0]) : ''}<div style="margin-top:8px"><button class="btn btn-ink btn-sm" type="button" data-bank="${esc(b.id)}">${esc(t('bt_open'))}</button></div></div>`;
       return `<div class="trip" data-id="${esc(b.id)}"><span class="st ${wait ? 'wait' : ''}">${esc(t('st_' + b.status))}${b.sandbox ? ' · test' : ''}</span><b class="serif" style="font-size:21px">${esc(CATMAP[b.city] ? dName(b.city) : (b.city || b.title))}</b>
         <span style="font-size:14px;color:var(--mute)">${esc(b.code)} · ${esc(b.travelDate || '')} · ${b.days} ${esc(t('bk_days').toLowerCase())} · ${money(b.amountUsd)}</span>${g}
         ${b.refunds && b.refunds.length ? `<span style="font-size:13px;color:var(--mute)">↩ ${b.refunds.map(r => money(r.amountUsd) + ' · ' + esc(r.status)).join(', ')}</span>` : ''}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${b.canCancel ? `<button class="btn btn-line btn-sm" type="button" data-cancel="${esc(b.id)}" data-pct="${b.cancelRefundPct}" data-code="${esc(b.code)}">${esc(t('tr_cancel'))}</button>` : ''}${b.canReview ? `<button class="btn btn-ink btn-sm" type="button" data-rate="${esc(b.id)}">${esc(t('tr_rate'))}</button>` : ''}</div>
         <div class="rateBox"></div></div>`;
     }).join('') : `<div class="empty">${esc(t('tr_empty'))}</div>`;
+    $$('[data-bank]', d).forEach(btn => btn.onclick = () => { d.close(); openBank(btn.dataset.bank).catch(ex => alert(ex.message)); });
     $$('[data-cancel]', d).forEach(btn => btn.onclick = async () => {
       if (!confirm(t('tr_cancel_confirm', { code: btn.dataset.code, pct: btn.dataset.pct }))) return;
       try { await api(`/my/bookings/${btn.dataset.cancel}/cancel`, {}); openTrips(); } catch (ex) { btn.insertAdjacentHTML('afterend', msg(ex.message, 1)); }
@@ -907,26 +1006,7 @@ async function openTrips() {
   } catch (ex) { $('#trList', d).innerHTML = msg(ex.message, 1); }
 }
 
-/* ---------- Host cabinet ---------- */
-async function openGuideCabinet() {
-  const d = openDlg('dlgCab', `<div class="dlg">${head('cbH', t('cab_guide'))}<div id="cb"><div class="skel" style="min-height:200px"></div></div></div>`);
-  try {
-    const [me, bk] = await Promise.all([api('/guide/me'), api('/guide/bookings')]); const g = me.guide;
-    $('#cb', d).innerHTML = `${g.status !== 'approved' ? msg(t('gc_pending')) : ''}
-      <div class="stat4"><div><small>${esc(t('gc_bookings'))}</small><b>${me.stats.bookings}</b></div><div><small>${esc(t('gc_earned'))}</small><b>${money(me.stats.earnedUsd)}</b></div><div><small>${esc(t('gc_paid'))}</small><b>${money(me.stats.paidOutUsd)}</b></div><div><small>${esc(t('gc_rating'))}</small><b>${me.stats.rating ? '★ ' + me.stats.rating : '—'}</b></div></div>
-      <div class="tabs2" role="tablist"><button role="tab" aria-selected="true" data-tab="b">${esc(t('gc_bookings'))}</button><button role="tab" aria-selected="false" data-tab="p">${esc(t('gc_profile'))}</button></div>
-      <div id="tabB" class="mini">${bk.bookings.length ? bk.bookings.map(b => `<div class="mi"><div class="t"><b>${esc(b.code)} · ${esc(b.travelDate || '')}</b><span>${esc(t('st_' + b.status))} · ${b.days} ${esc(t('bk_days').toLowerCase())} · ${b.people} ${esc(t('bk_people').toLowerCase())} · ${money(b.payoutUsd)}${b.genderPref ? ' · ' + gIcon(b.genderPref) : ''}</span><span>${b.customer ? esc(b.customer.name) + ' · ' + esc(b.customer.contact) : '🔒 ' + esc(t('gc_customer_hidden'))}</span></div></div>`).join('') : `<div class="empty">${esc(t('gc_none'))}</div>`}</div>
-      <form id="tabP" class="mini" hidden novalidate>
-        <label class="lbl">${esc(t('ap_spec'))}<input class="inp" name="spec" maxlength="200" value="${esc(specText(g.spec))}"></label>
-        <label class="lbl">${esc(t('ap_langs'))}<input class="inp" name="langs" maxlength="120" value="${esc(langsText(g.langs))}"></label>
-        <div class="grid2"><label class="lbl">${esc(t('ap_rate'))}<input class="inp" name="rate" type="number" min="5" max="2000" value="${esc(g.rate)}"></label><label class="lbl">${esc(t('ap_tg'))}<input class="inp" name="tg" maxlength="64" value="${esc(g.tg || '')}"></label></div>
-        <label class="lbl">${esc(t('op_about'))}<textarea class="inp" name="about" maxlength="1000">${esc(g.about || '')}</textarea></label>
-        <div id="gpMsg"></div><button class="btn btn-ink" type="submit">${esc(t('gc_save'))}</button></form>`;
-    $$('[data-tab]', d).forEach(b => b.onclick = () => { $$('[data-tab]', d).forEach(x => x.setAttribute('aria-selected', x === b)); $('#tabB', d).hidden = b.dataset.tab !== 'b'; $('#tabP', d).hidden = b.dataset.tab !== 'p'; });
-    const f = $('#tabP', d); f.onsubmit = async e => { e.preventDefault(); try { await api('/guide/profile', { spec: f.spec.value, langs: f.langs.value, rate: f.rate.value, tg: f.tg.value, about: f.about.value }); $('#gpMsg', d).innerHTML = msg(t('gc_saved')); } catch (ex) { $('#gpMsg', d).innerHTML = msg(ex.message, 1); } };
-  } catch (ex) { $('#cb', d).innerHTML = msg(ex.message, 1); }
-}
-
+/* Gid kabineti endi alohida platformada: /guide (login va parol Telegram bot orqali) */
 /* ---------- Tour operator ---------- */
 function openOperator() {
   needLogin(async () => {
