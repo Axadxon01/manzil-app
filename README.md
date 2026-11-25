@@ -1,10 +1,10 @@
-# Manzil v3.3
+# Manzil v3.4
 
 Node.js 22+ (`node:sqlite`), **npm paketlarsiz**. Ommaviy sayt `/`, xodimlar paneli `/admin`, tasdiqlangan gidlar platformasi `/guide`.
 
 ```bash
 node server.js          # lokal; baza data/manzil.db
-npm test                # 232 ta integratsion tekshiruv (xotiradagi bazada, Telegram va AI mock bilan)
+npm test                # 271 ta integratsion tekshiruv (xotiradagi bazada, Telegram va AI mock bilan)
 ```
 
 ## Render'ga deploy
@@ -44,3 +44,9 @@ Summalar sentlarda · ikki yoqlama ledger · sandbox to'lovlar hisobotga kirmayd
 - **Gidni ulash**: admin gidni tasdiqlaganda, arizadagi Telegram username botga yozgan bo'lsa, login/parol avtomatik yuboriladi. Aks holda Admin → Gidlar → **Kirish** → bir martalik havola (7 kun) yoki gid botga `/gid` yozadi.
 - **Bank o'tkazmasi + chekni AI tekshirishi**: mijoz bron qilganda "Bank o'tkazmasi"ni tanlaydi → rekvizitlar va to'lov maqsadi (bron kodi) → pulni o'tkazib, chek (skrinshot yoki PDF) yuklaydi — saytda yoki Telegram botda. AI (Gemini → Claude → OpenAI zaxira) chekdan faqat **ma'lumotni o'qiydi**; summa, qabul qiluvchi karta/hisob, sana, tranzaksiya raqami takrorlanmasligi, fayl takrorlanishi va tahrir izlarini **server qoidalari** tekshiradi. Natija: "mos" / "tekshirish kerak" / "mos emas". **To'lovni AI hech qachon o'zi tasdiqlamaydi** — moliya xodimi Admin → Cheklar'da pul bank hisobiga tushganini ko'rib, bitta tugma bilan tasdiqlaydi ("mos emas" bo'lsa faqat izoh bilan). Chekdagi matn ko'rsatma sifatida bajarilmaydi (prompt-injection himoyasi).
 - **Sozlash**: Admin → Sozlamalar → "Bank o'tkazmasi" kartasiga rekvizitlarni kiriting (hisob raqami, MFO, INN, karta, karta egasi). Ular kiritilmaguncha saytda bu usul ko'rinmaydi.
+
+## v3.4: tur-paketlarni bron qilish
+- **Har bir tur-paket endi bron qilinadi.** Manzilning o'z paketlari (narxi taxminiy) uchun: mijoz sana, kishilar soni va izoh bilan **bron so'rovi** yuboradi — hozir pul olinmaydi. Xodim Admin → Buyurtmalar → **Yangi so'rovlar**da sanani gid/hamkor bilan kelishadi, **yakuniy narx** va mijozga izoh bilan tasdiqlaydi (yoki sabab bilan rad etadi). Shundan keyin mijozga Telegram'da xabar boradi va "Sayohatlarim"da **To'lash** tugmasi ochiladi: karta yoki bank o'tkazmasi (chek AI tekshiruvi bilan). Hamkor operator paketlari avvalgidek darhol to'lanadi.
+- Botda manzil kartasidagi har bir paketda "bron" tugmasi (saytdagi bron oynasini ochadi); tasdiqlangan narxni botning o'zida bank o'tkazmasi bilan to'lash mumkin.
+- "Sayohatlarim"da to'lanmay qolgan har qanday bron uchun "To'lash" (karta sahifasi yopilib qolsa ham).
+- **Bepul reja himoyasi**: diskisiz serverda gid parol xabari 10 daqiqada o'chiriladi (server uxlashidan oldin); Stripe'da to'lov bo'lib, bazada yozuvi yo'q bo'lsa (server qayta ishga tushgan), xodimlarga Telegram'da darhol ogohlantirish boradi. Ogohlantirish baza o'chganda ham yetib borishi uchun Render'da `TELEGRAM_ADMIN_CHAT_ID` o'rnatilgan bo'lsin.

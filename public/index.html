@@ -547,6 +547,7 @@ dialog.wide{width:min(1000px,calc(100% - 32px))}
 <script src="/i18n.js"></script>
 <script src="/i18n-ext.js"></script>
 <script src="/i18n-pay.js"></script>
+<script src="/i18n-pkg.js"></script>
 <script src="/articles.js"></script>
 <script>
 'use strict';
@@ -573,7 +574,11 @@ const country = iso => { try { return iso ? new Intl.DisplayNames([LANG], { type
 const langName = code => { try { return new Intl.DisplayNames([LANG], { type: 'language' }).of(code); } catch (_) { return code; } };
 const langsText = s => /^[a-z]{2,3}(,[a-z]{2,3})*$/.test(s || '') ? s.split(',').map(langName).join(', ') : (s || '');
 const specText = s => String(s || '').startsWith('@') ? t('sp_' + s.slice(1)) : (s || '');
-const monthName = m => { try { return new Intl.DateTimeFormat(LANG, { month: 'long' }).format(new Date(Date.UTC(2026, m - 1, 15))); } catch (_) { return m; } };
+const UZ_MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
+const monthName = m => {
+  if (LANG === 'uz') return UZ_MONTHS[m - 1] || m; // ba'zi brauzerlarda o'zbekcha oy nomlari yo'q ("M03")
+  try { const d = new Date(Date.UTC(2026, m - 1, 15)), s = new Intl.DateTimeFormat(LANG, { month: 'long' }).format(d); return /^M\d+$/.test(s) ? new Intl.DateTimeFormat('en', { month: 'long' }).format(d) : s; } catch (_) { return m; }
+};
 const gLabel = g => g === 'female' ? t('g_female') : g === 'male' ? t('g_male') : '';
 const gIcon = g => g === 'female' ? '♀' : g === 'male' ? '♂' : '';
 const path = p => `/${LANG}${p}`;
@@ -712,10 +717,10 @@ async function openDest(slug) {
     const fl = d.cost.flight * ppl, diy = fl + budget * days * ppl, host = diy + hostRate * days;
     $('#cFl', dlg).textContent = d.cost.flight ? money(fl) : '—'; $('#cDiy', dlg).textContent = money(diy); $('#cHost', dlg).textContent = money(host); };
   $('#cDays', dlg).oninput = calc; $('#cPpl', dlg).oninput = calc; calc();
-  $('#ddPk', dlg).innerHTML = x.packages.length ? x.packages.map(p => `<div class="mi"><div class="t"><b>${esc(pkgTitle(p))}${p.sample ? `<span class="tag s">${esc(t('pk_sample'))}</span>` : ''}</b><span>${esc(t('pk_days', { n: p.days }))} · ${esc(t('from'))} ${money(p.priceUsd)} ${esc(t('pk_per_person'))}${p.priceStatus === 'estimated' ? ' · ' + esc(t('estimated').split(' — ')[0]) : ''}</span></div><button class="btn btn-ink btn-sm" type="button" data-pk="${esc(p.id)}">${esc(p.sample ? t('pk_request') : t('pk_book'))}</button></div>`).join('') : `<div class="empty">—</div>`;
+  $('#ddPk', dlg).innerHTML = x.packages.length ? x.packages.map(p => `<div class="mi"><div class="t"><b>${esc(pkgTitle(p))}</b><span>${esc(t('pk_days', { n: p.days }))} · ${esc(t('pk_price_line', { price: money(p.priceUsd) }))}${p.priceStatus === 'estimated' ? ' · ' + esc(t('estimated').split(' — ')[0]) : ''}</span></div><button class="btn btn-ink btn-sm" type="button" data-pk="${esc(p.id)}">${esc(t('pk_book'))}</button></div>`).join('') : `<div class="empty">—</div>`;
   $('#ddHosts', dlg).innerHTML = x.hosts.length ? x.hosts.map(h => `<div class="mi"><div class="t"><b>${esc(t('host'))} ${esc(h.alias)} ${h.gender ? `<span class="tag">${gIcon(h.gender)} ${esc(gLabel(h.gender))}</span>` : ''}${h.sample ? `<span class="tag s">${esc(t('h_sample'))}</span>` : ''}</b><span>${esc(specText(h.spec))} · ${esc(langsText(h.langs))} · ${money(h.rate)} ${esc(t('per_day'))}</span></div><button class="btn btn-ink btn-sm" type="button" data-host="${esc(h.id)}">${esc(h.sample ? t('pk_request') : t('book'))}</button></div>`).join('') : `<div class="empty">${esc(t('dd_none_hosts'))}<br><button class="btn btn-line btn-sm" type="button" id="ddReq" style="margin-top:10px">${esc(t('pk_request'))}</button></div>`;
   const pkById = Object.fromEntries(x.packages.map(p => [p.id, p])), hById = Object.fromEntries(x.hosts.map(h => [h.id, h]));
-  $$('[data-pk]', dlg).forEach(b => b.onclick = () => { const p = pkById[b.dataset.pk]; dlg.close(); p.sample ? openRequest({ kind: 'package', id: p.id, title: pkgTitle(p), note: t('pk_sample_note') }) : openPackageBooking(p); });
+  $$('[data-pk]', dlg).forEach(b => b.onclick = () => { const p = pkById[b.dataset.pk]; dlg.close(); openPackage(p); });
   $$('[data-host]', dlg).forEach(b => b.onclick = () => { const h = hById[b.dataset.host]; dlg.close(); h.sample ? openRequest({ kind: 'host', id: h.id, title: `${t('host')} ${h.alias} · ${dName(h.dest)}`, note: t('h_sample_note'), gender: h.gender }) : openBooking(h); });
   const rq = $('#ddReq', dlg); if (rq) rq.onclick = () => { dlg.close(); openRequest({ kind: 'trip', title: name, dest: d.slug }); };
 }
@@ -832,7 +837,7 @@ async function submitOrder(d, body, box, btn) {
     }
     box.innerHTML = msg(t('bk_created', { code: r.code }));
   } catch (ex) {
-    if (ex.data && ex.data.code === 'SAMPLE_OFFER') { d.close(); return openRequest({ kind: body.packageId ? 'package' : 'host', id: body.packageId || body.guideId, title: '', note: t('pk_sample_note') }); }
+    if (ex.data && ex.data.code === 'SAMPLE_OFFER') { d.close(); if (body.packageId) return api('/packages/' + encodeURIComponent(body.packageId)).then(r => openPackageRequest(r.package)).catch(e => alert(e.message)); return openRequest({ kind: 'host', id: body.guideId, title: '', note: t('pk_sample_note') }); }
     box.innerHTML = msg(ex.message, 1); btn.disabled = false;
   }
 }
@@ -854,6 +859,61 @@ function openBooking(h) {
     f.onsubmit = e => { e.preventDefault(); if (!f.travelDate.value) return f.travelDate.focus();
       submitOrder(d, { guideId: h.id, genderPref: h.gender || undefined, travelDate: f.travelDate.value, days: +f.days.value, people: +f.people.value, provider: f.provider.value, customerName: f.customerName.value.trim(), contact: f.contact.value.trim() }, $('#bkMsg', d), $('#bkSubmit', d)); };
   }, t('bk_need_login'));
+}
+/* Manzil paketlari: avval bron so'rovi (pul olinmaydi), jamoa sana va narxni tasdiqlagach "Sayohatlarim"da to'lov */
+function openPackage(p) { return p.sample ? openPackageRequest(p) : openPackageBooking(p); }
+function openPackageRequest(p) {
+  needLogin(() => {
+    const min = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+    const d = openDlg('dlgBook', `<form class="dlg" id="pqForm" novalidate>${head('bkH', pkgTitle(p))}
+      <p style="margin:0;color:var(--mute)">${esc(t('pk_days', { n: p.days }))} · ${esc(dName(p.dest))}</p>
+      ${p.itinerary && p.itinerary.length ? `<ol class="itin">${p.itinerary.map((x, i) => `<li><span>${esc(t('day'))} ${i + 1}</span><div>${esc(x)}</div></li>`).join('')}</ol>` : ''}
+      <div class="note" style="font-size:14px">${esc(t('pq_how'))}</div>
+      <div class="grid2"><label class="lbl">${esc(t('bk_date'))}<input class="inp" name="travelDate" type="date" min="${min}" required aria-describedby="pqMin"><small id="pqMin" style="color:var(--mute);font-size:12px">${esc(t('pq_min_date'))}</small></label><label class="lbl">${esc(t('bk_people'))}<input class="inp" name="people" type="number" min="1" max="${p.maxPeople}" value="2" inputmode="numeric"></label></div>
+      <label class="lbl">${esc(t('bk_name'))}<input class="inp" name="customerName" autocomplete="name" required value="${esc(USER.name || '')}"></label>
+      <label class="lbl">${esc(t('bk_contact'))}<input class="inp" name="contact" required value="${esc(USER.email || '')}"></label>
+      <label class="lbl">${esc(t('pq_note'))}<textarea class="inp" name="message" maxlength="1000" rows="2" placeholder="${esc(t('pq_note_ph'))}"></textarea></label>
+      <div class="sum"><span>${esc(t('pq_estimate'))}</span><b id="pqTotal"></b></div>
+      <div id="pqMsg" role="status"></div><button class="btn btn-primary" type="submit" id="pqSubmit">${esc(t('pq_submit'))}</button></form>`);
+    const f = $('#pqForm', d), ppl = () => Math.max(1, Math.min(p.maxPeople, parseInt(f.people.value, 10) || 1));
+    const total = () => { $('#pqTotal', d).textContent = '≈ ' + money(p.priceUsd * ppl()); };
+    f.people.oninput = total; total();
+    f.onsubmit = async e => {
+      e.preventDefault(); if (!f.travelDate.value) return f.travelDate.focus();
+      const btn = $('#pqSubmit', d), box = $('#pqMsg', d); btn.disabled = true; box.innerHTML = '';
+      try {
+        const r = await api(`/packages/${encodeURIComponent(p.id)}/request`, { travelDate: f.travelDate.value, people: ppl(), customerName: f.customerName.value.trim(), contact: f.contact.value.trim(), message: f.message.value.trim(), lang: LANG });
+        f.innerHTML = `${head('bkH', pkgTitle(p))}<div class="msg">${esc(t('pq_sent', { code: r.code }))}</div><button class="btn btn-primary" type="button" id="pqTrips">${esc(t('pq_open_trips'))}</button>`;
+        $('#pqTrips', d).onclick = () => { d.close(); openTrips(); };
+      } catch (ex) { box.innerHTML = msg(ex.message, 1); btn.disabled = false; }
+    };
+  }, t('bk_need_login'));
+}
+/* "Sayohatlarim" → To'lash: narxi tasdiqlangan bron uchun usul tanlash */
+async function openPay(b) {
+  await loadPM();
+  const m = PM || {}, opts = [['stripe', t('bk_card'), m.stripe || m.demo], ['bank', t('pm_bank'), m.bank], ['click', 'Click', m.click], ['payme', 'Payme', m.payme]].filter(o => o[2]);
+  const d = openDlg('dlgBook', `<form class="dlg" id="payForm" novalidate>${head('bkH', t('tr_pay_how'))}
+    <p style="margin:0"><b>${esc(b.code)}</b> · ${esc(CATMAP[b.city] ? dName(b.city) : (b.city || b.title))} · ${esc(b.travelDate || '')}</p>
+    ${b.offerNote ? `<div class="note" style="font-size:14px"><b>${esc(t('tr_offer_note'))}:</b> ${esc(b.offerNote)}</div>` : ''}
+    <div class="sum"><span>${esc(t('bk_total'))}</span><b>${money(b.amountUsd)}</b></div>
+    ${opts.length ? `<label class="lbl">${esc(t('bk_pay'))}<select class="inp" name="provider">${opts.map(([v, l], i) => `<option value="${v}" ${i ? '' : 'selected'}>${esc(l)}</option>`).join('')}</select></label>` : `<div class="msg err">${esc(t('tr_pay_none'))}</div>`}
+    <div id="payMsg" role="status"></div>${opts.length ? `<button class="btn btn-primary" type="submit" id="paySubmit">${esc(t('tr_pay_go'))}</button>` : ''}</form>`);
+  const f = $('#payForm', d);
+  f.onsubmit = async e => {
+    e.preventDefault(); const btn = $('#paySubmit', d), box = $('#payMsg', d); btn.disabled = true; box.innerHTML = '';
+    try {
+      const r = await api(`/my/bookings/${encodeURIComponent(b.id)}/pay`, { provider: f.provider.value, lang: LANG });
+      if (r.bankTransfer) { showBank(d, { id: b.id, code: b.code }, r.bankTransfer); d.scrollTop = 0; return; }
+      if (r.checkoutUrl) { location.href = r.checkoutUrl; return; }
+      if (r.sandbox) {
+        box.innerHTML = `<div class="msg">${esc(t('bk_sandbox', { code: r.code }))}<br><button class="btn btn-line btn-sm" type="button" id="sbx" style="margin-top:10px">${esc(t('bk_confirm_sbx'))}</button></div>`;
+        $('#sbx', d).onclick = async () => { try { await api('/payments/sandbox-confirm', { paymentId: r.paymentId }); d.close(); openTrips(); } catch (ex) { box.innerHTML = msg(ex.message, 1); } };
+        return;
+      }
+      box.innerHTML = msg(t('bk_created', { code: r.code }));
+    } catch (ex) { box.innerHTML = msg(ex.message, 1); btn.disabled = false; }
+  };
 }
 function openPackageBooking(p) {
   needLogin(async () => {
@@ -978,21 +1038,26 @@ async function openTrips() {
   try {
     const { bookings } = await api('/my/bookings');
     $('#trList', d).innerHTML = bookings.length ? bookings.map(b => {
-      const wait = ['awaiting_payment', 'pending'].includes(b.status);
+      const wait = ['requested', 'awaiting_payment', 'pending'].includes(b.status);
       let g = '';
       if (b.guide) g = b.guide.revealed
         ? `<div class="reveal"><b>${esc(t('tr_guide'))}:</b> ${esc(b.guide.name)}${b.guide.telegram ? ` · <a href="https://t.me/${esc(String(b.guide.telegram).replace(/[^A-Za-z0-9_]/g, ''))}" target="_blank" rel="noopener">Telegram @${esc(String(b.guide.telegram).replace(/[^A-Za-z0-9_]/g, ''))}</a>` : ''}</div>`
         : `<div class="reveal" style="color:var(--mute)">🔒 ${esc(t('tr_guide_hidden'))}</div>`;
       if (b.operator) g += `<div class="reveal"><b>${esc(t('tr_operator'))}:</b> ${esc(b.operator.company)}${b.operator.phone ? ' · ' + esc(b.operator.phone) : ''}</div>`;
+      if (b.offerNote && b.status !== 'cancelled') g += `<div class="reveal"><b>${esc(t('tr_offer_note'))}:</b> ${esc(b.offerNote)}</div>`;
+      if (b.offerNote && b.status === 'cancelled') g += `<div class="reveal"><b>${esc(t('tr_decline_note'))}:</b> ${esc(b.offerNote)}</div>`;
       const bt = b.bankTransfer && b.bankTransfer.paymentStatus === 'pending' ? b.bankTransfer : null;
+      if (b.canPay && !bt) g += `<div class="reveal">${b.offeredAt ? `<b>✓ ${esc(t('tr_price_ok'))}</b>` : ''}<div style="${b.offeredAt ? 'margin-top:8px' : ''}"><button class="btn btn-primary btn-sm" type="button" data-pay="${esc(b.id)}">${esc(t('tr_pay'))} · ${money(b.amountUsd)}</button></div></div>`;
       if (bt) g += `<div class="reveal"><b>${esc(t('bt_wait_pay'))}:</b> ${som(bt.amountUzs)} ${esc(t('bt_uzs'))}${bt.receipts[0] ? receiptLine(bt.receipts[0]) : ''}<div style="margin-top:8px"><button class="btn btn-ink btn-sm" type="button" data-bank="${esc(b.id)}">${esc(t('bt_open'))}</button></div></div>`;
-      return `<div class="trip" data-id="${esc(b.id)}"><span class="st ${wait ? 'wait' : ''}">${esc(t('st_' + b.status))}${b.sandbox ? ' · test' : ''}</span><b class="serif" style="font-size:21px">${esc(CATMAP[b.city] ? dName(b.city) : (b.city || b.title))}</b>
+      return `<div class="trip" data-id="${esc(b.id)}"><span class="st ${wait ? 'wait' : ''}">${esc(t('st_' + b.status))}${b.sandbox ? ' · test' : ''}</span><b class="serif" style="font-size:21px">${esc(b.packageKind && CATMAP[b.city] ? t('pk_k_' + b.packageKind, { place: dName(b.city) }) : CATMAP[b.city] ? dName(b.city) : (b.city || b.title))}</b>
         <span style="font-size:14px;color:var(--mute)">${esc(b.code)} · ${esc(b.travelDate || '')} · ${b.days} ${esc(t('bk_days').toLowerCase())} · ${money(b.amountUsd)}</span>${g}
         ${b.refunds && b.refunds.length ? `<span style="font-size:13px;color:var(--mute)">↩ ${b.refunds.map(r => money(r.amountUsd) + ' · ' + esc(r.status)).join(', ')}</span>` : ''}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${b.canCancel ? `<button class="btn btn-line btn-sm" type="button" data-cancel="${esc(b.id)}" data-pct="${b.cancelRefundPct}" data-code="${esc(b.code)}">${esc(t('tr_cancel'))}</button>` : ''}${b.canReview ? `<button class="btn btn-ink btn-sm" type="button" data-rate="${esc(b.id)}">${esc(t('tr_rate'))}</button>` : ''}</div>
         <div class="rateBox"></div></div>`;
     }).join('') : `<div class="empty">${esc(t('tr_empty'))}</div>`;
     $$('[data-bank]', d).forEach(btn => btn.onclick = () => { d.close(); openBank(btn.dataset.bank).catch(ex => alert(ex.message)); });
+    const byId = Object.fromEntries(bookings.map(x => [x.id, x]));
+    $$('[data-pay]', d).forEach(btn => btn.onclick = () => { d.close(); openPay(byId[btn.dataset.pay]).catch(ex => alert(ex.message)); });
     $$('[data-cancel]', d).forEach(btn => btn.onclick = async () => {
       if (!confirm(t('tr_cancel_confirm', { code: btn.dataset.code, pct: btn.dataset.pct }))) return;
       try { await api(`/my/bookings/${btn.dataset.cancel}/cancel`, {}); openTrips(); } catch (ex) { btn.insertAdjacentHTML('afterend', msg(ex.message, 1)); }
@@ -1117,7 +1182,8 @@ document.addEventListener('error', e => { const im = e.target; if (im.tagName !=
 $('#yr').textContent = new Date().getFullYear();
 applyI18n();
 loadCatalog().then(loadHosts);
-loadMe().then(() => { const qs = new URLSearchParams(location.search); if (qs.get('order') && USER) openTrips(); if (qs.get('reset')) openReset(); });
+loadMe().then(() => { const qs = new URLSearchParams(location.search); if (qs.get('order')) { if (USER) openTrips(); else needLogin(() => openTrips(), t('bk_need_login')); } if (qs.get('reset')) openReset();
+  if (qs.get('pk')) api('/packages/' + encodeURIComponent(qs.get('pk'))).then(r => openPackage(r.package)).catch(() => {}); });
 addEventListener('hashchange', handleHash);
 </script>
 </body>

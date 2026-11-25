@@ -32,7 +32,7 @@ const receipts = require('./lib/receipts');
 const { HttpError, str } = sec;
 guides.useTelegram({ send: bot.send, call: bot.call, t: bot.t, enabled: bot.enabled, scheduleDelete: bot.scheduleDelete, notifyStaff: bot.notifyStaff, botName: bot.botName });
 
-const VERSION = '3.3.0';
+const VERSION = '3.4.0';
 const PORT = Number(process.env.PORT) || 3000;
 const IS_PROD = process.env.NODE_ENV === 'production';
 const DEMO_PAYMENTS = process.env.DEMO_PAYMENTS === 'true' && !IS_PROD;
@@ -53,7 +53,7 @@ db.seedSampleGuides();
 try { const r = catalog.seedSamples(); if (!r.skipped) console.log('[catalog] namunaviy gidlar:', r.hosts, 'paketlar:', r.pkgs); } catch (e) { console.error('[catalog] seed', e.message); }
 // Baza doimiy diskdami (Render Persistent Disk /data)? Vaqtinchalik bazada 2FA sirlari har qayta ishga tushishda o'chadi —
 // u holda 2FA majburiy qilinmaydi (aks holda admin har safar qaytadan sozlashga majbur bo'lardi), panelda ogohlantirish ko'rsatiladi.
-const PERSISTENT_DB = !db.IN_MEMORY && (process.env.PERSISTENT_DB === 'true' || /^\/data\//.test(String(db.DB_PATH || '')));
+const PERSISTENT_DB = db.PERSISTENT;
 const REQUIRE_2FA = IS_PROD && (process.env.REQUIRE_STAFF_2FA === 'true' || (process.env.REQUIRE_STAFF_2FA !== 'false' && PERSISTENT_DB));
 async function bootstrapAdmin() {
   if (db.get('SELECT COUNT(*) c FROM staff').c > 0) return;
@@ -389,7 +389,17 @@ route('POST', '/api/payments/webhook/stripe', { raw: true }, ({ req, rawBody }) 
   const obj = ev.data && ev.data.object || {};
   const pid = obj.metadata && obj.metadata.paymentId;
   const p = pid && db.get('SELECT * FROM payments WHERE id=?', pid);
-  if (!p) return { ok: true, ignored: true };
+  if (!p) {
+    // Pul yechilgan, lekin bazada yozuv yo'q (masalan, diskisiz server qayta ishga tushgan): xodimlarga darhol xabar
+    if (ev.type === 'checkout.session.completed' && obj.payment_status === 'paid') {
+      const info = { session: obj.id, paymentIntent: obj.payment_intent || null, amount: (Number(obj.amount_total) || 0) / 100, currency: String(obj.currency || '').toUpperCase(),
+        bookingCode: obj.client_reference_id || null, email: (obj.customer_details && obj.customer_details.email) || obj.customer_email || null, paymentId: pid || null };
+      sec.audit(core.SYSTEM, 'payment.orphan', 'payment', pid || obj.id, null, info);
+      notifyTg(`🚨 Stripe'da to'lov bor, lekin bazada yozuvi yo'q\n${info.amount} ${info.currency} · bron: ${info.bookingCode || '—'} · ${info.email || 'email yo\'q'}\nStripe: ${info.paymentIntent || info.session}\nServer qayta ishga tushgan bo'lishi mumkin. Stripe kabinetida tekshirib, mijoz bilan bog'laning.`);
+      return { ok: true, orphan: true };
+    }
+    return { ok: true, ignored: true };
+  }
   if (ev.type === 'checkout.session.completed' && obj.payment_status === 'paid') {
     if (obj.amount_total !== p.amount_c || String(obj.currency).toLowerCase() !== 'usd') {
       sec.audit(core.SYSTEM, 'payment.amount_mismatch', 'payment', p.id, { expectedC: p.amount_c }, { gotC: obj.amount_total, currency: obj.currency });
@@ -413,6 +423,17 @@ route('POST', '/api/my/bookings/:id/receipt', { auth: 'user', binary: true, max:
 route('GET', '/api/my/bookings/:id/payment', { auth: 'user' }, ({ user, params }) => {
   const b = db.get('SELECT id, code, status FROM bookings WHERE id=? AND user_id=?', str(params.id, 40), user.id); if (!b) throw new HttpError(404, 'Bron topilmadi.');
   return { ok: true, code: b.code, status: b.status, bankTransfer: receipts.forBooking(b.id) };
+});
+// Narxi tasdiqlangan bronni to'lash (paket so'rovi tasdiqlangach yoki karta sahifasi yopilib qolganda)
+route('POST', '/api/my/bookings/:id/pay', { auth: 'user' }, async ({ req, user, params, body }) => {
+  rl(req, 'pay-again', 20, 3600 * 1000, user.id);
+  const prep = core.preparePayment(user, str(params.id, 40), str(body.provider, 20).toLowerCase());
+  const b = prep.booking;
+  if (prep.reused) return { ok: true, code: b.code, bookingId: b.id, paymentId: prep.payment.id, checkoutUrl: null, bankTransfer: receipts.forBooking(b.id) };
+  const checkout = await makeCheckout(prep.o, body);
+  const pay = core.insertPayment(user, prep.o, b, checkout);
+  return { ok: true, code: b.code, bookingId: b.id, paymentId: pay.id, checkoutUrl: checkout.url, sandbox: !!checkout.sandbox,
+    bankTransfer: prep.o.provider === 'bank' ? receipts.forBooking(b.id) : null };
 });
 route('POST', '/api/my/bookings/:id/cancel', { auth: 'user' }, ({ user, params }) => ({ ok: true, ...core.cancelByCustomer(user, params.id) }));
 route('POST', '/api/my/bookings/:id/review', { auth: 'user' }, ({ user, params, body }) => ({ ok: true, id: core.addReview(user, params.id, body) }));
@@ -473,6 +494,7 @@ route('POST', '/api/admin/bookings/:id/status', A('bookings.write'), ({ staff, p
   core.setBookingStatus(params.id, str(body.status, 20), staff, { note: str(body.note, 300), priceVerified: !!body.priceVerified, refund: !!body.refund });
   return { ok: true, ...core.bookingDetail(params.id) };
 });
+route('POST', '/api/admin/bookings/:id/offer', A('bookings.write'), ({ staff, params, body }) => ({ ok: true, booking: core.bookingView(db.get('SELECT * FROM bookings WHERE id=?', core.offerRequest(str(params.id, 40), staff, { amountUsd: body.amountUsd, note: body.note }).id)) }));
 route('POST', '/api/admin/bookings/:id/assign', A('bookings.write'), ({ staff, params, body }) => {
   const st = db.get('SELECT id,active FROM staff WHERE id=?', str(body.staffId, 40)); if (!st || !st.active) throw new HttpError(404, 'Xodim topilmadi.');
   if (!db.get('SELECT 1 x FROM bookings WHERE id=?', params.id)) throw new HttpError(404, 'Buyurtma topilmadi.');
@@ -717,6 +739,17 @@ route('GET', '/api/catalog/:slug', {}, ({ params }) => {
 route('GET', '/api/packages', {}, ({ query }) => {
   const dest = q(query, 'dest');
   return { ok: true, packages: db.all(`SELECT * FROM packages WHERE status='approved' ${dest ? 'AND dest_slug=?' : ''} ORDER BY is_sample, created_at DESC LIMIT 300`, ...(dest ? [dest] : [])).map(packageView) };
+});
+route('GET', '/api/packages/:id', {}, ({ params }) => {
+  const p = db.get("SELECT * FROM packages WHERE id=? AND status='approved'", str(params.id, 60));
+  if (!p) throw new HttpError(404, 'Paket topilmadi.');
+  return { ok: true, package: packageView(p) };
+});
+// Tur-paketni bron qilish so'rovi: pul olinmaydi; xodim sana va narxni tasdiqlagach mijoz "Sayohatlarim"dan to'laydi
+route('POST', '/api/packages/:id/request', { auth: 'user' }, ({ req, user, params, body }) => {
+  rl(req, 'pk-request', 10, 3600 * 1000, user.id);
+  const b = core.requestPackage(user, { ...body, packageId: params.id });
+  return { ok: true, code: b.code, bookingId: b.id, status: b.status, estimateUsd: core.usd(b.amount_c) };
 });
 // Namunaviy taklif (yoki istalgan taklif) uchun so'rov: pul olinmaydi, support jamoasiga murojaat yaratiladi
 route('POST', '/api/requests', {}, async ({ req, body, user }) => {

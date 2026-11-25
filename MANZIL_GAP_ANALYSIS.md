@@ -69,6 +69,13 @@ Belgilar: ✅ ishlaydi (sinovdan o'tdi) · ⚠️ qisman / shart bilan · ❌ ha
 | Manzillar: 30% ro'yxat / 70% batafsil | ✅ gid platformasida; telefonda batafsil to'liq ekranda |
 | Free rejada ma'lumot saqlanishi | ❌ Render Free'da baza uxlash/deploy paytida o'chadi (gid hisoblari va cheklar ham). Starter + 1 GB disk kerak |
 
+## 3d. v3.4
+| Talab | Holat |
+|---|---|
+| Tur-paketlarni bron qilish | ✅ so'rov → xodim sana va yakuniy narxni tasdiqlaydi → mijoz karta yoki bank o'tkazmasi bilan to'laydi; rad etish sababi mijozga ko'rinadi |
+| To'lanmay qolgan bronni keyin to'lash | ✅ "Sayohatlarim" → To'lash (karta/bank), botda bank o'tkazmasi |
+| Bepul rejada pul yo'qolishi xavfi | ⚠️ qisman: bazada yo'q Stripe to'lovi haqida xodimlarga ogohlantirish. To'liq yechim — Starter + disk |
+
 ## 4. Xavfsizlik
 ✅ scrypt xesh, parol siyosati, lockout (5 xato/15 daq), rate limit, server tomonida narx hisoblash, parametrlangan SQL, HttpOnly/SameSite cookie, Origin tekshiruvi (CSRF), CSP va xavfsizlik sarlavhalari, path-traversal himoyasi, RBAC (har so'rovda), TOTP 2FA, sessiya xesh holda saqlanadi, parol almashganda sessiyalar bekor, audit zanjiri, CSV formula-injection himoyasi, XSS: admin panelda barcha qiymatlar escape.
 ⚠️ Rate limit va sessiyalar bitta jarayon uchun (ko'p serverga ulashda Redis kerak). HTTPS — Render/proksi darajasida. `unsafe-inline` CSP (bitta fayllik HTML tufayli).
